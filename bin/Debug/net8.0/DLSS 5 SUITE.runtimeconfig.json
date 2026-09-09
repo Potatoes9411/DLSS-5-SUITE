@@ -1,0 +1,19 @@
+{
+  "runtimeOptions": {
+    "tfm": "net8.0",
+    "framework": {
+      "name": "Microsoft.NETCore.App",
+      "version": "8.0.0"
+    },
+    "configProperties": {
+      "Avalonia.Diagnostics.Diagnostic.IsEnabled": true,
+      "MVVMTOOLKIT_ENABLE_INOTIFYPROPERTYCHANGING_SUPPORT": true,
+      "System.Diagnostics.Metrics.Meter.IsSupported": true,
+      "System.GC.Concurrent": false,
+      "System.GC.Server": false,
+      "System.GC.RetainVM": false,
+      "System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization": false,
+      "System.Runtime.TieredPGO": true
+    }
+  }
+}
