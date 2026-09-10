@@ -1,148 +1,75 @@
-﻿<div align="center">
+<div align="center">
 
 # DLSS 5 SUITE
 
-**A smart manager and one-click mod installer for DLSS 5, ReShade, OptiScaler and Streamline.**
+**A modified edition of DLSS 5 MANAGER for Windows.**
 
-[![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge&logoColor=white)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
+[![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-[![Version](https://img.shields.io/badge/Version-1.2.0--suite.1-35d22b?style=flat-square)]()
-[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-24292e?style=flat-square)]()
-[![Framework](https://img.shields.io/badge/Framework-.NET%208%20|%20Avalonia%20UI-512bd4?style=flat-square)]()
-[![Language](https://img.shields.io/badge/Language-F%23-30b9db?style=flat-square)]()
+Version 1.2.1-suite.1 · Windows x64 · .NET 8 · Avalonia UI
 
 </div>
 
----
+## Project status and ownership
 
-## About this build
+DLSS 5 SUITE is a permitted modified version of **DLSS 5 MANAGER**, which was created by **NODIX TECH** and published by **Numidia Studios**. Potatoes9411 maintains this modified edition under the name Potatoes-dev.
 
-**DLSS 5 SUITE** is a modified version of **DLSS 5 MANAGER**, built by
-**NODIX TECH** and published by **Numidia Studios**. The original work — the
-scanner, the installer routes, the interface — is theirs.
+Public access to this repository does **not** transfer ownership of DLSS 5 MANAGER, DLSS 5 SUITE, their artwork, bundled components, or third-party technology. It also does not grant permission to rename, rebrand, resell, or republish the application as someone else's product.
 
-This build is by **Potatoes9411**, published by **Potatoes-dev**
-(<https://potatoes-dev.com>), and exists **with NODIX TECH's permission**.
+The permission granted for DLSS 5 SUITE is specific to this project and its maintainer. It is not a blanket license for anyone who discovers or downloads the repository. Refer to [NOTICE.txt](NOTICE.txt) and [Copyright.txt](Copyright.txt) before copying, modifying, or distributing any part of the project.
 
-### Get the original
+## Original application
 
-**DLSS 5 MANAGER — <https://numidiastudios.com/dlss-5-manager/>**
+The original and unchanged DLSS 5 MANAGER is available from its developer at:
 
-If you want the original rather than this modified build, that is where it
-comes from. The link is in the application too, under About.
+**https://numidiastudios.com/dlss-5-manager/**
 
-See [NOTICE.txt](NOTICE.txt) for the terms this build was permitted under, and
-[Copyright.txt](Copyright.txt) for the original author's own terms.
+DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace or claim ownership of the original application or its download location.
 
----
+## What this edition provides
 
-## What it does
+- Detection of installed games and their likely rendering APIs.
+- Supported DLSS, ReShade, RenoDX and OptiScaler installation routes.
+- Backup-aware installation and removal workflows.
+- Steam artwork and library handling improvements.
+- Batch installation with per-game compatibility routing.
+- A separately isolated ShaderGlass single-monitor compatibility route.
+- An optional Lossless Scaling readiness check for experimental external capture.
+- DLSS 5 SUITE themes, visual effects, installer and update channel.
 
-- Finds installed games across Steam, Epic, GOG and standalone folders, and
-  works out which executable in each install is actually the game.
-- Detects the graphics API each title renders with by reading the
-  executable's import tables and string data — not by guessing from the files
-  lying in its folder.
-- Installs and removes DLSS 5 through the route that suits the title:
-  OptiScaler (DirectX 12, Vulkan or neural upstream), ReShade + RenoDX on
-  DirectX 12 or 11, dgVoodoo on DirectX 9, or the AMD RDNA 4 payload.
-- Keeps backups of everything it replaces, so a removal puts the game back
-  exactly as it was.
+Compatibility varies by game, graphics hardware, anti-cheat system and game update. The project does not promise that every title will work, and it does not bypass anti-cheat protections.
 
----
+## Safety notice
 
-## Installing
+Only obtain releases from this repository or the original DLSS 5 MANAGER website. Do not use unofficial executables advertised as “MV 2.7” or named `eurotrucks2.exe`; supplied examples were detected as Trojans by numerous independent security products and are not part of DLSS 5 SUITE.
 
-Download the setup from the
-[releases page](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
-and run it. It offers a per-user or all-machine install, asks about shortcuts,
-startup and the taskbar, and can update over a running copy — it will offer to
-close the application for you.
+The ShaderGlass route verifies its base executable against the official ShaderGlass v1.3.0 SHA-256 before launching it. Third-party mod components retain their own ownership and licensing.
 
-Updates are checked against this repository's releases. A release must be
-tagged with the plain version number (`v1.2.1` or `1.2.1`) for the check to
-recognise it.
+## Installation
 
----
+Download the versioned setup executable from this repository's Releases page. Existing installers are retained as separate historical downloads and are never silently overwritten with a different build.
 
-## Storage
-
-Settings, the poster cache, install manifests and backups live in:
+Application data, cached artwork, settings, manifests and backups are stored under:
 
 ```text
 %LOCALAPPDATA%\DLSS5Manager\
 ```
 
-The folder name is deliberately unchanged from the original so an existing
-install keeps its settings and library after updating.
+The existing folder name is retained for compatibility with installations of the original application.
 
----
+## Source availability
 
-## Community feature — temporarily hidden
+The source is published for transparency, maintenance and permitted collaboration. Source availability should not be interpreted as public-domain status or as permission to redistribute proprietary payload files.
 
-Two controls are merged, compiled and working, but hidden in this build:
+Large mod and NVIDIA runtime payloads are intentionally excluded from the Git repository. Their absence from a source checkout does not indicate a broken release; authorized release installers package the required files separately.
 
-| Control | Where |
-|---|---|
-| **Community** tab | main tab strip (two places in `MainWindow.axaml`) |
-| **Share result** button | the game Manage sheet |
+## Credits and trademarks
 
-Both talk to NODIX TECH's Cloudflare Worker. The shared 1.2.0 source ships
-placeholders instead of the credentials (`CommunityApi.BaseUrl = "your-worker"`,
-`AppSecret = "lol i can not give this"`), so the share button only ever returned
-a 404. NODIX TECH is keeping the feature exclusive to DLSS 5 MANAGER for now -
-his servers are at capacity - and has said he will grant access to this build
-later.
+- DLSS 5 MANAGER: NODIX TECH / Numidia Studios
+- DLSS 5 SUITE modifications: Potatoes9411 / Potatoes-dev
+- ShaderGlass: Mausimus
+- RenoDX and ReShade components belong to their respective developers
 
-**To switch it back on**, once he does: set the three `IsVisible="False"` flags
-back to `True` and fill in `BaseUrl` and `AppSecret`. Nothing else is needed -
-`CommunityApi.fs`, `SystemSpecs.fs` and `CommunityViewModel.fs` are all present
-and compiling, and nothing contacts his server while the feature is hidden.
+NVIDIA, DLSS and the NVIDIA eye logo are trademarks of NVIDIA Corporation. DLSS 5 SUITE is not affiliated with, endorsed by, or sponsored by NVIDIA.
 
-## Building
-
-Requires the .NET 8 SDK.
-
-```bash
-# Both steps, with the setup named for the version it contains
-./build-setup.sh
-```
-
-`build-setup.sh` reads `<Version>` from the fsproj and writes
-`dist/DLSS 5 SUITE Setup v<version>.exe`. **Old setups are never deleted**, and
-it refuses to overwrite a setup that already exists for the current version -
-bump `<Version>` instead. A download link someone already has must keep serving
-the build it served before.
-
-The two steps by hand, if needed:
-
-```bash
-# The application
-dotnet publish "DLSS 5 SUITE.fsproj" -c Release -r win-x64 --self-contained true -o publish
-
-# The installer, with the application embedded in it
-dotnet publish ../Setup/DLSS5SuiteSetup.csproj -c Release -r win-x64 --self-contained true \
-  -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true \
-  -p:IncludeNativeLibrariesForSelfExtract=true \
-  -p:PayloadDir=<full path to the publish folder above>
-```
-
-Release builds run the output through Obfuscar. The bundled tool targets
-.NET 9, so on a machine without that runtime add `-p:SkipObfuscation=true` to
-build without it — shipping builds should be made with it on.
-
-### The mod payload
-
-The `mod files` folder is **not in the repository** and cannot be: one file in
-it, `dlss 5/nvngx_dlssnr.dll`, is 158 MB and GitHub rejects anything over 100
-MB. The folder is 362 MB in total.
-
-It ships inside the installer instead, so a release download has everything.
-A fresh clone does not, and the app will say *"The mod files folder is missing
-next to the application"* until you provide it — the build is fine, the payload
-simply is not there.
-
-To get it, copy the `mod files` folder out of an existing DLSS 5 MANAGER or
-DLSS 5 SUITE installation (or out of a release archive) and drop it beside
-`DLSS 5 SUITE.fsproj`. The project copies it into the build output from there,
-and the installer picks it up from the publish output.
+For the exact conditions governing this modified edition, read [NOTICE.txt](NOTICE.txt).
