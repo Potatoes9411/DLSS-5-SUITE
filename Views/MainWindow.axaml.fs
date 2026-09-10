@@ -1036,20 +1036,17 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.CheckShaderGlass()
         | _ -> ()
 
-    member this.OnDownloadShaderGlassClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm -> this.OpenExternal(vm.ShaderGlassDownloadUrl)
-        | _ -> ()
-
     member this.OnLaunchShaderGlassClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm ->
-            vm.CheckShaderGlass()
-            match vm.VerifiedShaderGlassPath with
-            | Some path ->
-                try Process.Start(ProcessStartInfo(path, UseShellExecute = true)) |> ignore
-                with _ -> ()
-            | None -> ()
+            async {
+                let! path = vm.SetupShaderGlass()
+                match path with
+                | Some executable ->
+                    try Process.Start(ProcessStartInfo(executable, UseShellExecute = true)) |> ignore
+                    with _ -> ()
+                | None -> ()
+            } |> Async.StartImmediate
         | _ -> ()
 
     member this.OnBackToGamesClicked(sender: obj, e: RoutedEventArgs) =

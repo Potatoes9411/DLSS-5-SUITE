@@ -6,7 +6,7 @@
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-Version 1.2.1-suite.1 · Windows x64 · .NET 8 · Avalonia UI
+Version 1.2.1-suite.2 · Windows x64 · .NET 8 · Avalonia UI
 
 </div>
 

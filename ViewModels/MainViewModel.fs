@@ -358,6 +358,8 @@ type MainViewModel() as this =
     let mutable losslessScalingStatus = "Check Steam libraries for an existing Lossless Scaling installation."
     let mutable shaderGlassStatus = "Check for the verified official ShaderGlass v1.3.0 build."
     let mutable verifiedShaderGlassPath: string option = None
+    let mutable isSettingUpShaderGlass = false
+    let mutable shaderGlassProgress = 0.0
     let mutable totalGamesCount = 0
 
     /// The community section. Built with the window so the tab can switch to it
@@ -1284,19 +1286,52 @@ type MainViewModel() as this =
     member _.CanCheckLosslessScaling = not isCheckingLosslessScaling
     member _.ShaderGlassStatus = shaderGlassStatus
     member _.CanLaunchShaderGlass = verifiedShaderGlassPath.IsSome
-    member _.ShaderGlassDownloadUrl = ShaderGlassDetector.OfficialDownloadUrl
+    member _.IsSettingUpShaderGlass = isSettingUpShaderGlass
+    member _.ShaderGlassProgress = shaderGlassProgress
 
     member this.CheckShaderGlass() =
         let result = ShaderGlassDetector.discover ()
         verifiedShaderGlassPath <-
             match result with
-            | ShaderGlassDetector.Verified path -> Some path
+            | ShaderGlassDetector.Ready path
+            | ShaderGlassDetector.NeedsUpdate path -> Some path
             | _ -> None
         shaderGlassStatus <- ShaderGlassDetector.describe result
         this.RaisePropertyChanged("ShaderGlassStatus")
         this.RaisePropertyChanged("CanLaunchShaderGlass")
 
     member _.VerifiedShaderGlassPath = verifiedShaderGlassPath
+
+    member this.SetupShaderGlass() = async {
+        if not isSettingUpShaderGlass then
+            isSettingUpShaderGlass <- true
+            shaderGlassProgress <- 0.0
+            this.RaisePropertyChanged("IsSettingUpShaderGlass")
+            this.RaisePropertyChanged("ShaderGlassProgress")
+            let! result = async {
+                try
+                    let report text value =
+                        Dispatcher.UIThread.Post(fun () ->
+                            shaderGlassStatus <- text
+                            shaderGlassProgress <- value
+                            this.RaisePropertyChanged("ShaderGlassStatus")
+                            this.RaisePropertyChanged("ShaderGlassProgress"))
+                    let! path = ShaderGlassDetector.setupLatest report |> Async.AwaitTask
+                    verifiedShaderGlassPath <- Some path
+                    return Some path
+                with ex ->
+                    shaderGlassStatus <- "Setup stopped safely: " + ex.Message
+                    this.RaisePropertyChanged("ShaderGlassStatus")
+                    return None
+            }
+            try return result
+            finally
+                isSettingUpShaderGlass <- false
+                this.RaisePropertyChanged("IsSettingUpShaderGlass")
+                this.RaisePropertyChanged("CanLaunchShaderGlass")
+        else
+            return None
+    }
 
     member this.CheckLosslessScaling() =
         if not isCheckingLosslessScaling then
