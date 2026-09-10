@@ -1016,6 +1016,9 @@
                                                 <TextBlock Text="{Binding UpdateStatusText}" IsVisible="{Binding HasUpdateStatus}"
                                                            FontSize="11.5" FontWeight="SemiBold" Foreground="{Binding UpdateStatusBrush}"
                                                            TextWrapping="Wrap" MaxWidth="330" HorizontalAlignment="Left" />
+                                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding UpdateDownloadProgress}"
+                                                             Height="5" MaxWidth="330" HorizontalAlignment="Stretch"
+                                                             IsVisible="{Binding IsCheckingUpdates}" />
                                             </StackPanel>
 
                                             <Button Grid.Column="2" Classes="EmptyActionBtn" Click="OnCheckUpdatesClicked" Cursor="Hand"

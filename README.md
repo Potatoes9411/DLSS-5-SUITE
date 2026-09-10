@@ -6,7 +6,7 @@
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-Version 1.2.1-suite.2 · Windows x64 · .NET 8 · Avalonia UI
+Version 1.2.1-suite.4 · Windows x64 · .NET 8 · Avalonia UI
 
 </div>
 
@@ -33,9 +33,10 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - Backup-aware installation and removal workflows.
 - Steam artwork and library handling improvements.
 - Batch installation with per-game compatibility routing.
-- A separately isolated ShaderGlass single-monitor compatibility route.
+- A separately isolated ShaderGlass compatibility route for games such as Roblox and Minecraft.
 - An optional Lossless Scaling readiness check for experimental external capture.
-- DLSS 5 SUITE themes, visual effects, installer and update channel.
+- Automatic, browser-free application and compatibility-component updates with visible progress.
+- DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
 
 Compatibility varies by game, graphics hardware, anti-cheat system and game update. The project does not promise that every title will work, and it does not bypass anti-cheat protections.
 
@@ -43,11 +44,31 @@ Compatibility varies by game, graphics hardware, anti-cheat system and game upda
 
 Only obtain releases from this repository or the original DLSS 5 MANAGER website. Do not use unofficial executables advertised as “MV 2.7” or named `eurotrucks2.exe`; supplied examples were detected as Trojans by numerous independent security products and are not part of DLSS 5 SUITE.
 
-The ShaderGlass route verifies its base executable against the official ShaderGlass v1.3.0 SHA-256 before launching it. Third-party mod components retain their own ownership and licensing.
+The ShaderGlass route only uses allowlisted official upstream projects. Release names and versions are checked, downloaded assets are SHA-256 verified, archives are extracted with path-traversal protection, and setup stops safely if verification fails. The unsafe MV 2.7 method is never downloaded or used. Third-party mod components retain their own ownership and licensing.
 
 ## Installation
 
-Download the versioned setup executable from this repository's Releases page. Existing installers are retained as separate historical downloads and are never silently overwritten with a different build.
+Choose one of three versioned packages from this repository's Releases page:
+
+- **Full Setup** — contains the application payload and can install offline.
+- **Web Setup** — a smaller installer that downloads and verifies the Portable ZIP for the same release.
+- **Portable ZIP** — extract and run without installing.
+
+Existing installers are retained as separate historical downloads and are never silently overwritten with a different build.
+
+## Updates
+
+DLSS 5 SUITE checks this repository's stable GitHub releases. When an update is available, the app downloads the exactly matching Full Setup directly, displays progress, verifies GitHub's published SHA-256 digest, and starts Setup without opening a browser. A missing or mismatched release asset is rejected.
+
+The ShaderGlass route independently checks the allowlisted official ShaderGlass and DLSS5-Feeder release sources when **Set up/update & launch ShaderGlass** is selected. This keeps the optional compatibility files current without bundling unverified YouTube packages or asking the user to assemble files manually.
+
+For a valid release, use a version tag such as `v1.2.1-suite.4` and attach files with matching versioned names:
+
+```text
+DLSS 5 SUITE Setup v1.2.1-suite.4.exe
+DLSS 5 SUITE Web Setup v1.2.1-suite.4.exe
+DLSS 5 SUITE Portable v1.2.1-suite.4.zip
+```
 
 Application data, cached artwork, settings, manifests and backups are stored under:
 

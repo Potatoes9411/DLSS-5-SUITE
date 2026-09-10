@@ -470,6 +470,7 @@ type MainViewModel() as this =
     // ---- Update check state ---------------------------------------------
     let mutable isCheckingUpdates = false
     let mutable updateStatusText = ""
+    let mutable updateDownloadProgress = 0.0
     let mutable hasUpdateAvailable = false
     let mutable latestVersionFound = ""
 
@@ -2802,6 +2803,10 @@ type MainViewModel() as this =
 
     member this.CanCheckUpdates = not isCheckingUpdates
 
+    member this.UpdateDownloadProgress
+        with get () = updateDownloadProgress
+        and set value = this.SetProperty(&updateDownloadProgress, value) |> ignore
+
     member this.UpdateStatusText
         with get () = updateStatusText
         and set value =
@@ -2824,7 +2829,8 @@ type MainViewModel() as this =
         else "UPDATE v" + latestVersionFound
 
     member this.UpdateButtonText =
-        if isCheckingUpdates then "CHECKING..."
+        if isCheckingUpdates && updateDownloadProgress > 0.0 then "DOWNLOADING..."
+        elif isCheckingUpdates then "CHECKING..."
         elif hasUpdateAvailable then "DOWNLOAD UPDATE"
         else "CHECK FOR UPDATES"
 
@@ -2847,6 +2853,36 @@ type MainViewModel() as this =
                     this.UpdateStatusText <- result.Message)
             }
             |> Async.Start
+
+    member this.DownloadUpdate() : Async<string option> = async {
+        if isCheckingUpdates then return None
+        else
+            this.IsCheckingUpdates <- true
+            this.UpdateDownloadProgress <- 0.0
+            this.UpdateStatusText <- "Preparing the verified update..."
+            let! result =
+                async {
+                    try
+                        let report message fraction =
+                            Dispatcher.UIThread.Post(fun () ->
+                                this.UpdateStatusText <- message
+                                this.UpdateDownloadProgress <- Math.Clamp(fraction * 100.0, 0.0, 100.0)
+                                this.RaisePropertyChanged("UpdateButtonText"))
+                        let! path = UpdateChecker.downloadLatestSetup report
+                        return Ok path
+                    with ex -> return Error ex.Message
+                }
+            this.IsCheckingUpdates <- false
+            match result with
+            | Ok path ->
+                this.UpdateDownloadProgress <- 100.0
+                this.UpdateStatusText <- "Update verified. Starting setup..."
+                return Some path
+            | Error message ->
+                this.UpdateDownloadProgress <- 0.0
+                this.UpdateStatusText <- "Update failed safely: " + message
+                return None
+    }
 
     /// Runs once on every launch, quietly. Only a confirmed newer build says
     /// anything - a failed check must never greet the user with an error.

@@ -1570,23 +1570,29 @@ type MainWindow() as this =
             if not (String.IsNullOrWhiteSpace(vm.GuidesUrl)) then this.OpenExternal(vm.GuidesUrl)
         | _ -> ()
 
-    /// The header pill only exists while an update is waiting, so it always
-    /// goes straight to the download page.
+    member private this.DownloadAndLaunchUpdate(vm: MainViewModel) =
+        async {
+            let! setupPath = vm.DownloadUpdate()
+            match setupPath with
+            | Some path ->
+                try Process.Start(ProcessStartInfo(path, UseShellExecute = true)) |> ignore
+                with ex -> vm.UpdateStatusText <- "The verified setup could not start: " + ex.Message
+            | None -> ()
+        }
+        |> Async.StartImmediate
+
     member this.OnUpdateBadgeClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
-        | :? MainViewModel as vm -> this.OpenExternal(vm.DownloadPageUrl)
+        | :? MainViewModel as vm -> this.DownloadAndLaunchUpdate(vm)
         | _ -> ()
 
-    /// First press checks GitHub; once an update is known it opens the
-    /// official download page instead.
+    /// First press checks GitHub; once an update is known it securely
+    /// downloads, verifies, and launches the setup without opening a browser.
     member this.OnCheckUpdatesClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm ->
             if vm.HasUpdateAvailable then
-                try
-                    Process.Start(ProcessStartInfo(vm.DownloadPageUrl, UseShellExecute = true)) |> ignore
-                with _ ->
-                    ()
+                this.DownloadAndLaunchUpdate(vm)
             else
                 vm.CheckForUpdates()
         | _ -> ()

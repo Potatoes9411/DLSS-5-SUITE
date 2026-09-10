@@ -4,13 +4,15 @@ open System
 open System.Net.Http
 open System.Text.Json
 open System.Text.RegularExpressions
+open System.IO
+open System.Security.Cryptography
 
 /// Compares the running build against the published GitHub releases and points
 /// the user at the official download page when a newer version exists.
 module UpdateChecker =
 
     [<Literal>]
-    let CurrentVersion = "1.2.0-suite.1"
+    let CurrentVersion = "1.2.1-suite.4"
 
     // =====================================================================
     // WHERE UPDATES COME FROM
@@ -67,7 +69,7 @@ module UpdateChecker =
 
     let private client =
         let c = new HttpClient()
-        c.Timeout <- TimeSpan.FromSeconds(12.0)
+        c.Timeout <- TimeSpan.FromMinutes(30.0)
         c.DefaultRequestHeaders.UserAgent.ParseAdd("DLSS5Manager-Updater/1.0")
         c.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json")
         c
@@ -164,3 +166,55 @@ module UpdateChecker =
                       LatestVersion = CurrentVersion
                       Message = "Could not reach the update server. " + ex.Message }
         }
+
+    /// Downloads the full setup from the latest trusted GitHub release and
+    /// verifies the release asset's GitHub-published SHA-256 digest.
+    let downloadLatestSetup (progress: string -> float -> unit) : Async<string> = async {
+        // GitHub's release API supplies the authoritative asset and digest.
+        use! metadataResponse = client.GetAsync(sprintf "https://api.github.com/repos/%s/%s/releases/latest" RepoOwner RepoName) |> Async.AwaitTask
+        metadataResponse.EnsureSuccessStatusCode() |> ignore
+        let! json = metadataResponse.Content.ReadAsStringAsync() |> Async.AwaitTask
+        use document = JsonDocument.Parse(json)
+        let tag = document.RootElement.GetProperty("tag_name").GetString().TrimStart('v', 'V')
+        let expectedName = sprintf "DLSS 5 SUITE Setup v%s.exe" tag
+        let asset =
+            document.RootElement.GetProperty("assets").EnumerateArray()
+            |> Seq.tryFind (fun item ->
+                let name = item.GetProperty("name").GetString()
+                String.Equals(name, expectedName, StringComparison.OrdinalIgnoreCase))
+            |> Option.defaultWith (fun () -> failwith "The latest release has no full setup asset.")
+        let name = asset.GetProperty("name").GetString()
+        let url = asset.GetProperty("browser_download_url").GetString()
+        let uri = Uri(url)
+        if uri.Scheme <> Uri.UriSchemeHttps || uri.Host <> "github.com" then
+            failwith "GitHub returned an untrusted setup download address."
+        let digest =
+            match asset.TryGetProperty("digest") with
+            | true, value when not (String.IsNullOrWhiteSpace(value.GetString())) -> value.GetString().Replace("sha256:", "").ToUpperInvariant()
+            | _ -> failwith "GitHub did not publish a SHA-256 digest for the setup."
+        if digest.Length <> 64 then failwith "The setup has an invalid SHA-256 digest."
+        let destination = Path.Combine(Path.GetTempPath(), name)
+        use! downloadResponse = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead) |> Async.AwaitTask
+        downloadResponse.EnsureSuccessStatusCode() |> ignore
+        let total = downloadResponse.Content.Headers.ContentLength |> Option.ofNullable |> Option.defaultValue 0L
+        use! input = downloadResponse.Content.ReadAsStreamAsync() |> Async.AwaitTask
+        use output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None)
+        let buffer = Array.zeroCreate<byte> (128 * 1024)
+        let mutable doneBytes = 0L
+        let mutable reading = true
+        while reading do
+            let! count = input.ReadAsync(buffer, 0, buffer.Length) |> Async.AwaitTask
+            if count = 0 then reading <- false
+            else
+                do! output.WriteAsync(buffer, 0, count) |> Async.AwaitTask
+                doneBytes <- doneBytes + int64 count
+                progress (sprintf "Downloading %s" name) (if total > 0 then float doneBytes / float total else 0.0)
+        output.Flush(true)
+        use verify = File.OpenRead(destination)
+        use sha = SHA256.Create()
+        let actual = sha.ComputeHash(verify) |> Convert.ToHexString
+        if not (String.Equals(actual, digest, StringComparison.OrdinalIgnoreCase)) then
+            File.Delete(destination)
+            failwith "The downloaded setup failed SHA-256 verification."
+        return destination
+    }
