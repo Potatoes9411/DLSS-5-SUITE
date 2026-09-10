@@ -289,6 +289,10 @@ module ModInstaller =
     /// cleanly, so it stays in `exclusiveArtifacts` below.
     let renodxAddonLegacyName = "renodx-dlss5.addon64"
 
+    /// Alternate filename retained only so older/experimental Suite installs
+    /// can still be removed cleanly. New installs use renodx-dlss5.addon64.
+    let renodxAddonLegacyName = "renodx-dlss.addon64"
+
     /// Ships next to the RenoDX add-on and must always travel with it.
     let feedAddonName = "dlss5-feed.addon64"
 

@@ -1031,6 +1031,27 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.CheckLosslessScaling()
         | _ -> ()
 
+    member this.OnCheckShaderGlassClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.CheckShaderGlass()
+        | _ -> ()
+
+    member this.OnDownloadShaderGlassClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> this.OpenExternal(vm.ShaderGlassDownloadUrl)
+        | _ -> ()
+
+    member this.OnLaunchShaderGlassClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm ->
+            vm.CheckShaderGlass()
+            match vm.VerifiedShaderGlassPath with
+            | Some path ->
+                try Process.Start(ProcessStartInfo(path, UseShellExecute = true)) |> ignore
+                with _ -> ()
+            | None -> ()
+        | _ -> ()
+
     member this.OnBackToGamesClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> vm.CloseSettings()

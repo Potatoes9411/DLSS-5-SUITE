@@ -356,6 +356,8 @@ type MainViewModel() as this =
     let mutable isSettingsOpen = false
     let mutable isCheckingLosslessScaling = false
     let mutable losslessScalingStatus = "Check Steam libraries for an existing Lossless Scaling installation."
+    let mutable shaderGlassStatus = "Check for the verified official ShaderGlass v1.3.0 build."
+    let mutable verifiedShaderGlassPath: string option = None
     let mutable totalGamesCount = 0
 
     /// The community section. Built with the window so the tab can switch to it
@@ -1280,6 +1282,21 @@ type MainViewModel() as this =
     member this.OpenSettings() = this.ActiveSection <- "settings"
     member _.LosslessScalingStatus = losslessScalingStatus
     member _.CanCheckLosslessScaling = not isCheckingLosslessScaling
+    member _.ShaderGlassStatus = shaderGlassStatus
+    member _.CanLaunchShaderGlass = verifiedShaderGlassPath.IsSome
+    member _.ShaderGlassDownloadUrl = ShaderGlassDetector.OfficialDownloadUrl
+
+    member this.CheckShaderGlass() =
+        let result = ShaderGlassDetector.discover ()
+        verifiedShaderGlassPath <-
+            match result with
+            | ShaderGlassDetector.Verified path -> Some path
+            | _ -> None
+        shaderGlassStatus <- ShaderGlassDetector.describe result
+        this.RaisePropertyChanged("ShaderGlassStatus")
+        this.RaisePropertyChanged("CanLaunchShaderGlass")
+
+    member _.VerifiedShaderGlassPath = verifiedShaderGlassPath
 
     member this.CheckLosslessScaling() =
         if not isCheckingLosslessScaling then

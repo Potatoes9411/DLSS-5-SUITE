@@ -14,10 +14,10 @@
     <Authors>Potatoes9411</Authors>
     <Description>DLSS 5 SUITE — a modified version of DLSS 5 MANAGER (built by NODIX TECH, published by Numidia Studios). Built by Potatoes9411, published by Potatoes-dev.</Description>
     <Copyright>© 2026 Potatoes-dev. Based on DLSS 5 MANAGER, © 2026 Numidia Studios. All rights reserved.</Copyright>
-    <Version>1.2.0-suite.1</Version>
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.2.0.0</FileVersion>
-    <InformationalVersion>1.2.0</InformationalVersion>
+    <Version>1.2.1-suite.1</Version>
+    <AssemblyVersion>1.2.1.1</AssemblyVersion>
+    <FileVersion>1.2.1.1</FileVersion>
+    <InformationalVersion>1.2.1-suite.1</InformationalVersion>
 
     <!-- ================================================================= -->
     <!-- RUNTIME FOOTPRINT                                                  -->
@@ -52,6 +52,7 @@
     <Compile Include="Services\IconExtractor.fs" />
     <Compile Include="Services\GameScanner.fs" />
     <Compile Include="Services\LosslessScalingDetector.fs" />
+    <Compile Include="Services\ShaderGlassDetector.fs" />
     <Compile Include="Services\EmulatorCatalog.fs" />
     <Compile Include="Services\ModInstaller.fs" />
     <Compile Include="Services\AnalysisStore.fs" />
