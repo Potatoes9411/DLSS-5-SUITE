@@ -14,7 +14,7 @@
     <Authors>Potatoes9411</Authors>
     <Description>DLSS 5 SUITE — a modified version of DLSS 5 MANAGER (built by NODIX TECH, published by Numidia Studios). Built by Potatoes9411, published by Potatoes-dev.</Description>
     <Copyright>© 2026 Potatoes-dev. Based on DLSS 5 MANAGER, © 2026 Numidia Studios. All rights reserved.</Copyright>
-    <Version>1.2.0</Version>
+    <Version>1.2.0-suite.1</Version>
     <AssemblyVersion>1.2.0.0</AssemblyVersion>
     <FileVersion>1.2.0.0</FileVersion>
     <InformationalVersion>1.2.0</InformationalVersion>
@@ -51,12 +51,16 @@
     <Compile Include="Services\GameAnalyzer.fs" />
     <Compile Include="Services\IconExtractor.fs" />
     <Compile Include="Services\GameScanner.fs" />
+    <Compile Include="Services\LosslessScalingDetector.fs" />
     <Compile Include="Services\EmulatorCatalog.fs" />
     <Compile Include="Services\ModInstaller.fs" />
     <Compile Include="Services\AnalysisStore.fs" />
     <Compile Include="Services\UpdateChecker.fs" />
+    <Compile Include="Services\SystemSpecs.fs" />
+    <Compile Include="Services\CommunityApi.fs" />
     <Compile Include="ViewModels\ViewModelBase.fs" />
     <Compile Include="ViewModels\GameCardViewModel.fs" />
+    <Compile Include="ViewModels\CommunityViewModel.fs" />
     <Compile Include="ViewModels\MainViewModel.fs" />
     <Compile Include="Views\MainWindow.axaml.fs" />
     <Compile Include="ViewLocator.fs" />
@@ -68,6 +72,10 @@
     <PackageReference Include="Avalonia" Version="12.1.0" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.0" />
+    <!-- ItemsRepeater left the core package in Avalonia 11. The games grid
+         needs it: it is the only container that virtualises a wrapping
+         layout, and without it every game in the library stays realised. -->
+    <PackageReference Include="Avalonia.Controls.ItemsRepeater" Version="12.0.0" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.0" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>

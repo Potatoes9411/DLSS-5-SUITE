@@ -1,4 +1,4 @@
-namespace DLSS_5_MANAGER.Services
+﻿namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -45,6 +45,55 @@ module GameScanner =
                 else
                     ""
         with _ -> ""
+
+    /// Pixel size of an image, or (0, 0) if it is not one.
+    let private imageSize (filePath: string) : int * int =
+        try
+            if String.IsNullOrWhiteSpace(filePath) || not (File.Exists(filePath)) then (0, 0)
+            else
+                use img = System.Drawing.Image.FromFile(filePath)
+                (img.Width, img.Height)
+        with _ -> (0, 0)
+
+    /// The cover art Steam has already downloaded for a game the user owns.
+    ///
+    /// This is the first place to look and it used to find nothing, because
+    /// the search was for "*600x900*.jpg" and Steam changed its layout. The
+    /// old client wrote "<appid>_library_600x900.jpg" straight into
+    /// librarycache; the current one writes
+    ///
+    ///     appcache\librarycache\<appid>\<sha1>\library_capsule.jpg
+    ///
+    /// with hashed folder names, so the glob matched nothing and every game
+    /// fell through to the network - and for a title too new to have art on
+    /// the CDN, on to a store search that returned somebody else's cover.
+    ///
+    /// So nothing is matched by name. Every image under the app's folder is
+    /// measured, the portrait ones are kept, and the largest wins: that is
+    /// library_capsule on a current client and the 600x900 on an old one,
+    /// without having to know which client wrote it.
+    let private localSteamArtwork (steamPath: string) (appId: string) : string =
+        try
+            let dir = Path.Combine(steamPath, "appcache", "librarycache", appId)
+
+            if not (Directory.Exists(dir)) then
+                ""
+            else
+                Directory.GetFiles(dir, "*.*", SearchOption.AllDirectories)
+                |> Array.filter (fun f ->
+                    let ext = Path.GetExtension(f).ToLowerInvariant()
+                    ext = ".jpg" || ext = ".jpeg" || ext = ".png")
+                |> Array.choose (fun f ->
+                    let (w, h) = imageSize f
+                    // Portrait, and big enough to be a cover rather than an
+                    // icon - the 32x32 favicon lives in the same folder.
+                    if h > w && w >= 150 then Some(f, w * h) else None)
+                |> Array.sortByDescending snd
+                |> Array.tryHead
+                |> Option.map fst
+                |> Option.defaultValue ""
+        with _ ->
+            ""
 
     let private isVerticalPoster (filePath: string) : bool =
         try
@@ -226,7 +275,7 @@ module GameScanner =
                             // the store.
                             let matchesThisGame (itemName: string) =
                                 not (String.IsNullOrWhiteSpace(itemName))
-                                && GameAnalyzer.titleSimilarity itemName gameTitle >= 0.6
+                                && GameAnalyzer.titleMatchesForArtwork itemName gameTitle
 
                             // Pass 1: Try base games only (filter out DLCs/Packs/Soundtracks)
                             for i in 0 .. (min 10 (count - 1)) do
@@ -332,15 +381,12 @@ module GameScanner =
     let private resolveArtwork (steamPath: string) (appIdOpt: string option) (gameTitle: string) (exePath: string) : string =
         let mutable found = ""
 
-        // 1. Check local Steam appcache for STRICTLY 600x900 vertical posters
+        // 1. Whatever Steam has already put on this machine for a game the
+        //    user owns. Always right, always present, and needs no network -
+        //    everything below is a fallback for when this finds nothing.
         match appIdOpt with
         | Some appId when not (String.IsNullOrWhiteSpace(steamPath)) && not (String.IsNullOrWhiteSpace(appId)) ->
-            let appCacheDir = Path.Combine(steamPath, "appcache", "librarycache", appId)
-            if Directory.Exists(appCacheDir) then
-                let candidateFiles = Directory.GetFiles(appCacheDir, "*600x900*.jpg", SearchOption.AllDirectories)
-                for f in candidateFiles do
-                    if String.IsNullOrWhiteSpace(found) && isVerticalPoster f then
-                        found <- f
+            found <- localSteamArtwork steamPath appId
         | _ -> ()
 
         // 2. Fetch official 600x900 vertical poster from Steam CDN if AppId is known
@@ -955,7 +1001,22 @@ module GameScanner =
         /// a settings file written before the overlay had a picker, which
         /// reads back as the default.
         OverlayHotkey: string
+        /// How the library is ordered. One of GameScanner.sortModes; empty on
+        /// a settings file written before sorting existed, which reads back as
+        /// the first entry.
+        SortMode: string
     }
+
+    /// The orders the library can be shown in, in the order they appear in the
+    /// picker. Stored by name rather than by index so inserting one later does
+    /// not silently change what an existing settings file means.
+    let sortModes =
+        [| "Name (A-Z)"
+           "Name (Z-A)"
+           "Recently installed"
+           "Oldest installed"
+           "Newest release"
+           "Oldest release" |]
 
     let private getSettingsFilePath () =
         let localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
@@ -973,7 +1034,8 @@ module GameScanner =
           PerformanceMode = false
           OverlayDisabled = false
           OverlayTheme = "Neon Emerald"
-          OverlayHotkey = "Shift+O" }
+          OverlayHotkey = "Shift+O"
+          SortMode = sortModes.[0] }
 
     let loadSettings () : AppSettings =
         try

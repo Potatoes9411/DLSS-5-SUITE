@@ -38,6 +38,19 @@ module AnalysisStore =
           /// its string data - a few hundred milliseconds a game, which is
           /// fine once during the scan and unacceptable per repaint.
           GraphicsApi: string
+          /// When this game was actually put on the machine, taken from the
+          /// install folder's creation time.
+          ///
+          /// Not the Steam manifest's LastUpdated, which is what the library
+          /// sorted on first and which moves every time a game patches - so a
+          /// title installed two years ago and updated last night sorted as
+          /// the newest thing you own. The folder's creation time only
+          /// changes when the game is actually installed.
+          InstalledAtUtc: string
+          /// The game's release date, from the Steam store. Empty when it is
+          /// not a Steam title or the lookup failed; sorted last in that case
+          /// rather than treated as ancient.
+          ReleaseDateUtc: string
           AnalyzedAtUtc: string }
 
     let private storeLock = obj ()
@@ -49,11 +62,12 @@ module AnalysisStore =
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Manager")
 
         Directory.CreateDirectory(dir) |> ignore
+        // v4: the record gained InstalledAtUtc and ReleaseDateUtc.
         // v3: the record gained GraphicsApi. An entry written by an older
         // build has no value for it, and a card cannot show an API that was
         // never worked out - so the file name carries the shape, and a new
         // build re-analyses instead of reading a record it cannot trust.
-        Path.Combine(dir, "analysis_cache_v3.json")
+        Path.Combine(dir, "analysis_cache_v4.json")
 
     let key (game: GameItem) =
         if String.IsNullOrWhiteSpace(game.AppId) then game.Title else game.AppId
@@ -137,6 +151,90 @@ module AnalysisStore =
 
     /// Full deep scan of a single game. This is the expensive part, so it only
     /// runs on first discovery, on an explicit re-scan, or after an install.
+     // =====================================================================
+    // WHEN IT ARRIVED, AND WHEN IT CAME OUT
+    // =====================================================================
+    /// When the game was installed, from the folder's creation time.
+    let private installedAt (game: GameItem) : string =
+        try
+            if String.IsNullOrWhiteSpace(game.InstallDirectory)
+               || not (Directory.Exists(game.InstallDirectory)) then
+                ""
+            else
+                Directory.GetCreationTimeUtc(game.InstallDirectory).ToString("o")
+        with _ ->
+            ""
+
+    /// Release date, from the Steam store, for titles that have an AppId.
+    ///
+    /// The date is nowhere on disk - the manifest carries when the game was
+    /// installed and patched, and nothing about when it came out - so this is
+    /// the one thing here that needs the network. It runs once per game and is
+    /// then held in this cache, so a rescan never asks again.
+    let private releaseDate (client: Net.Http.HttpClient) (game: GameItem) : string =
+        // GameItem.AppId is namespaced by launcher - "steam_211670", "epic_...",
+        // "gog_...", "repack_..." - because the library holds titles from all of
+        // them under one id. The store only knows the number, and only for its
+        // own games, so anything else has no release date to look up.
+        let steamId =
+            if not (isNull (box game.AppId))
+               && game.AppId.StartsWith("steam_", StringComparison.OrdinalIgnoreCase) then
+                game.AppId.Substring(6)
+            else
+                ""
+
+        if String.IsNullOrWhiteSpace(steamId) then
+            ""
+        else
+            try
+                let url =
+                    sprintf
+                        // filters=release_date, not "basic". The basic filter
+                        // returns the name and little else - release_date is not
+                        // in it, so the lookup came back empty for every game.
+                        "https://store.steampowered.com/api/appdetails?appids=%s&filters=release_date&l=english"
+                        steamId
+
+                let json = client.GetStringAsync(url).GetAwaiter().GetResult()
+
+                use doc = Text.Json.JsonDocument.Parse(json)
+
+                match doc.RootElement.TryGetProperty(steamId) with
+                | true, entry ->
+                    match entry.TryGetProperty("data") with
+                    | true, data ->
+                        match data.TryGetProperty("release_date") with
+                        | true, rd ->
+                            match rd.TryGetProperty("date") with
+                            | true, d when d.ValueKind = Text.Json.JsonValueKind.String ->
+                                // Steam writes "8 Sep, 2026", "Sep 2026", or
+                                // "Coming soon". Only a full date is useful, and
+                                // anything else is left empty so it sorts last
+                                // rather than landing on the first of a month it
+                                // was never released in.
+                                match DateTime.TryParse(
+                                        d.GetString(),
+                                        Globalization.CultureInfo.InvariantCulture,
+                                        Globalization.DateTimeStyles.AssumeUniversal
+                                        ||| Globalization.DateTimeStyles.AdjustToUniversal) with
+                                | true, parsed -> parsed.ToString("o")
+                                | _ -> ""
+                            | _ -> ""
+                        | _ -> ""
+                    | _ -> ""
+                | _ -> ""
+            with _ ->
+                ""
+
+    /// One client for the whole run, with a short leash: a release date is a
+    /// nicety and must never hold up a scan.
+    let private storeClient =
+        lazy
+            (let c = new Net.Http.HttpClient()
+             c.Timeout <- TimeSpan.FromSeconds(4.0)
+             c.DefaultRequestHeaders.UserAgent.ParseAdd("DLSS5Suite/1.2 (+https://potatoes-dev.com)")
+             c)
+
     let analyze (game: GameItem) : GameAnalysis =
         let exePath =
             if not (String.IsNullOrWhiteSpace(game.TargetExecutablePath))
@@ -180,6 +278,8 @@ module AnalysisStore =
           Dlss5Missing = dlss5.Missing
           ModInstalled = dlss5.ManagedByApp
           GraphicsApi = GameAnalyzer.detectGraphicsApi exePath
+          InstalledAtUtc = installedAt game
+          ReleaseDateUtc = releaseDate (storeClient.Force()) game
           AnalyzedAtUtc = DateTime.UtcNow.ToString("o") }
 
     /// Manual add: the user already pointed at the executable, so there is
@@ -217,6 +317,8 @@ module AnalysisStore =
           Dlss5Missing = dlss5.Missing
           ModInstalled = dlss5.ManagedByApp
           GraphicsApi = GameAnalyzer.detectGraphicsApi exePath
+          InstalledAtUtc = installedAt game
+          ReleaseDateUtc = releaseDate (storeClient.Force()) game
           AnalyzedAtUtc = DateTime.UtcNow.ToString("o") }
 
     /// Analyze and persist a single game.

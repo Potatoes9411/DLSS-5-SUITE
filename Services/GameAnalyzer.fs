@@ -1,4 +1,4 @@
-namespace DLSS_5_MANAGER.Services
+﻿namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -115,6 +115,72 @@ module GameAnalyzer =
     /// that the something is actually this game it will happily hand back the
     /// artwork for a different one.
     let titleSimilarity (a: string) (b: string) : float = similarity a b
+
+    /// Roman numerals a game title plausibly uses, folded to digits so that
+    /// "Final Fantasy VII" and "Final Fantasy 7" agree on their number.
+    let private romanValues =
+        dict [ "i", "1"; "ii", "2"; "iii", "3"; "iv", "4"; "v", "5"
+               "vi", "6"; "vii", "7"; "viii", "8"; "ix", "9"; "x", "10"
+               "xi", "11"; "xii", "12"; "xiii", "13"; "xiv", "14"; "xv", "15" ]
+
+    let private ordinalOf (token: string) =
+        if token |> Seq.forall Char.IsDigit then Some(token.TrimStart('0'))
+        else
+            match romanValues.TryGetValue(token) with
+            | true, v -> Some v
+            | _ -> None
+
+    /// Strict enough to hang artwork on.
+    ///
+    /// `similarity` above is deliberately forgiving because the executable
+    /// resolver would rather guess than give up. Artwork is the opposite: a
+    /// near miss puts one game's cover on another game's card, which is worse
+    /// than showing no cover at all. Two rules do the work that a coverage
+    /// score cannot:
+    ///
+    ///   1. Coverage is measured against the LARGER token set. Dividing by the
+    ///      smaller one lets a short store title that happens to be a subset
+    ///      of the installed name score high - that is how "Assassin's Creed
+    ///      Odyssey" attached itself to "Assassin's Creed Black Flag".
+    ///   2. Any numbers in the two titles must agree exactly. Sequels differ
+    ///      by a single token that a percentage will always drown out, so
+    ///      "Jackbox Party Pack 11" must never accept Pack 7's cover.
+    let titleMatchesForArtwork (candidate: string) (gameTitle: string) : bool =
+        let na = normalize candidate
+        let nb = normalize gameTitle
+
+        if na = "" || nb = "" then false
+        elif na = nb then true
+        else
+            let ta = tokenize candidate
+            let tb = tokenize gameTitle
+
+            if ta.Length = 0 || tb.Length = 0 then
+                false
+            else
+                let ordinals (tokens: string[]) =
+                    HashSet<string>(tokens |> Array.choose ordinalOf, StringComparer.Ordinal)
+
+                let oa = ordinals ta
+                let ob = ordinals tb
+
+                if not (oa.SetEquals(ob)) then
+                    false
+                else
+                    // Fold numerals to a single spelling first, so that the
+                    // "VII" in one title and the "7" in the other count as the
+                    // same token rather than as two misses.
+                    let canonical (tokens: string[]) =
+                        HashSet<string>(
+                            tokens |> Array.map (fun t -> defaultArg (ordinalOf t) t),
+                            StringComparer.OrdinalIgnoreCase
+                        )
+
+                    let sa = canonical ta
+                    let sb = canonical tb
+                    let intersection = sa |> Seq.filter sb.Contains |> Seq.length
+                    let larger = max sa.Count sb.Count
+                    float intersection / float larger >= 0.75
 
     // =====================================================================
     // EXCLUSION RULES

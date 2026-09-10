@@ -249,3 +249,96 @@ C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\obj\Release\net8.0\win-
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\obj\Release\net8.0\win-x64\DLSS 5 SUITE.genruntimeconfig.cache
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\obj\Release\net8.0\win-x64\ref\DLSS 5 SUITE.dll
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\obj\Release\net8.0\win-x64\DLSS 5 SUITE.sourcelink.json
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\dlss 5\nvngx_dlssnr.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\dlss5-feed.addon32
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\dlss5-feed.addon64
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\dlss5-overlay.addon64
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if 32 bit\host64\dlss5-feed-host64.exe
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if 32 bit\host64\dlss5-feed.addon64
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if 32 bit\host64\dxgi.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if amd\dlssnr_on_amd.ini
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if amd\dlssnr_on_amd.log
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if amd\nvngx.dll_dlssnr.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if amd\version.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if dx9\D3D9.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if dx9\dgVoodoo.conf
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if dx9\dgVoodooCpl.exe
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if emulator\deep-fried-chicken-nvngx.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if emulator\deep-fried-chicken.addon64
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if emulator\deep-fried-chicken.cfg
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\docs\DLSS-FRAME-GENERATION.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\docs\NR-COMPATIBILITY.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\docs\PADDED-PRESR.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\docs\PR-2-REVIEW.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\docs\releases\v0.6.1-padded-presr.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\docs\releases\v0.6.2-swapchain-fixes.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\docs\RTX40-MFG.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\get_streamline.ps1
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\INSTALL-DLSSNR.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\Licenses\DirectX_LICENSE.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\Licenses\FidelityFX_v2_LICENSE.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\Licenses\RenoDX_ATTRIBUTION.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\Licenses\XeSS_LICENSE.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\nvngx.dll_dlssnr.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\OptiScaler.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\OptiScaler.ini
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\OptiScaler\D3D12_OptiScaler\D3D12Core.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\OptiScaler\dlss-enabler-headless.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\README.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\redist\streamline\manifest.json
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler neural-upstream\setup_windows.bat
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\Licenses\DirectX_LICENSE.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\Licenses\FidelityFX_v2_LICENSE.md
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\Licenses\RenoDX_ATTRIBUTION.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\Licenses\XeSS_LICENSE.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\nvngx.dll_dlssnr.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\OptiScaler.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\OptiScaler.ini
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\OptiScaler\D3D12_OptiScaler\D3D12Core.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\OptiScaler\dlss-enabler-headless.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\READ ME - DLSS Neural Rendering.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\if OptiScaler\setup_windows.bat
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\nvngx.dll.addon64
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\renodx-dlss5.addon64
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\Blending.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\Daltonize.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\Deband.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\DisplayDepth.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\DLSS5_Feed.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\DrawText.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\include\lumenite_ColorManagement.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\include\lumenite_Compute.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\include\lumenite_Helpers.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\include\lumenite_Projections.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\lumenite_AnamorphicBloom.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\lumenite_Kernel.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\lumenite_LSAO.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\lumenite_QuantAO.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\lumenite_QuantMotion.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\lumenite_RTAO.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\lumenite_SSSR.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\lumenite_TRAA.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\LUT.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\Macros.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\ReShade.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\ReShadeUI.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\TriDither.fxh
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Shaders\UIMask.fx
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Textures\FontAtlas.png
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Textures\lumenite_bluenoise256.png
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\reshade-shaders\Textures\lut.png
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\ReShade_Setup_6.8.0_Addon.exe
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\dlss\nis.license.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\dlss\nvngx_dlss.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\dlss\nvngx_dlss.license.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\dlss\nvngx_dlssg.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\dlss\reflex.license.txt
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\streamline\sl.common.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\streamline\sl.dlss.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\streamline\sl.dlss_g.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\streamline\sl.dlss_nr.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\streamline\sl.interposer.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\streamline\sl.nis.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\streamline\sl.pcl.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\mod files\streamline_dlss\streamline\sl.reflex.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Release\net8.0\win-x64\Avalonia.Controls.ItemsRepeater.dll

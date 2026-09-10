@@ -1,0 +1,8 @@
+﻿bin/
+obj/
+publish/
+dist/
+setup-out/
+mod files/
+.obfuscar-tool/
+*.user

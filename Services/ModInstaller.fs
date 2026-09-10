@@ -1,4 +1,4 @@
-namespace DLSS_5_MANAGER.Services
+﻿namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -13,7 +13,7 @@ open DLSS_5_MANAGER.Services.GameAnalyzer
 
 /// Performs the full DLSS 5 installation:
 ///   1. ReShade (headless) next to the real game executable
-///   2. renodx-dlss5.addon64 next to ReShade
+///   2. renodx-dlss.addon64 next to ReShade
 ///   3. NVIDIA Streamline refresh   (only when the game ships >= 2.4)
 ///   4. NVIDIA DLSS refresh         (only when the game ships an older build)
 ///   5. nvngx_dlssnr.dll placed next to ReShade, DLSS and Streamline
@@ -282,7 +282,12 @@ module ModInstaller =
     // =====================================================================
     // DLSS 5 PRESENCE & COMPLETENESS
     // =====================================================================
-    let renodxAddonName = "renodx-dlss5.addon64"
+    let renodxAddonName = "renodx-dlss.addon64"
+
+    /// What the same add-on was called up to 1.2.0. Nothing deploys it any
+    /// more, but installs made while it had that name still have to come off
+    /// cleanly, so it stays in `exclusiveArtifacts` below.
+    let renodxAddonLegacyName = "renodx-dlss5.addon64"
 
     /// Ships next to the RenoDX add-on and must always travel with it.
     let feedAddonName = "dlss5-feed.addon64"
@@ -418,7 +423,8 @@ module ModInstaller =
     /// ones the current layout produces, so removal finishes with a sweep over
     /// this list. Anything already handled by the manifest is skipped.
     let exclusiveArtifacts =
-        [| "dlssnr_on_amd.ini"; "dlssnr_on_amd.log"; "dlss5-feed.addon64"; "dlss5-feed.addon32"; "renodx-dlss5.addon64"
+        [| "dlssnr_on_amd.ini"; "dlssnr_on_amd.log"; "dlss5-feed.addon64"; "dlss5-feed.addon32"
+           renodxAddonName; renodxAddonLegacyName
            "nvngx_dlssnr.dll"; "nvngx.dll_dlssnr.dll"; "nvngx.dll.addon64"
            "dlss5-overlay.addon64"; "dlss5-overlay.ini"; "dlss5-overlay.ini.bak"; "dlss5-overlay.log"
            "OptiScaler.ini"; "OptiScaler.log"; "Remove_OptiScaler.bat"; "setup_windows.bat"

@@ -1,4 +1,4 @@
-namespace DLSS_5_MANAGER.Services
+﻿namespace DLSS_5_MANAGER.Services
 
 open System
 open System.Net.Http
@@ -10,7 +10,7 @@ open System.Text.RegularExpressions
 module UpdateChecker =
 
     [<Literal>]
-    let CurrentVersion = "1.2.0"
+    let CurrentVersion = "1.2.0-suite.1"
 
     // =====================================================================
     // WHERE UPDATES COME FROM
@@ -38,11 +38,27 @@ module UpdateChecker =
     let ReleasesPageUrl =
         "https://github.com/" + RepoOwner + "/" + RepoName + "/releases"
 
-    /// Where the "get it" button goes. The releases page rather than a
-    /// marketing page, so the download is one click from the version notice.
+    /// Where an update to *this* build is downloaded from.
     [<Literal>]
     let DownloadPageUrl =
         "https://github.com/" + RepoOwner + "/" + RepoName + "/releases/latest"
+
+    // =====================================================================
+    // THE ORIGINAL
+    // =====================================================================
+    // A condition of the permission NODIX TECH gave for this modified build:
+    // the original's download location is not to be changed or replaced, and
+    // this link has to stay in the application. It is not a fallback and not
+    // a courtesy - leaving it out breaks the terms this build exists under.
+    [<Literal>]
+    let OriginalDownloadUrl = "https://numidiastudios.com/dlss-5-manager/"
+
+    /// The community guides site NODIX TECH is building, which will cover the
+    /// original and the modified builds alike. Linking to it once it exists is
+    /// the other standing condition. Fill this in and the button appears by
+    /// itself - nothing else needs changing.
+    [<Literal>]
+    let GuidesUrl = "https://dlss5manager.numidiastudios.com/tutorials"
 
     type UpdateResult =
         { HasUpdate: bool

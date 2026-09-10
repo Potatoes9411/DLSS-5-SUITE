@@ -1,4 +1,4 @@
-# Obfuscates the built "DLSS 5 SUITE.dll" in a given output directory.
+﻿# Obfuscates the built "DLSS 5 SUITE.dll" in a given output directory.
 # Called from the .fsproj after a Release build (and therefore before the
 # publish pipeline copies files out), so it works for plain builds, any
 # RuntimeIdentifier (win-x86 / win-x64), and folder/self-contained publishes.
@@ -51,6 +51,10 @@ $cfg = @"
 "@
 
 Set-Content -Path $cfgPath -Value $cfg -Encoding UTF8
+
+# The bundled Obfuscar tool targets .NET 9. Roll it forward so it runs on
+# whatever newer runtime the build machine actually has installed.
+$env:DOTNET_ROLL_FORWARD = "LatestMajor"
 
 & $Tool $cfgPath
 if ($LASTEXITCODE -ne 0) { throw "Obfuscar failed with exit code $LASTEXITCODE" }

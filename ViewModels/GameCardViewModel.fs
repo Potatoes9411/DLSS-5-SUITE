@@ -117,6 +117,38 @@ type GameCardViewModel(game: GameItem) =
 
     member this.HasDetectedApi = this.DetectedApiText <> ""
 
+    /// The chip is abbreviated to fit the corner, so the tooltip spells the
+    /// API out. "DX12" is obvious to someone who already knows what it means,
+    /// which is not who the label is for.
+    member this.ApiTooltip =
+        let full =
+            match AnalysisStore.tryGet currentGame with
+            | Some a when not (isNull (box a.GraphicsApi)) ->
+                match a.GraphicsApi with
+                | "dx12" -> "DirectX 12"
+                | "dx11" -> "DirectX 11"
+                | "dx10" -> "DirectX 10"
+                | "dx9" -> "DirectX 9"
+                | "vulkan" -> "Vulkan"
+                | "opengl" -> "OpenGL"
+                | _ -> ""
+            | _ -> ""
+
+        if full = "" then Localization.current.ApiTooltip + "  \u00B7  " + Localization.current.ApiUnknown
+        else Localization.current.ApiTooltip + "  \u00B7  " + full
+
+    /// The card's own copy of the installed badge text. The template cannot
+    /// bind to MainViewModel.Loc from in here - see Localization.current.
+    member _.BadgeInstalled = Localization.current.BadgeInstalled
+
+    /// The corner mark is a bare tick, so the tooltip has to carry the whole
+    /// meaning - and the route badge with it, which is the part a user who
+    /// already knows it is installed actually wants.
+    member this.InstalledTooltip =
+        let route = this.ModBadgeText
+        if String.IsNullOrWhiteSpace(route) then Localization.current.InstalledTooltip
+        else Localization.current.InstalledTooltip + "  \u00B7  " + route
+
     member this.Title = cleanDisplayTitle currentGame.Title
     member this.RawTitle = currentGame.Title
     member this.LauncherType = currentGame.LauncherTypeName

@@ -1,4 +1,4 @@
-namespace DLSS_5_MANAGER.Services
+﻿namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -149,6 +149,33 @@ module Localization =
         member _.SupportDesc = get "support_desc"
         member _.BtnWatchTutorials = get "btn_watch_tutorials"
         member _.BtnSupportKofi = get "btn_support_kofi"
+
+        // ---- Added by this build ------------------------------------------
+        // Ko-fi is split 50-50 with the original author, so each button has to
+        // say whose it is; the rest are controls this build introduced.
+        member _.BtnSupportThisBuild = get "btn_support_this_build"
+        member _.BtnSupportOriginal = get "btn_support_original"
+        member _.SupportPromptText = get "support_prompt_text"
+        member _.BadgeInstalled = get "badge_installed"
+        member _.InstalledTooltip = get "installed_tooltip"
+        member _.ApiTooltip = get "api_tooltip"
+        member _.ApiUnknown = get "api_unknown"
+        member _.SortLabel = get "sort_label"
+        member _.SortNameAz = get "sort_name_az"
+        member _.SortNameZa = get "sort_name_za"
+        member _.SortRecentlyInstalled = get "sort_recently_installed"
+        member _.SortOldestInstalled = get "sort_oldest_installed"
+        member _.SortNewestRelease = get "sort_newest_release"
+        member _.SortOldestRelease = get "sort_oldest_release"
+
+        // ---- Batch sheet ---------------------------------------------------
+        member _.BatchTitle = get "batch_title"
+        member _.BatchSubtitle = get "batch_subtitle"
+        member _.BatchSelectAll = get "batch_select_all"
+        member _.BatchSelectNone = get "batch_select_none"
+        member _.BatchInstall = get "batch_install"
+        member _.BatchUninstall = get "batch_uninstall"
+        member _.BatchOpen = get "batch_open"
         member _.AppTitle = get "app_title"
 
         /// What this build was made from, and who made that. Shown above the
@@ -167,9 +194,45 @@ module Localization =
         member _.AmdTitle = get "amd_title"
         member _.AmdDesc = get "amd_desc"
 
-        // ---- In-game overlay ----------------------------------------------
+        // ---- Community ------------------------------------------------------
+        member _.TabCommunity = get "tab_community"
+        member _.CommunitySection = get "community_section"
+        member _.CommunityJoinTitle = get "community_join_title"
+        member _.CommunityJoinHint = get "community_join_hint"
+        member _.CommunityNamePlaceholder = get "community_name_placeholder"
+        member _.BtnJoinCommunity = get "btn_join_community"
+        member _.BtnRefresh = get "btn_refresh"
+        member _.BtnCommunityGuides = get "btn_community_guides"
+        member _.CommunityEmptyTitle = get "community_empty_title"
+        member _.CommunityEmptyHint = get "community_empty_hint"
+        member _.CommunityShare = get "community_share"
+        member _.CommunityPostTitle = get "community_post_title"
+        member _.CommunityResult = get "community_result"
+        member _.CommunityInstallMethod = get "community_install_method"
+        member _.CommunityNote = get "community_note"
+        member _.CommunityNotePlaceholder = get "community_note_placeholder"
+        member _.CommunitySpecs = get "community_specs"
+        member _.BtnDetectSpecs = get "btn_detect_specs"
+        member _.BtnRemoveSpecs = get "btn_remove_specs"
+        member _.BtnPost = get "btn_post"
+        member _.BtnReply = get "btn_reply"
+        member _.ReplyPlaceholder = get "reply_placeholder"
+        member _.NoReportsTitle = get "no_reports_title"
+        member _.StatusWorking = get "status_working"
+        member _.StatusMixed = get "status_mixed"
+        member _.StatusBroken = get "status_broken"
+
+        // ---- Features card -------------------------------------------------
+        member _.FeaturesSection = get "features_section"
+        member _.PerformanceMode = get "performance_mode"
+        member _.PerformanceTagline = get "performance_tagline"
+        member _.AmdTagline = get "amd_tagline"
+        member _.SupportTagline = get "support_tagline"
+
+        // ---- Dynamic Overlay ------------------------------------------------
         member _.OverlaySection = get "overlay_section"
         member _.OverlayTitle = get "overlay_title"
+        member _.OverlayTagline = get "overlay_tagline"
         member _.OverlayDesc = get "overlay_desc"
         member _.OverlayStyle = get "overlay_style"
         member _.OverlayHotkey = get "overlay_hotkey"
@@ -208,3 +271,12 @@ module Localization =
 
         member _.StatusGamesReady(count: int) =
             (get "status_games_ready").Replace("{count}", string count)
+
+    /// The strings the window is currently showing.
+    ///
+    /// MainViewModel owns the language and hands its own Strings out through
+    /// `Loc`, which is all the main view needs. Card templates cannot reach it:
+    /// inside the games grid the DataContext is a GameCardViewModel, so a
+    /// `{Binding Loc...}` there resolves against the card and fails. Anything
+    /// rendered per-card reads its text from here instead.
+    let mutable current = Strings("en")

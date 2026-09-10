@@ -11,11 +11,18 @@
         x:DataType="vm:MainViewModel"
         Icon="/Assets/logo.ico"
         Title="DLSS 5 SUITE"
-        TransparencyLevelHint="Transparent, AcrylicBlur, Mica"
+        TransparencyLevelHint="Transparent"
         Background="Transparent"
         WindowDecorations="None"
         PointerMoved="OnCardPointerMoved"
         PointerReleased="OnCardPointerReleased">
+
+    <!-- TransparencyLevelHint asked for "Transparent, AcrylicBlur, Mica".
+         The last two make Windows blur whatever sits behind the window on
+         every frame, and none of that was ever visible: the backdrop inside
+         the window paints over all of it. Transparency itself still has to
+         stay - it is what lets the rounded corners cut out. -->
+
 
     <Design.DataContext>
         <vm:MainViewModel />
@@ -85,156 +92,64 @@
                      half opacity because a vignette, an acrylic wash and ten
                      animated orbs all stack on top of it.
                      ========================================================== -->
-                <!-- Neon Emerald is the signature look, so on that atmosphere
-                     the plate is shown as painted. Every other atmosphere gets
-                     the same plate as a mask filled with that theme's own
-                     colour, so the backdrop follows the interface instead of
-                     leaving a green wash under a crimson or ice-blue one. -->
-                <Image Source="/Assets/bg_nebula.jpg" Stretch="UniformToFill"
-                       Opacity="0.55" IsHitTestVisible="False"
-                       IsVisible="{Binding IsEmeraldAtmosphere}" />
+                <!-- ==========================================================
+                     DEEP SPACE BACKDROP
+                     Sits on the theme colour, under everything that moves.
 
-                <Border IsHitTestVisible="False" Opacity="0.62"
-                        IsVisible="{Binding IsTintedAtmosphere}"
-                        Background="{Binding BgNebulaTintBrush}">
-                    <Border.OpacityMask>
-                        <ImageBrush Source="/Assets/bg_nebula_mask.png" Stretch="UniformToFill" />
-                    </Border.OpacityMask>
-                </Border>
+                     One image per atmosphere rather than one image plus a
+                     tinting mask. A Border filled with the accent colour and
+                     clipped by a 4K OpacityMask cost an offscreen compositor
+                     pass on every frame, kept a second 4K texture resident to
+                     act as a stencil, and reduced the artwork to a flat
+                     silhouette - which is why the mark vanished on every
+                     theme but the green one. Only the bound image is decoded,
+                     so this is one texture, not two, and no extra pass.
+                     ========================================================== -->
+                <Image Source="{Binding NebulaSource}" Stretch="UniformToFill"
+                       Opacity="0.82" IsHitTestVisible="False" />
 
-                <!-- Three star plates, each a different scatter on its own
-                     period. Because the periods share no common factor, the
-                     plates peak at unrelated moments and the twinkle lands on
-                     different parts of the sky rather than pulsing the whole
-                     field at once. Parked with the rest of the motion when the
-                     window loses focus or performance mode is on. -->
-                <Image Classes="Twinkle1" Source="/Assets/bg_stars_1.png" Stretch="UniformToFill" IsHitTestVisible="False" />
-                <Image Classes="Twinkle2" Source="/Assets/bg_stars_2.png" Stretch="UniformToFill" IsHitTestVisible="False" />
-                <Image Classes="Twinkle3" Source="/Assets/bg_stars_3.png" Stretch="UniformToFill" IsHitTestVisible="False" />
+                <!-- Three star plates, each a different scatter, faded against
+                     each other by the timer in the code-behind. 1280x720:
+                     stars are points of light and nothing in them survives a
+                     rescale, so the larger plates were paying bandwidth on
+                     every composited frame for detail nobody can see. -->
+                <Image x:Name="StarPlate1" Source="/Assets/bg_stars_1.png" Stretch="UniformToFill" Opacity="0.6" IsHitTestVisible="False" />
+                <Image x:Name="StarPlate2" Source="/Assets/bg_stars_2.png" Stretch="UniformToFill" Opacity="0.6" IsHitTestVisible="False" />
+                <Image x:Name="StarPlate3" Source="/Assets/bg_stars_3.png" Stretch="UniformToFill" Opacity="0.6" IsHitTestVisible="False" />
 
-                <!-- The mark, barely there. Its plate edges are feathered in
-                     the asset itself, so nothing reads as a rectangle drawn on
-                     the interface. Above the space plate, below the orbs, and
-                     tinted with the same rule as the nebula. -->
-                <Image Source="/Assets/bg_nvidia_mark.png" Stretch="Uniform"
-                       Width="560" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Opacity="0.13" IsHitTestVisible="False"
-                       IsVisible="{Binding IsEmeraldAtmosphere}" />
+                <!-- Shooting stars. Three reusable streaks, parked until the
+                     timer sends one across. -->
+                <Border x:Name="Shooter1" Classes="Shooter" />
+                <Border x:Name="Shooter2" Classes="Shooter" />
+                <Border x:Name="Shooter3" Classes="Shooter" />
 
-                <Border Width="560" Height="393" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        IsHitTestVisible="False" Opacity="0.15"
-                        IsVisible="{Binding IsTintedAtmosphere}"
-                        Background="{Binding MotifAccentBrush}">
-                    <Border.OpacityMask>
-                        <ImageBrush Source="/Assets/bg_nvidia_mark_mask.png" Stretch="Uniform" />
-                    </Border.OpacityMask>
-                </Border>
+                <!-- The mark, recoloured per atmosphere, breaking through the
+                     nebula: cloud, star clusters and the rim of light where it
+                     comes through are baked into the same texture. One plate,
+                     not a stack of animated layers - the drifting orbs that
+                     used to sit here showed what a full-width layer costs to
+                     composite every frame.
 
-                <!-- Ambient Light Orb 1 (Floating Top-Left) -->
-                <Border Classes="FloatOrb1" Width="750" Height="750" CornerRadius="375" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-200,-200,0,0"
-                        Background="{Binding BgOrb1Brush}" />
+                     The width covers the whole plate, so the glyph inside it
+                     renders at roughly 430px and the cloud fills the rest. At
+                     0.9 opacity and no cloud this filled the middle of the
+                     window and the settings page had to be read straight
+                     through it. What makes 0.34 safe now is that the cards on
+                     top are dense glass rather than a 3% white wash, so text
+                     sits on its own ground instead of on the backdrop. -->
+                <Image Source="{Binding NvidiaMarkSource}" Stretch="Uniform"
+                       Width="668" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Opacity="0.34" IsHitTestVisible="False" />
 
-                <!-- Ambient Light Orb 2 (Floating Bottom-Right) -->
-                <Border Classes="FloatOrb2" Width="800" Height="800" CornerRadius="400" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-200,-200"
-                        Background="{Binding BgOrb2Brush}" />
+                <!-- The drifting orbs and the five geometric motifs that used
+                     to sit here are gone. They were ten infinite animations
+                     over full-screen gradients, compositing every frame for as
+                     long as the window had focus, and they read as clutter over
+                     the starfield. The sky, the stars and the mark carry the
+                     backdrop on their own now.
 
-                <!-- 1. ORBITAL SPHERES (Floating Soft Glass Orbs & Halos) -->
-                <Panel IsVisible="{Binding IsOrbitalSpheresVisible}">
-                    <Border Classes="FloatOrb1" Width="300" Height="300" CornerRadius="150" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,60,100,0">
-                        <Panel>
-                            <Border Width="300" Height="300" CornerRadius="150" BorderBrush="{Binding MotifAccentBrush}" BorderThickness="1.5" Opacity="0.2" />
-                            <Border Width="220" Height="220" CornerRadius="110" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.3">
-                                <Border.Background>
-                                    <RadialGradientBrush Center="50%,50%" RadiusX="50%" RadiusY="50%">
-                                        <GradientStop Color="#40FFFFFF" Offset="0.0" />
-                                        <GradientStop Color="#00000000" Offset="1.0" />
-                                    </RadialGradientBrush>
-                                </Border.Background>
-                            </Border>
-                        </Panel>
-                    </Border>
-
-                    <Border Classes="FloatOrb2" Width="200" Height="200" CornerRadius="100" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="90,0,0,100">
-                        <Panel>
-                            <Border Width="200" Height="200" CornerRadius="100" BorderBrush="{Binding MotifAccentBrush}" BorderThickness="1" Opacity="0.2" />
-                            <Border Width="150" Height="150" CornerRadius="75" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.25">
-                                <Border.Background>
-                                    <RadialGradientBrush Center="50%,50%" RadiusX="50%" RadiusY="50%">
-                                        <GradientStop Color="#30FFFFFF" Offset="0.0" />
-                                        <GradientStop Color="#00000000" Offset="1.0" />
-                                    </RadialGradientBrush>
-                                </Border.Background>
-                            </Border>
-                        </Panel>
-                    </Border>
-
-                    <Border Classes="FloatOrb3" Width="110" Height="110" CornerRadius="55" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="-140,70,0,0">
-                        <Border.Background>
-                            <RadialGradientBrush Center="50%,50%" RadiusX="50%" RadiusY="50%">
-                                <GradientStop Color="#35FFFFFF" Offset="0.0" />
-                                <GradientStop Color="#00000000" Offset="1.0" />
-                            </RadialGradientBrush>
-                        </Border.Background>
-                    </Border>
-                </Panel>
-
-                <!-- 2. PRISM AURORAS (Fluid Gradient Light Bands) -->
-                <Panel IsVisible="{Binding IsPrismAurorasVisible}">
-                    <Border Classes="FloatAurora1" Width="850" Height="180" CornerRadius="90" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-40,-100,0">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                <GradientStop Color="#00000000" Offset="0.0" />
-                                <GradientStop Color="#40FFFFFF" Offset="0.5" />
-                                <GradientStop Color="#00000000" Offset="1.0" />
-                            </LinearGradientBrush>
-                        </Border.Background>
-                    </Border>
-
-                    <Border Classes="FloatAurora2" Width="950" Height="220" CornerRadius="110" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="-100,0,0,-60">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="100%,0%" EndPoint="0%,100%">
-                                <GradientStop Color="#00000000" Offset="0.0" />
-                                <GradientStop Color="#35FFFFFF" Offset="0.5" />
-                                <GradientStop Color="#00000000" Offset="1.0" />
-                            </LinearGradientBrush>
-                        </Border.Background>
-                    </Border>
-                </Panel>
-
-                <!-- 3. FLOATING CRYSTALS (Smooth Rounded Polygons) -->
-                <Panel IsVisible="{Binding IsFloatingCrystalsVisible}">
-                    <Border Classes="FloatCrystal1" Width="180" Height="180" CornerRadius="36" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,100,160,0"
-                            BorderBrush="{Binding MotifAccentBrush}" BorderThickness="1.5" Opacity="0.22">
-                        <Border Width="110" Height="110" CornerRadius="22" BorderBrush="#40FFFFFF" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-
-                    <Border Classes="FloatCrystal2" Width="140" Height="140" CornerRadius="28" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="140,0,0,130"
-                            BorderBrush="{Binding MotifAccentBrush}" BorderThickness="1" Opacity="0.2">
-                        <Border Width="80" Height="80" CornerRadius="16" BorderBrush="#35FFFFFF" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                </Panel>
-
-                <!-- 4. STARDUST PARTICLES (Soft Ambient Bokeh Embers) -->
-                <Panel IsVisible="{Binding IsStardustParticlesVisible}">
-                    <Border Classes="FloatParticle1" Width="16" Height="16" CornerRadius="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,140,240,0"
-                            Background="{Binding MotifAccentBrush}" />
-                    <Border Classes="FloatParticle2" Width="22" Height="22" CornerRadius="11" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,180,-80"
-                            Background="#80FFFFFF" />
-                    <Border Classes="FloatParticle1" Width="12" Height="12" CornerRadius="6" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="220,-90,0,0"
-                            Background="{Binding MotifAccentBrush}" />
-                    <Border Classes="FloatParticle2" Width="28" Height="28" CornerRadius="14" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="160,0,0,180"
-                            Background="#60FFFFFF" />
-                    <Border Classes="FloatParticle1" Width="18" Height="18" CornerRadius="9" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="80,120,0,0"
-                            Background="{Binding MotifAccentBrush}" />
-                </Panel>
-
-                <!-- 5. CYBER FLUX (Sleek Drifting Light Streaks) -->
-                <Panel IsVisible="{Binding IsCyberFluxVisible}">
-                    <Border Classes="FloatFlux1" Height="2" HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="0,-70,0,0"
-                            Background="{Binding MotifAccentBrush}" />
-                    <Border Classes="FloatFlux1" Height="1.5" HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="0,110,0,0"
-                            Background="{Binding MotifAccentBrush}" />
-                </Panel>
+                     MotifAccentBrush survives - progress bars and a few accents
+                     still bind to it. -->
 
                 <!-- Soft Glass Vignette Backdrop Overlay -->
                 <Border Background="{Binding BgVignetteBrush}" />
@@ -288,6 +203,15 @@
                                     Content="{Binding Loc.Games}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
                             <Button Classes="SegmentedTab" Classes.Active="{Binding IsEmulatorsTabActive}" Click="OnTabEmulatorsClicked"
                                     Content="{Binding Loc.TabEmulators}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
+                            <!-- COMMUNITY: hidden in this build.
+                                 The feature talks to NODIX TECH's own Cloudflare Worker and the
+                                 credentials for it are deliberately not in the shared source
+                                 (CommunityApi.BaseUrl / AppSecret are placeholders). It stays
+                                 exclusive to the original DLSS 5 MANAGER until they grant access.
+                                 The code is merged and intact - set these back to True and fill
+                                 in the two constants to switch it on. -->
+                            <Button Classes="SegmentedTab" Classes.Active="{Binding IsCommunityTabActive}" Click="OnTabCommunityClicked" IsVisible="False"
+                                    Content="{Binding Loc.TabCommunity}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
                         </StackPanel>
 
                         <!-- Bottom: Settings -->
@@ -330,6 +254,7 @@
                                 <StackPanel Orientation="Horizontal" Spacing="2">
                                     <Button Classes="SegmentedTab" Classes.Active="{Binding IsGamesTabActive}" Click="OnTabGamesClicked" Content="{Binding Loc.Games}" />
                                     <Button Classes="SegmentedTab" Classes.Active="{Binding IsEmulatorsTabActive}" Click="OnTabEmulatorsClicked" Content="{Binding Loc.TabEmulators}" />
+                                    <Button Classes="SegmentedTab" Classes.Active="{Binding IsCommunityTabActive}" Click="OnTabCommunityClicked" Content="{Binding Loc.TabCommunity}" IsVisible="False" />
 
                                     <!-- Add Game / Folder Button (+) -->
                                     <Button Classes="SegmentedTab" x:Name="BtnAddGame" ToolTip.Tip="{Binding Loc.AddGame}" Padding="12,7">
@@ -498,9 +423,109 @@
                                     </Grid>
                                 </Border>
 
+                                <!-- Card 3d: Features. Three toggles that used to be three
+                                     whole cards - same switches, a third of the height, and
+                                     they now read as a list of what the app can do. Each row
+                                     keeps its own search property so a query still hides the
+                                     rows it does not match. -->
+                                <Border Classes="SettingsCard Stagger5" Classes.Shown="{Binding IsSettingsOpen}"
+                                        IsVisible="{Binding ShowFeaturesCard}"
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                    <StackPanel Spacing="12">
+                                        <TextBlock Text="{Binding Loc.FeaturesSection}" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.5" />
+
+                                        <!-- Dynamic Overlay -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowOverlayCard}">
+                                            <StackPanel Spacing="11">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                    <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1A00FF88"
+                                                            BorderBrush="#3300FF88" BorderThickness="1" VerticalAlignment="Center">
+                                                        <PathIcon Data="M 3,5 H 21 V 19 H 3 Z M 5,7 V 17 H 19 V 7 Z M 6.5,8.5 H 12 V 11 H 6.5 Z"
+                                                                  Width="14" Height="14" Foreground="#00FF88" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+
+                                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Loc.OverlayTitle}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                        <TextBlock Text="{Binding Loc.OverlayTagline}" FontSize="11" Foreground="#A3AEC0" />
+                                                    </StackPanel>
+
+                                                    <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsOverlayEnabled, Mode=TwoWay}"
+                                                                  OnContent="" OffContent="" VerticalAlignment="Center" />
+                                                </Grid>
+
+                                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding IsOverlayEnabled}">
+                                                    <Grid Grid.Column="0" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                        <TextBlock Grid.Column="0" Text="{Binding Loc.OverlayStyle}" FontSize="11.5" FontWeight="SemiBold"
+                                                                   Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                        <ComboBox Grid.Column="1" Classes="GlassComboBox"
+                                                                  ItemsSource="{Binding OverlayThemes}"
+                                                                  SelectedItem="{Binding SelectedOverlayTheme, Mode=TwoWay}"
+                                                                  HorizontalAlignment="Stretch" Height="34" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                    <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                        <TextBlock Grid.Column="0" Text="{Binding Loc.OverlayHotkey}" FontSize="11.5" FontWeight="SemiBold"
+                                                                   Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                        <ComboBox Grid.Column="1" Classes="GlassComboBox"
+                                                                  ItemsSource="{Binding OverlayHotkeys}"
+                                                                  SelectedItem="{Binding SelectedOverlayHotkey, Mode=TwoWay}"
+                                                                  HorizontalAlignment="Stretch" Height="34" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- AMD RDNA 4 -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowAmdCard}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1AF59E0B"
+                                                        BorderBrush="#33F59E0B" BorderThickness="1" VerticalAlignment="Center">
+                                                    <PathIcon Data="M 4,4 H 20 V 20 H 4 Z M 6,6 V 18 H 18 V 6 Z M 8,8 H 16 V 10 H 8 Z M 8,12 H 13 V 14 H 8 Z"
+                                                              Width="14" Height="14" Foreground="#F59E0B" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Text="{Binding Loc.AmdTitle}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                                                        <Border Background="#26F59E0B" BorderBrush="#55F59E0B" BorderThickness="1" CornerRadius="6"
+                                                                Padding="6,1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Loc.Beta}" FontSize="8.5" FontWeight="Bold" Foreground="#FCD34D" LetterSpacing="0.6" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Loc.AmdTagline}" FontSize="11" Foreground="#A3AEC0" />
+                                                </StackPanel>
+
+                                                <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsAmdModeEnabled, Mode=TwoWay}"
+                                                              OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Performance mode -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1A60A5FA"
+                                                        BorderBrush="#3360A5FA" BorderThickness="1" VerticalAlignment="Center">
+                                                    <PathIcon Data="M 13,2 L 4,14 H 11 L 10,22 L 20,9 H 13 Z"
+                                                              Width="14" Height="14" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Loc.PerformanceMode}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                    <TextBlock Text="{Binding Loc.PerformanceTagline}" FontSize="11" Foreground="#A3AEC0" />
+                                                </StackPanel>
+
+                                                <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsPerformanceMode, Mode=TwoWay}"
+                                                              OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Card 1: Interface & Navigation -->
                                 <Border Classes="SettingsCard Stagger1" Classes.Shown="{Binding IsSettingsOpen}" IsVisible="{Binding ShowInterfaceCard}"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
                                     <StackPanel Spacing="14">
                                         <Button Classes="SectionHeader" Click="OnToggleSectionClicked" Tag="interface" Cursor="Hand">
                                             <Grid ColumnDefinitions="*,Auto">
@@ -539,7 +564,7 @@
 
                                 <!-- Card 2: Visual Atmosphere -->
                                 <Border Classes="SettingsCard Stagger2" Classes.Shown="{Binding IsSettingsOpen}" IsVisible="{Binding ShowAtmosphereCard}"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
                                     <StackPanel Spacing="14">
                                         <Button Classes="SectionHeader" Click="OnToggleSectionClicked" Tag="atmosphere" Cursor="Hand">
                                             <Grid ColumnDefinitions="*,Auto">
@@ -552,25 +577,14 @@
 
                                         <StackPanel Spacing="14" IsVisible="{Binding IsAtmosphereSectionOpen}">
 
-                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                                            <Border Grid.Column="0" Background="#0AFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
+                                        <Grid ColumnDefinitions="*">
+                                            <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
                                                 <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                                                     <TextBlock Grid.Column="0" Text="{Binding Loc.ColorAtmosphere}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" VerticalAlignment="Center" />
                                                     <ComboBox Grid.Column="1" Classes="GlassComboBox"
                                                               ItemsSource="{Binding ColorAtmospheres}"
                                                               DisplayMemberBinding="{Binding Display}"
                                                               SelectedIndex="{Binding SelectedAtmosphereIndex, Mode=TwoWay}"
-                                                              Width="180" Height="36" VerticalAlignment="Center" />
-                                                </Grid>
-                                            </Border>
-
-                                            <Border Grid.Column="1" Background="#0AFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
-                                                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                                                    <TextBlock Grid.Column="0" Text="{Binding Loc.GeometricMotif}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" VerticalAlignment="Center" />
-                                                    <ComboBox Grid.Column="1" Classes="GlassComboBox"
-                                                              ItemsSource="{Binding GeometricMotifs}"
-                                                              DisplayMemberBinding="{Binding Display}"
-                                                              SelectedIndex="{Binding SelectedMotifIndex, Mode=TwoWay}"
                                                               Width="180" Height="36" VerticalAlignment="Center" />
                                                 </Grid>
                                             </Border>
@@ -581,7 +595,7 @@
 
                                 <!-- Card 3: Library & Cache -->
                                 <Border Classes="SettingsCard Stagger3" Classes.Shown="{Binding IsSettingsOpen}" IsVisible="{Binding ShowLibraryCard}"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
                                     <StackPanel Spacing="14">
                                         <Button Classes="SectionHeader" Click="OnToggleSectionClicked" Tag="library" Cursor="Hand">
                                             <Grid ColumnDefinitions="*,Auto">
@@ -625,7 +639,7 @@
 
                                 <!-- Card 3b: Mod Payload Files (user replaceable) -->
                                 <Border Classes="SettingsCard Stagger4" Classes.Shown="{Binding IsSettingsOpen}" IsVisible="{Binding ShowPayloadCard}"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
                                     <StackPanel Spacing="14">
                                         <Button Classes="SectionHeader" Click="OnToggleSectionClicked" Tag="payload" Cursor="Hand">
                                             <Grid ColumnDefinitions="*,Auto">
@@ -637,14 +651,11 @@
                                         </Button>
 
                                         <StackPanel Spacing="12" IsVisible="{Binding IsPayloadSectionOpen}">
-                                            <TextBlock Text="{Binding Loc.ModPayloadDesc}"
-                                                       FontSize="11.5" Foreground="#7C8595" TextWrapping="Wrap" LineHeight="17" />
-
                                             <!-- Swappable files, each with its own on/off switch -->
                                             <ItemsControl ItemsSource="{Binding PayloadRows}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:PayloadRowViewModel">
-                                                        <Border Background="#0AFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
                                                                 Padding="14,10" Margin="0,0,0,10">
                                                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                                                                 <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
@@ -672,7 +683,7 @@
                                             </ItemsControl>
 
                                             <!-- ReShade installer: any newer build can take its place -->
-                                            <Border Background="#0AFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
+                                            <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
                                                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
                                                     <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                                         <TextBlock Text="ReShade setup" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" />
@@ -696,7 +707,7 @@
                                             </Border>
 
                                             <!-- OptiScaler: a folder, so no switch - nothing installs without it -->
-                                            <Border Background="#0AFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
+                                            <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
                                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                                     <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                                         <TextBlock Text="OptiScaler" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" />
@@ -716,7 +727,7 @@
 
                                             <!-- The neural upstream build of OptiScaler, swapped the
                                                  same way and just as unswitchable -->
-                                            <Border Background="#0AFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
+                                            <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
                                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                                     <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                                         <TextBlock Text="OptiScaler neural-upstream" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" />
@@ -736,7 +747,7 @@
 
                                             <!-- AMD payload: swappable, but never switchable - the
                                                  route has nothing to install without it. -->
-                                            <Border Background="#0AFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
+                                            <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
                                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                                                     <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                                         <TextBlock Text="AMD payload (version.dll)" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" />
@@ -758,10 +769,8 @@
 
                                             <!-- User extras -->
                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                                                <StackPanel Grid.Column="0" Spacing="3">
+                                                <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Loc.Extras}" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.5" />
-                                                    <TextBlock Text="{Binding Loc.ExtrasDesc}"
-                                                               FontSize="11.5" Foreground="#7C8595" TextWrapping="Wrap" LineHeight="17" />
                                                 </StackPanel>
 
                                                 <Button Grid.Column="1" Classes="EmptyActionBtn" Cursor="Hand" Padding="14,8" VerticalAlignment="Center">
@@ -778,7 +787,7 @@
                                             <ItemsControl ItemsSource="{Binding Extras}" IsVisible="{Binding HasExtras}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:ExtraRowViewModel">
-                                                        <Border Background="#0AFFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
                                                                 Padding="14,12" Margin="0,0,0,10">
                                                             <StackPanel Spacing="11">
                                                                 <!-- Identity and the switch that decides if it ships -->
@@ -786,7 +795,7 @@
                                                                     <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
                                                                         <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF"
                                                                                    TextTrimming="CharacterEllipsis" />
-                                                                        <TextBlock Text="{Binding SourceLabel}" FontSize="10.5" Foreground="#64748B"
+                                                                        <TextBlock Text="{Binding SourceLabel}" FontSize="10.5" Foreground="#94A3B8"
                                                                                    TextTrimming="CharacterEllipsis" MaxWidth="430" HorizontalAlignment="Left" />
                                                                     </StackPanel>
 
@@ -800,7 +809,7 @@
                                                                 </Grid>
 
                                                                 <!-- What the batch actually contains -->
-                                                                <Border Background="#0AFFFFFF" BorderBrush="#14FFFFFF" BorderThickness="1"
+                                                                <Border Background="#5C121619" BorderBrush="#14FFFFFF" BorderThickness="1"
                                                                         CornerRadius="10" Padding="10,7" IsVisible="{Binding HasManyFiles}">
                                                                     <TextBlock Text="{Binding FilesLabel}" FontSize="10.5" Foreground="#94A3B8"
                                                                                TextWrapping="Wrap" LineHeight="16" />
@@ -812,7 +821,7 @@
                                                                 <StackPanel Spacing="8">
                                                                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
                                                                         <TextBlock Grid.Column="0" Text="INSTALLS WITH" FontSize="9.5" FontWeight="Bold"
-                                                                                   Foreground="#7C8595" LetterSpacing="0.8" VerticalAlignment="Center" />
+                                                                                   Foreground="#A3AEC0" LetterSpacing="0.8" VerticalAlignment="Center" />
                                                                         <TextBlock Grid.Column="1" Text="{Binding ModesText}" FontSize="10.5" FontWeight="SemiBold"
                                                                                    Foreground="#94A3B8" VerticalAlignment="Center"
                                                                                    TextTrimming="CharacterEllipsis" />
@@ -888,20 +897,33 @@
                                 </Border>
 
                                 <!-- Card 3c: Support & Tutorials -->
+                                <Border Classes="SettingsCard" Classes.Shown="{Binding IsSettingsOpen}" IsVisible="{Binding ShowUniversalCard}"
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                    <StackPanel Spacing="12">
+                                        <TextBlock Text="UNIVERSAL NR · LOSSLESS SCALING" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8" />
+                                        <TextBlock Text="Readiness check" FontSize="13.5" FontWeight="SemiBold" Foreground="White" />
+                                        <TextBlock Text="{Binding LosslessScalingStatus}" TextWrapping="Wrap" Foreground="#CBD5E1" FontSize="12" />
+                                        <Button Content="Check installation" Click="OnCheckLosslessScalingClicked"
+                                                IsEnabled="{Binding CanCheckLosslessScaling}" HorizontalAlignment="Left" />
+                                        <TextBlock Text="Read-only check: no game or Lossless Scaling files are changed. Automatic NR installation is not available yet; an exact compatible package set and runtime test are still required. Lossless Scaling is optional and external capture does not guarantee anti-cheat approval."
+                                                   TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Classes="SettingsCard Stagger5" Classes.Shown="{Binding IsSettingsOpen}"
                                         IsVisible="{Binding ShowSupportCard}"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
                                     <StackPanel Spacing="14">
                                         <TextBlock Text="{Binding Loc.SectionSupportTutorials}" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.5" />
 
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                                            <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Loc.SupportTitle}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                                <TextBlock Text="{Binding Loc.SupportDesc}"
-                                                           FontSize="11.5" Foreground="#7C8595" TextWrapping="Wrap" LineHeight="17" MaxWidth="480" HorizontalAlignment="Left" />
+                                                <TextBlock Text="{Binding Loc.SupportTagline}" FontSize="11" Foreground="#A3AEC0" />
                                             </StackPanel>
 
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                                            <StackPanel Grid.Column="1" Spacing="9" VerticalAlignment="Center">
+                                              <StackPanel Orientation="Horizontal" Spacing="9" HorizontalAlignment="Right">
                                                 <Button Classes="GlassLinkBtn Tutorials" Click="OnTutorialsClicked" Cursor="Hand"
                                                         ToolTip.Tip="youtube.com/@Nodix-Tech">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -912,103 +934,44 @@
                                                 </Button>
 
                                                 <Button Classes="GlassLinkBtn Donate" Click="OnDonateClicked" Cursor="Hand"
+                                                        ToolTip.Tip="ko-fi.com/potatoes9411">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <PathIcon Data="M 12,21.35 L 10.55,20.03 C 5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3 9.24,3 10.91,3.81 12,5.09 13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5 22,12.28 18.6,15.36 13.45,20.04 Z"
+                                                                  Width="15" Height="15" Foreground="#FF8FB1" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding DonateLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+
+                                                <Button Classes="GlassLinkBtn Donate" Click="OnOriginalDonateClicked" Cursor="Hand"
                                                         ToolTip.Tip="ko-fi.com/nodix">
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                                         <PathIcon Data="M 12,21.35 L 10.55,20.03 C 5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3 9.24,3 10.91,3.81 12,5.09 13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5 22,12.28 18.6,15.36 13.45,20.04 Z"
                                                                   Width="15" Height="15" Foreground="#FF8FB1" VerticalAlignment="Center" />
-                                                        <TextBlock Text="{Binding Loc.BtnSupportKofi}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding OriginalDonateLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
                                                     </StackPanel>
                                                 </Button>
+                                              </StackPanel>
+
+                                              <StackPanel Orientation="Horizontal" Spacing="9" HorizontalAlignment="Right">
+                                                <Button Classes="GlassLinkBtn" Click="OnSiteClicked" Cursor="Hand"
+                                                        ToolTip.Tip="{Binding SiteUrl}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <PathIcon Data="M 12,2 C 6.48,2 2,6.48 2,12 2,17.52 6.48,22 12,22 17.52,22 22,17.52 22,12 22,6.48 17.52,2 12,2 Z M 11,19.93 C 7.05,19.44 4,16.08 4,12 4,11.38 4.08,10.79 4.21,10.21 L 9,15 v 1 c 0,1.1 0.9,2 2,2 z m 6.9,-2.54 c -0.26,-0.81 -1,-1.39 -1.9,-1.39 h -1 v -3 c 0,-0.55 -0.45,-1 -1,-1 H 8 v -2 h 2 c 0.55,0 1,-0.45 1,-1 V 7 h 2 c 1.1,0 2,-0.9 2,-2 V 4.59 C 17.93,5.77 20,8.65 20,12 c 0,2.08 -0.8,3.97 -2.1,5.39 z"
+                                                                  Width="15" Height="15" Foreground="#7DD3A0" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding SiteLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+
+                                                <Button Classes="GlassLinkBtn" Click="OnOriginalSiteClicked" Cursor="Hand"
+                                                        ToolTip.Tip="{Binding OriginalSiteUrl}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <PathIcon Data="M 12,2 C 6.48,2 2,6.48 2,12 2,17.52 6.48,22 12,22 17.52,22 22,17.52 22,12 22,6.48 17.52,2 12,2 Z M 11,19.93 C 7.05,19.44 4,16.08 4,12 4,11.38 4.08,10.79 4.21,10.21 L 9,15 v 1 c 0,1.1 0.9,2 2,2 z m 6.9,-2.54 c -0.26,-0.81 -1,-1.39 -1.9,-1.39 h -1 v -3 c 0,-0.55 -0.45,-1 -1,-1 H 8 v -2 h 2 c 0.55,0 1,-0.45 1,-1 V 7 h 2 c 1.1,0 2,-0.9 2,-2 V 4.59 C 17.93,5.77 20,8.65 20,12 c 0,2.08 -0.8,3.97 -2.1,5.39 z"
+                                                                  Width="15" Height="15" Foreground="#7DD3A0" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding OriginalSiteLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+                                              </StackPanel>
                                             </StackPanel>
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Card 3e: Performance mode -->
-                                <Border Classes="SettingsCard Stagger5" Classes.Shown="{Binding IsSettingsOpen}"
-                                        IsVisible="{Binding ShowPerformanceCard}"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
-                                    <StackPanel Spacing="14">
-                                        <TextBlock Text="PERFORMANCE" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.5" />
-
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                                <TextBlock Text="Performance mode" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                                <TextBlock Text="Stops the moving background and the animation that grows a game card under the cursor. Everything still looks the same standing still - it just stops asking the graphics card to redraw it."
-                                                           FontSize="11.5" Foreground="#7C8595" TextWrapping="Wrap" LineHeight="17"
-                                                           MaxWidth="520" HorizontalAlignment="Left" />
-                                            </StackPanel>
-
-                                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsPerformanceMode, Mode=TwoWay}"
-                                                          OnContent="" OffContent="" VerticalAlignment="Center" />
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Card 3d: AMD RDNA 4 -->
-                                <Border Classes="SettingsCard Stagger6" Classes.Shown="{Binding IsSettingsOpen}"
-                                        IsVisible="{Binding ShowAmdCard}"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
-                                    <StackPanel Spacing="14">
-                                        <StackPanel Orientation="Horizontal" Spacing="10">
-                                            <TextBlock Text="{Binding Loc.AmdMode}" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8"
-                                                       LetterSpacing="0.5" VerticalAlignment="Center" />
-                                            <Border Background="#26F59E0B" BorderBrush="#55F59E0B" BorderThickness="1" CornerRadius="7"
-                                                    Padding="7,2" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Loc.Beta}" FontSize="9.5" FontWeight="Bold" Foreground="#FCD34D" LetterSpacing="0.8" />
-                                            </Border>
-                                        </StackPanel>
-
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                                            <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Loc.AmdTitle}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                                <TextBlock Text="{Binding Loc.AmdDesc}"
-                                                           FontSize="11.5" Foreground="#7C8595" TextWrapping="Wrap" LineHeight="17"
-                                                           MaxWidth="520" HorizontalAlignment="Left" />
-                                            </StackPanel>
-
-                                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsAmdModeEnabled, Mode=TwoWay}"
-                                                          OnContent="" OffContent="" VerticalAlignment="Center" />
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Card 3e: In-game overlay -->
-                                <Border Classes="SettingsCard Stagger5" Classes.Shown="{Binding IsSettingsOpen}"
-                                        IsVisible="{Binding ShowOverlayCard}"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
-                                    <StackPanel Spacing="14">
-                                        <TextBlock Text="{Binding Loc.OverlaySection}" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8"
-                                                   LetterSpacing="0.5" />
-
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                                            <TextBlock Grid.Column="0" Text="{Binding Loc.OverlayTitle}" FontSize="13.5"
-                                                       FontWeight="SemiBold" Foreground="#FFFFFF" VerticalAlignment="Center" />
-
-                                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsOverlayEnabled, Mode=TwoWay}"
-                                                          OnContent="" OffContent="" VerticalAlignment="Center"
-                                                          ToolTip.Tip="Off means no install deploys the overlay" />
-                                        </Grid>
-
-                                        <Rectangle Height="1" Fill="#12FFFFFF" HorizontalAlignment="Stretch"
-                                                   IsVisible="{Binding IsOverlayEnabled}" />
-
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" IsVisible="{Binding IsOverlayEnabled}">
-                                            <TextBlock Grid.Column="0" Text="{Binding Loc.OverlayStyle}" FontSize="12.5" FontWeight="SemiBold"
-                                                       Foreground="#CBD5E1" VerticalAlignment="Center" />
-                                            <ComboBox Grid.Column="1" Classes="GlassComboBox"
-                                                      ItemsSource="{Binding OverlayThemes}"
-                                                      SelectedItem="{Binding SelectedOverlayTheme, Mode=TwoWay}"
-                                                      Width="200" Height="36" VerticalAlignment="Center" />
-                                        </Grid>
-
-                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16" IsVisible="{Binding IsOverlayEnabled}">
-                                            <TextBlock Grid.Column="0" Text="{Binding Loc.OverlayHotkey}" FontSize="12.5"
-                                                       FontWeight="SemiBold" Foreground="#CBD5E1" VerticalAlignment="Center" />
-                                            <ComboBox Grid.Column="1" Classes="GlassComboBox"
-                                                      ItemsSource="{Binding OverlayHotkeys}"
-                                                      SelectedItem="{Binding SelectedOverlayHotkey, Mode=TwoWay}"
-                                                      Width="200" Height="36" VerticalAlignment="Center" />
                                         </Grid>
                                     </StackPanel>
                                 </Border>
@@ -1016,7 +979,7 @@
                                 <!-- Card 4: About & Updates -->
                                 <Border Classes="SettingsCard Stagger6" Classes.Shown="{Binding IsSettingsOpen}"
                                         IsVisible="{Binding ShowAboutCard}"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
                                     <StackPanel Spacing="16">
                                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
                                             <Image Grid.Column="0" Source="/Assets/logo_card.png" Width="228" VerticalAlignment="Center"
@@ -1052,18 +1015,40 @@
 
                                         <Rectangle Height="1" Fill="#12FFFFFF" HorizontalAlignment="Stretch" />
 
+                                        <!-- The original's own download page, and the community
+                                             guides site once it exists. Both are conditions of the
+                                             permission this modified build was given, so they are
+                                             part of the interface rather than a note in a file.
+                                             Updates to this build come from its own releases; this
+                                             link is the original's download page and points at
+                                             NODIX TECH's site, not anywhere this build controls. -->
+                                        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                                            <Button Classes="EmptyActionBtn" Click="OnOriginalDownloadClicked" Cursor="Hand"
+                                                    Padding="14,7" ToolTip.Tip="{Binding OriginalDownloadUrl}">
+                                                <TextBlock Text="{Binding OriginalDownloadText}" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="#CBD5E1" />
+                                            </Button>
+
+                                            <Button Classes="EmptyActionBtn" Click="OnGuidesClicked" Cursor="Hand"
+                                                    Padding="14,7" IsVisible="{Binding HasGuidesLink}"
+                                                    ToolTip.Tip="{Binding GuidesUrl}">
+                                                <TextBlock Text="{Binding GuidesText}" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="#CBD5E1" />
+                                            </Button>
+                                        </StackPanel>
+
                                         <TextBlock Text="{Binding CopyrightText}" FontSize="10.5" FontWeight="Medium"
-                                                   Foreground="#64748B" HorizontalAlignment="Center" />
+                                                   Foreground="#94A3B8" HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </Border>
 
                                 <!-- Nothing on this page answers the search -->
                                 <Border IsVisible="{Binding HasNoSettingsMatch}" Margin="0,30,0,0"
-                                        Background="#08FFFFFF" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="24"
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="24"
                                         HorizontalAlignment="Center">
                                     <StackPanel Spacing="6" HorizontalAlignment="Center">
                                         <TextBlock Text="No matching setting" FontSize="13.5" FontWeight="Bold" Foreground="#E2E8F0" HorizontalAlignment="Center" />
-                                        <TextBlock Text="Clear the search box to see every setting again." FontSize="11.5" Foreground="#7C8595" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Clear the search box to see every setting again." FontSize="11.5" Foreground="#A3AEC0" HorizontalAlignment="Center" />
                                     </StackPanel>
                                 </Border>
 
@@ -1097,19 +1082,67 @@
                                             </LinearGradientBrush>
                                         </Border.Background>
                                         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                            <ProgressBar IsIndeterminate="True" Width="60" Height="3.5" VerticalAlignment="Center" Foreground="{Binding MotifAccentBrush}" />
+                                            <ProgressBar Classes="Flow" IsIndeterminate="True" Width="60" Height="3.5" VerticalAlignment="Center" Foreground="{Binding MotifAccentBrush}" />
                                             <TextBlock Text="{Binding ScanStatusText}" FontSize="12" FontWeight="SemiBold" Foreground="#E2E8F0" VerticalAlignment="Center" />
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- Games Cards Grid -->
-                                    <ItemsControl x:Name="GamesItemsControl" ItemsSource="{Binding Games}">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
+                                    <!-- Library order. Sits above the grid on the right,
+                                         where it is out of the way until wanted. -->
+                                    <StackPanel Orientation="Horizontal" Spacing="8"
+                                                HorizontalAlignment="Right" Margin="0,0,10,0"
+                                                IsVisible="{Binding HasGames}">
+                                        <!-- Batch sheet lives beside the sort picker: both act on
+                                             the library as a whole rather than on one card. -->
+                                        <Button Classes="EmptyActionBtn" Click="OnBatchOpenClicked" Cursor="Hand"
+                                                Padding="12,6" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                ToolTip.Tip="{Binding Loc.BatchSubtitle}">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <PathIcon Data="M 4,6 H 20 V 8 H 4 Z M 4,11 H 20 V 13 H 4 Z M 4,16 H 14 V 18 H 4 Z"
+                                                          Width="13" Height="13"
+                                                          Foreground="{DynamicResource AppAccentBrush}" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Loc.BatchOpen}" FontSize="11" FontWeight="SemiBold"
+                                                           Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <TextBlock Text="{Binding Loc.SortLabel}" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="#94A3B8" VerticalAlignment="Center" />
+                                        <ComboBox Classes="GlassComboBox"
+                                                  ItemsSource="{Binding SortOptions}"
+                                                  SelectedIndex="{Binding SelectedSortIndex, Mode=TwoWay}"
+                                                  MinWidth="150" />
+                                    </StackPanel>
+
+                                    <!-- Games Cards Grid
+                                         ItemsRepeater with a UniformGridLayout, not an ItemsControl
+                                         over a WrapPanel. Neither of those virtualises, so every
+                                         game in the library had its whole card realised and its
+                                         poster decoded and held whether or not it was on screen -
+                                         which is what put the working set near a gigabyte and kept
+                                         the collector busy. This realises the rows around the
+                                         viewport and nothing else.
+
+                                         The cell is the card's real measured size: 216x330 plus its
+                                         10px margins, so 236x350. Those numbers have to match the
+                                         template or the grid gaps or overlaps.
+
+                                         Justification is Start, not Center, and the repeater itself
+                                         is centred instead. That is what the WrapPanel did: the block
+                                         of cards sits in the middle of the page, but the cards inside
+                                         it fill left to right, so a part-full last row stays left
+                                         aligned. Centring the justification instead centres every row
+                                         individually, which pushed the final three cards into the
+                                         middle of the page and looked wrong. -->
+                                    <ItemsRepeater x:Name="GamesItemsControl" ItemsSource="{Binding Games}"
+                                                   HorizontalAlignment="Center">
+                                        <ItemsRepeater.Layout>
+                                            <UniformGridLayout MinItemWidth="236" MinItemHeight="350"
+                                                               MinColumnSpacing="0" MinRowSpacing="0"
+                                                               ItemsJustification="Start"
+                                                               ItemsStretch="None" />
+                                        </ItemsRepeater.Layout>
+                                        <ItemsRepeater.ItemTemplate>
                                             <DataTemplate x:DataType="vm:GameCardViewModel">
                                                 <!-- Container for Card + External Title Below -->
                                                 <StackPanel Classes="GameCardItem" Margin="10" Width="216" HorizontalAlignment="Center" Background="Transparent"
@@ -1285,30 +1318,33 @@
                                                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                                 </Border>
 
-                                                                <!-- Two corner labels over the artwork. Left says the
-                                                                     mod is installed on this game, right says what
-                                                                     the game renders with. It says INSTALLED rather
-                                                                     than "DLSS 5" because every game in the list can
-                                                                     take DLSS 5 - the fact worth showing is which
-                                                                     ones already have it. Both are text rather than chips so
-                                                                     the cover stays the subject. -->
+                                                                <!-- Two corner marks over the artwork. Left says the
+                                                                     mod is installed on this game, right says what the
+                                                                     game renders with.
+
+                                                                     The left one is a bare tick rather than the word
+                                                                     INSTALLED: the word was wide enough to sit across
+                                                                     the title printed on a lot of cover art. The
+                                                                     tooltip carries the meaning instead, so nothing is
+                                                                     lost and the cover stays the subject. -->
                                                                 <Border Classes="InstalledTag" IsVisible="{Binding HasModBadge}"
-                                                                        ToolTip.Tip="{Binding ModBadgeText}" ZIndex="10">
+                                                                        ToolTip.Tip="{Binding InstalledTooltip}" ZIndex="10">
                                                                     <Panel>
                                                                         <!-- Avalonia has no text stroke, so the outline
                                                                              is four offset black copies under the green
                                                                              one. At this size that reads as a crisp
                                                                              edge and keeps the label legible over pale
                                                                              cover art. -->
-                                                                        <TextBlock Classes="TagOutline" Text="✓ INSTALLED" Margin="-1,0,0,0" />
-                                                                        <TextBlock Classes="TagOutline" Text="✓ INSTALLED" Margin="1,0,0,0" />
-                                                                        <TextBlock Classes="TagOutline" Text="✓ INSTALLED" Margin="0,-1,0,0" />
-                                                                        <TextBlock Classes="TagOutline" Text="✓ INSTALLED" Margin="0,1,0,0" />
-                                                                        <TextBlock Classes="TagGreen" Text="✓ INSTALLED" />
+                                                                        <TextBlock Classes="TagOutline" Text="&#x2713;" Margin="-1,0,0,0" />
+                                                                        <TextBlock Classes="TagOutline" Text="&#x2713;" Margin="1,0,0,0" />
+                                                                        <TextBlock Classes="TagOutline" Text="&#x2713;" Margin="0,-1,0,0" />
+                                                                        <TextBlock Classes="TagOutline" Text="&#x2713;" Margin="0,1,0,0" />
+                                                                        <TextBlock Classes="TagGreen" Text="&#x2713;" />
                                                                     </Panel>
                                                                 </Border>
 
-                                                                <Border Classes="ApiChip" IsVisible="{Binding HasDetectedApi}" ZIndex="10">
+                                                                <Border Classes="ApiChip" IsVisible="{Binding HasDetectedApi}"
+                                                                        ToolTip.Tip="{Binding ApiTooltip}" ZIndex="10">
                                                                     <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                                                                         <!-- A lit pip, so the chip reads as a live
                                                                              readout rather than a printed label. -->
@@ -1371,8 +1407,8 @@
                                                     </Border>
                                                 </StackPanel>
                                             </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                        </ItemsRepeater.ItemTemplate>
+                                    </ItemsRepeater>
 
                                     <!-- Empty State -->
                                     <Border IsVisible="{Binding !HasGames}" Margin="0,50,0,0" HorizontalAlignment="Center">
@@ -1434,7 +1470,7 @@
                                             </LinearGradientBrush>
                                         </Border.Background>
                                         <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                            <ProgressBar IsIndeterminate="True" Width="60" Height="3.5" VerticalAlignment="Center" Foreground="{Binding MotifAccentBrush}" />
+                                            <ProgressBar Classes="Flow" IsIndeterminate="True" Width="60" Height="3.5" VerticalAlignment="Center" Foreground="{Binding MotifAccentBrush}" />
                                             <TextBlock Text="{Binding ScanStatusText}" FontSize="12" FontWeight="SemiBold" Foreground="#E2E8F0" VerticalAlignment="Center" />
                                         </StackPanel>
                                     </Border>
@@ -1486,24 +1522,25 @@
                                                                        RenderOptions.BitmapInterpolationMode="HighQuality" />
 
                                                                 <Border IsVisible="{Binding !HasBannerImage}" Background="#121A16">
-                                                                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="Bold" Foreground="#64748B"
+                                                                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="Bold" Foreground="#94A3B8"
                                                                                TextAlignment="Center" TextWrapping="Wrap" Margin="18"
                                                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                                 </Border>
 
                                                                 <!-- Same two marks a game card gets -->
                                                                 <Border Classes="InstalledTag" IsVisible="{Binding HasModBadge}"
-                                                                        ToolTip.Tip="{Binding ModBadgeText}" ZIndex="10">
+                                                                        ToolTip.Tip="{Binding InstalledTooltip}" ZIndex="10">
                                                                     <Panel>
-                                                                        <TextBlock Classes="TagOutline" Text="✓ INSTALLED" Margin="-1,0,0,0" />
-                                                                        <TextBlock Classes="TagOutline" Text="✓ INSTALLED" Margin="1,0,0,0" />
-                                                                        <TextBlock Classes="TagOutline" Text="✓ INSTALLED" Margin="0,-1,0,0" />
-                                                                        <TextBlock Classes="TagOutline" Text="✓ INSTALLED" Margin="0,1,0,0" />
-                                                                        <TextBlock Classes="TagGreen" Text="✓ INSTALLED" />
+                                                                        <TextBlock Classes="TagOutline" Text="&#x2713;" Margin="-1,0,0,0" />
+                                                                        <TextBlock Classes="TagOutline" Text="&#x2713;" Margin="1,0,0,0" />
+                                                                        <TextBlock Classes="TagOutline" Text="&#x2713;" Margin="0,-1,0,0" />
+                                                                        <TextBlock Classes="TagOutline" Text="&#x2713;" Margin="0,1,0,0" />
+                                                                        <TextBlock Classes="TagGreen" Text="&#x2713;" />
                                                                     </Panel>
                                                                 </Border>
 
-                                                                <Border Classes="ApiChip" IsVisible="{Binding HasDetectedApi}" ZIndex="10">
+                                                                <Border Classes="ApiChip" IsVisible="{Binding HasDetectedApi}"
+                                                                        ToolTip.Tip="{Binding ApiTooltip}" ZIndex="10">
                                                                     <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                                                                         <!-- A lit pip, so the chip reads as a live
                                                                              readout rather than a printed label. -->
@@ -1529,7 +1566,7 @@
                                             <TextBlock Text="{Binding Loc.NoEmulatorsTitle}" FontSize="16" FontWeight="Bold" Foreground="#E2E8F0"
                                                        HorizontalAlignment="Center" />
                                             <TextBlock Text="{Binding Loc.NoEmulatorsDesc}"
-                                                       FontSize="12" Foreground="#7C8595" TextWrapping="Wrap" TextAlignment="Center" LineHeight="18" />
+                                                       FontSize="12" Foreground="#A3AEC0" TextWrapping="Wrap" TextAlignment="Center" LineHeight="18" />
                                             <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
                                                 <Button Classes="EmptyActionBtn" Click="OnDetectEmulatorsClicked" Cursor="Hand"
                                                         IsEnabled="{Binding !IsScanning}"
@@ -1547,6 +1584,222 @@
                                 </StackPanel>
                             </ScrollViewer>
                         </Border>
+
+                        <!-- 4. COMMUNITY VIEW - what other people got working.
+                             Everything on this page comes from the Worker in
+                             front of Cloudflare D1; nothing is fetched until
+                             the tab is opened for the first time. -->
+                        <Border Classes="PageReveal" Classes.Shown="{Binding IsCommunityViewVisible}"
+                                IsVisible="{Binding IsCommunityViewVisible}" Padding="20,4,20,0" ClipToBounds="False">
+                            <Grid RowDefinitions="Auto,Auto,*">
+
+                                <!-- Header -->
+                                <Border Grid.Row="0" Background="#10FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1"
+                                        CornerRadius="18" Padding="18,12" Margin="0,8,0,12">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Loc.CommunitySection}" FontSize="13.5" FontWeight="Bold"
+                                                       Foreground="#FFFFFF" LetterSpacing="0.5" VerticalAlignment="Center" />
+                                            <Border Background="#26F59E0B" BorderBrush="#55F59E0B" BorderThickness="1"
+                                                    CornerRadius="6" Padding="6,1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Loc.Beta}" FontSize="8.5" FontWeight="Bold"
+                                                           Foreground="#FCD34D" LetterSpacing="0.6" />
+                                            </Border>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Border Background="#10FFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1"
+                                                    CornerRadius="9" Padding="10,4" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Community.TotalText}" FontSize="10.5" FontWeight="Bold" Foreground="#CBD5E1" />
+                                            </Border>
+
+                                            <!-- Who you post as. Tapping it lets you change it. -->
+                                            <Border Background="#1A00FF88" BorderBrush="#3300FF88" BorderThickness="1"
+                                                    CornerRadius="9" Padding="10,4" VerticalAlignment="Center"
+                                                    IsVisible="{Binding Community.IsNamed}">
+                                                <TextBlock Text="{Binding Community.DisplayName}" FontSize="10.5" FontWeight="Bold" Foreground="#7CFFC4" />
+                                            </Border>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Button Classes="GlassLinkBtn Tutorials" Click="OnCommunityTutorialsClicked" Cursor="Hand"
+                                                    ToolTip.Tip="dlss5manager.numidiastudios.com/tutorials">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <PathIcon Data="M 21.58,7.19 C 21.35,6.33 20.67,5.65 19.81,5.42 18.25,5 12,5 12,5 12,5 5.75,5 4.19,5.42 3.33,5.65 2.65,6.33 2.42,7.19 2,8.75 2,12 2,12 2,12 2,15.25 2.42,16.81 2.65,17.67 3.33,18.35 4.19,18.58 5.75,19 12,19 12,19 12,19 18.25,19 19.81,18.58 20.67,18.35 21.35,17.67 21.58,16.81 22,15.25 22,12 22,12 22,12 22,8.75 21.58,7.19 Z M 10,15 V 9 L 15,12 Z"
+                                                              Width="15" Height="15" Foreground="#FF6B6B" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Loc.BtnCommunityGuides}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Button>
+
+                                            <Button Classes="EmptyActionBtn" Click="OnCommunityRefreshClicked" Cursor="Hand" Padding="14,7"
+                                                    IsEnabled="{Binding Community.IsIdle}">
+                                                <TextBlock Text="{Binding Loc.BtnRefresh}" FontSize="11" FontWeight="Bold" Foreground="#FFFFFF" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Filters: which install route, and how it went -->
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,14"
+                                            HorizontalAlignment="Center"
+                                            IsVisible="{Binding Community.IsNamed}">
+                                    <Border CornerRadius="13" Padding="3" Background="#0C1014"
+                                            BorderBrush="#20FFFFFF" BorderThickness="1" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="2">
+                                            <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsRouteAll}" Click="OnCommunityRouteClicked" Tag="" Content="ALL ROUTES" />
+                                            <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsRouteOpti}" Click="OnCommunityRouteClicked" Tag="optiscaler" Content="OPTISCALER" />
+                                            <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsRouteReShade}" Click="OnCommunityRouteClicked" Tag="dx12" Content="RESHADE" />
+                                            <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsRouteEmulator}" Click="OnCommunityRouteClicked" Tag="emulator" Content="EMULATOR" />
+                                            <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsRouteAmd}" Click="OnCommunityRouteClicked" Tag="amd" Content="AMD" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border CornerRadius="13" Padding="3" Background="#0C1014"
+                                            BorderBrush="#20FFFFFF" BorderThickness="1" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="2">
+                                            <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsResultAll}" Click="OnCommunityResultClicked" Tag="" Content="ANY RESULT" />
+                                            <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsResultWorking}" Click="OnCommunityResultClicked" Tag="working" Content="WORKING" />
+                                            <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsResultMixed}" Click="OnCommunityResultClicked" Tag="mixed" Content="MIXED" />
+                                            <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsResultBroken}" Click="OnCommunityResultClicked" Tag="broken" Content="NOT WORKING" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <Panel Grid.Row="2">
+
+                                    <!-- The gate. One field, no account: the name is how other
+                                         people see you and it is all we ask for. -->
+                                    <Border IsVisible="{Binding Community.IsAnonymous}"
+                                            Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                            CornerRadius="20" Padding="30" MaxWidth="520"
+                                            HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,40,0,0">
+                                        <StackPanel Spacing="14">
+                                            <TextBlock Text="{Binding Loc.CommunityJoinTitle}" FontSize="15" FontWeight="Bold"
+                                                       Foreground="#FFFFFF" HorizontalAlignment="Center" />
+                                            <TextBlock Text="{Binding Loc.CommunityJoinHint}" FontSize="11.5" Foreground="#A3AEC0"
+                                                       TextWrapping="Wrap" TextAlignment="Center" LineHeight="17" />
+
+                                            <!-- The server caps a display name at 24 characters, but this
+                                                 box also accepts the developer passphrase, which is longer.
+                                                 Trimming here would cut that sentence in half. -->
+                                            <TextBox Text="{Binding Community.NameDraft, Mode=TwoWay}"
+                                                     PlaceholderText="{Binding Loc.CommunityNamePlaceholder}"
+                                                     MaxLength="64" Height="38" FontSize="13" />
+
+                                            <Button Classes="ApplePrimaryBtn" Click="OnCommunityClaimNameClicked" Cursor="Hand"
+                                                    IsEnabled="{Binding Community.CanClaimName}"
+                                                    HorizontalAlignment="Center" Padding="26,10">
+                                                <TextBlock Text="{Binding Loc.BtnJoinCommunity}" FontSize="12" FontWeight="Bold" Foreground="#F5F5F7" />
+                                            </Button>
+
+                                            <TextBlock Text="{Binding Community.StatusMessage}" IsVisible="{Binding Community.HasStatusMessage}"
+                                                       FontSize="11.5" Foreground="#FCA5A5" TextWrapping="Wrap" TextAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- The grid -->
+                                    <ScrollViewer x:Name="CommunityScrollViewer"
+                                                  IsVisible="{Binding Community.IsNamed}"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  ClipToBounds="False">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="{Binding Community.StatusMessage}" IsVisible="{Binding Community.HasStatusMessage}"
+                                                       FontSize="11.5" Foreground="#FCA5A5" TextWrapping="Wrap" HorizontalAlignment="Center" />
+
+                                            <ItemsControl ItemsSource="{Binding Community.Games}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:CommunityGameViewModel">
+                                                        <Button Classes="CommunityCard" Click="OnCommunityGameClicked" Cursor="Hand"
+                                                                Width="352" Margin="7" Padding="0" HorizontalContentAlignment="Stretch">
+                                                            <Border Background="#0C1210" BorderBrush="#20FFFFFF" BorderThickness="1"
+                                                                    CornerRadius="16" Padding="12" ClipToBounds="True">
+                                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+
+                                                                    <!-- Cover, or the first letter when there is none -->
+                                                                    <Border Grid.Column="0" Width="66" Height="94" CornerRadius="10"
+                                                                            ClipToBounds="True" Background="#0A0F0D"
+                                                                            BorderBrush="#1AFFFFFF" BorderThickness="1">
+                                                                        <Panel>
+                                                                            <Image Source="{Binding Cover}" Stretch="UniformToFill"
+                                                                                   IsVisible="{Binding HasCover}"
+                                                                                   RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                                            <TextBlock Text="{Binding Initial}" IsVisible="{Binding !HasCover}"
+                                                                                       FontSize="26" FontWeight="Bold" Foreground="#33FFFFFF"
+                                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                        </Panel>
+                                                                    </Border>
+
+                                                                    <StackPanel Grid.Column="1" Spacing="7" VerticalAlignment="Center">
+                                                                        <Border Background="{Binding VerdictTint}" BorderBrush="{Binding VerdictEdge}"
+                                                                                BorderThickness="1" CornerRadius="7" Padding="8,2"
+                                                                                HorizontalAlignment="Left">
+                                                                            <TextBlock Text="{Binding VerdictText}" FontSize="9" FontWeight="Bold"
+                                                                                       Foreground="{Binding VerdictAccent}" LetterSpacing="0.6" />
+                                                                        </Border>
+
+                                                                        <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="Bold" Foreground="#FFFFFF"
+                                                                                   TextTrimming="CharacterEllipsis" MaxLines="2" TextWrapping="Wrap" />
+
+                                                                        <!-- The tally: worked / mixed / did not -->
+                                                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                                <Ellipse Width="7" Height="7" Fill="#22C55E" VerticalAlignment="Center" />
+                                                                                <TextBlock Text="{Binding Working}" FontSize="11" FontWeight="Bold" Foreground="#CBD5E1" />
+                                                                            </StackPanel>
+                                                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                                <Ellipse Width="7" Height="7" Fill="#F59E0B" VerticalAlignment="Center" />
+                                                                                <TextBlock Text="{Binding Mixed}" FontSize="11" FontWeight="Bold" Foreground="#CBD5E1" />
+                                                                            </StackPanel>
+                                                                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                                <Ellipse Width="7" Height="7" Fill="#EF4444" VerticalAlignment="Center" />
+                                                                                <TextBlock Text="{Binding Broken}" FontSize="11" FontWeight="Bold" Foreground="#CBD5E1" />
+                                                                            </StackPanel>
+                                                                        </StackPanel>
+
+                                                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                                                            <TextBlock Text="{Binding ReportsText}" FontSize="10.5" Foreground="#A3AEC0" />
+                                                                            <TextBlock Text="·" FontSize="10.5" Foreground="#A3AEC0" />
+                                                                            <TextBlock Text="{Binding CommentsText}" FontSize="10.5" Foreground="#A3AEC0" />
+                                                                        </StackPanel>
+                                                                    </StackPanel>
+
+                                                                    <Border Grid.Column="2" Width="28" Height="28" CornerRadius="14"
+                                                                            Background="#12FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1"
+                                                                            VerticalAlignment="Center">
+                                                                        <PathIcon Data="M 9,6 L 15,12 L 9,18" Width="10" Height="10" Foreground="#CBD5E1"
+                                                                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    </Border>
+                                                                </Grid>
+                                                            </Border>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <!-- Nobody has posted about anything matching this filter -->
+                                            <Border IsVisible="{Binding Community.IsEmpty}" Margin="0,40,0,0"
+                                                    Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                                    CornerRadius="20" Padding="30" MaxWidth="480" HorizontalAlignment="Center">
+                                                <StackPanel Spacing="8">
+                                                    <TextBlock Text="{Binding Loc.CommunityEmptyTitle}" FontSize="14" FontWeight="Bold"
+                                                               Foreground="#E2E8F0" HorizontalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Loc.CommunityEmptyHint}" FontSize="11.5" Foreground="#A3AEC0"
+                                                               TextWrapping="Wrap" TextAlignment="Center" LineHeight="17" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Border Height="70" IsHitTestVisible="False" />
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Panel>
+                            </Grid>
+                        </Border>
                     </Panel>
 
                 </Grid>
@@ -1555,6 +1808,124 @@
             <!-- ============================================================ -->
             <!-- MANAGE GAME SHEET                                            -->
             <!-- ============================================================ -->
+            <!-- ==============================================================
+                 BATCH SHEET
+                 Install or remove DLSS 5 across many games in one pass. Each
+                 row carries its own route, worked out from the API the
+                 analyzer recorded, because a Vulkan title and a DX11 title
+                 cannot take the same one. The route picker only appears on
+                 DX12 rows - that is the one case where both OptiScaler and
+                 ReShade + RenoDX are genuinely available.
+                 ============================================================== -->
+            <Panel IsVisible="{Binding IsBatchOpen}" ZIndex="9100">
+                <Border Background="#96000000" PointerPressed="OnBatchBackdropPressed" />
+
+                <Border Classes="GlassModalCard" Width="740" MaxHeight="680" Padding="24,20"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <DockPanel LastChildFill="True">
+
+                        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,14">
+                            <StackPanel Grid.Column="0" Spacing="3">
+                                <TextBlock Text="{Binding Loc.BatchTitle}" FontSize="17" FontWeight="Bold" Foreground="#FFFFFF" />
+                                <TextBlock Text="{Binding Loc.BatchSubtitle}" FontSize="11.5" Foreground="#A3AEC0"
+                                           TextWrapping="Wrap" MaxWidth="560" HorizontalAlignment="Left" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Classes="GlassWindowControlBtn Close" Click="OnBatchCloseClicked"
+                                    IsVisible="{Binding IsBatchIdle}"
+                                    VerticalAlignment="Top" ToolTip.Tip="{Binding Loc.Close}">
+                                <PathIcon Data="M 19,6.41 L 17.59,5 L 12,10.59 L 6.41,5 L 5,6.41 L 10.59,12 L 5,17.59 L 6.41,19 L 12,13.41 L 17.59,19 L 19,17.59 L 13.41,12 Z"
+                                          Width="10" Height="10" Foreground="#FF6961" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+
+                        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="9" Margin="0,0,0,12">
+                            <Button Grid.Column="0" Classes="EmptyActionBtn" Click="OnBatchSelectAllClicked"
+                                    Cursor="Hand" Padding="13,6" IsEnabled="{Binding IsBatchIdle}">
+                                <TextBlock Text="{Binding Loc.BatchSelectAll}" FontSize="11" FontWeight="SemiBold" Foreground="#CBD5E1" />
+                            </Button>
+
+                            <Button Grid.Column="1" Classes="EmptyActionBtn" Click="OnBatchSelectNoneClicked"
+                                    Cursor="Hand" Padding="13,6" IsEnabled="{Binding IsBatchIdle}">
+                                <TextBlock Text="{Binding Loc.BatchSelectNone}" FontSize="11" FontWeight="SemiBold" Foreground="#CBD5E1" />
+                            </Button>
+
+                            <TextBlock Grid.Column="3" Text="{Binding BatchSummaryText}" FontSize="11.5" FontWeight="SemiBold"
+                                       Foreground="#A3AEC0" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,14,0,0">
+                            <ProgressBar Value="{Binding BatchProgress}" Maximum="100" Height="4"
+                                         IsVisible="{Binding IsBatchRunning}"
+                                         Foreground="{Binding MotifAccentBrush}" Background="#20FFFFFF" CornerRadius="2" />
+
+                            <TextBlock Text="{Binding BatchStatusText}" FontSize="11" Foreground="#A3AEC0"
+                                       IsVisible="{Binding IsBatchRunning}" TextTrimming="CharacterEllipsis" />
+
+                            <TextBlock Text="{Binding BatchResultText}" FontSize="11.5" FontWeight="SemiBold"
+                                       Foreground="#CBD5E1" TextWrapping="Wrap" />
+
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <Button Grid.Column="0" Classes="PrimaryActionBtn" Click="OnBatchInstallClicked"
+                                        Cursor="Hand" IsEnabled="{Binding CanRunBatch}"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                    <TextBlock Text="{Binding Loc.BatchInstall}" FontSize="12" FontWeight="Bold" Foreground="#FFFFFF" />
+                                </Button>
+
+                                <Button Grid.Column="1" Classes="EmptyActionBtn" Click="OnBatchUninstallClicked"
+                                        Cursor="Hand" IsEnabled="{Binding CanRunBatch}"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="14,9">
+                                    <TextBlock Text="{Binding Loc.BatchUninstall}" FontSize="12" FontWeight="Bold" Foreground="#FCA5A5" />
+                                </Button>
+                            </Grid>
+                        </StackPanel>
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding BatchRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Classes="RowIn" Background="#5C121619" BorderBrush="#24FFFFFF" BorderThickness="1"
+                                                CornerRadius="12" Padding="12,9" Margin="0,0,0,7">
+                                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="11">
+                                                <CheckBox Grid.Column="0" IsChecked="{Binding Selected, Mode=TwoWay}"
+                                                          Click="OnBatchRowToggled" VerticalAlignment="Center" />
+
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold"
+                                                               Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                                        <TextBlock Text="{Binding ApiLabel}" FontSize="9.5" FontWeight="Bold"
+                                                                   Foreground="{DynamicResource AppAccentBrush}" LetterSpacing="0.5" />
+                                                        <TextBlock Text="{Binding RouteLabel}" FontSize="10" Foreground="#A3AEC0" />
+                                                        <TextBlock Text="{Binding Status}" FontSize="10" Foreground="#CBD5E1"
+                                                                   TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                                                    </StackPanel>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
+                                                            VerticalAlignment="Center" IsVisible="{Binding CanChooseRoute}">
+                                                    <RadioButton GroupName="{Binding Title}" IsChecked="{Binding UseOptiScaler, Mode=TwoWay}"
+                                                                 Content="OptiScaler" FontSize="10.5" Foreground="#CBD5E1" />
+                                                    <RadioButton GroupName="{Binding Title}" IsChecked="{Binding UseReShade, Mode=TwoWay}"
+                                                                 Content="ReShade" FontSize="10.5" Foreground="#CBD5E1" />
+                                                </StackPanel>
+
+                                                <Border Grid.Column="3" IsVisible="{Binding IsInstalled}"
+                                                        Background="#1C35D22B" BorderBrush="{DynamicResource AppAccentSoftBrush}"
+                                                        BorderThickness="1" CornerRadius="7" Padding="6,2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding BadgeInstalled}" FontSize="9" FontWeight="Bold"
+                                                               Foreground="{DynamicResource AppAccentBrush}" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+            </Panel>
+
             <Panel IsVisible="{Binding IsManageOpen}" ZIndex="9000">
                 <!-- Dimming backdrop: click outside to dismiss -->
                 <Border Background="#96000000" PointerPressed="OnManageBackdropPressed" />
@@ -1563,14 +1934,29 @@
                         HorizontalAlignment="Center" VerticalAlignment="Center">
                     <StackPanel Spacing="18">
 
-                        <!-- Header -->
-                        <Grid ColumnDefinitions="*,Auto">
+                        <!-- Header.
+                             SHARE RESULT lives up here rather than in the action
+                             row below: four buttons plus "Complete Installation"
+                             do not fit inside a 560px sheet, and the last one was
+                             pushed straight out through the frame. -->
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                             <StackPanel Grid.Column="0" Spacing="3">
                                 <TextBlock Text="{Binding ManageTitle}" FontSize="17" FontWeight="Bold" Foreground="#FFFFFF"
-                                           TextTrimming="CharacterEllipsis" MaxWidth="430" HorizontalAlignment="Left" />
+                                           TextTrimming="CharacterEllipsis" MaxWidth="330" HorizontalAlignment="Left" />
                             </StackPanel>
 
-                            <Button Grid.Column="1" Classes="GlassWindowControlBtn Close" Click="OnManageCloseClicked"
+                            <!-- SHARE RESULT: hidden with the rest of the Community
+                                 feature. It posts to NODIX TECH's Worker, which this
+                                 build has no credentials for, so it only produced a
+                                 404. Re-enable it together with the Community tab
+                                 once access is granted. -->
+                            <Button Grid.Column="1" Classes="EmptyActionBtn" Click="OnShareToCommunityClicked" Cursor="Hand"
+                                    IsEnabled="{Binding IsManageReady}" IsVisible="False"
+                                    Padding="13,6" VerticalAlignment="Top">
+                                <TextBlock Text="{Binding Loc.CommunityShare}" FontSize="10.5" FontWeight="Bold" Foreground="#F1F5F9" />
+                            </Button>
+
+                            <Button Grid.Column="2" Classes="GlassWindowControlBtn Close" Click="OnManageCloseClicked"
                                     IsVisible="{Binding !IsInstalling}"
                                     VerticalAlignment="Top" ToolTip.Tip="{Binding Loc.Close}">
                                 <PathIcon Data="M 19,6.41 L 17.59,5 L 12,10.59 L 6.41,5 L 5,6.41 L 10.59,12 L 5,17.59 L 6.41,19 L 12,13.41 L 17.59,19 L 19,17.59 L 13.41,12 Z"
@@ -1579,7 +1965,7 @@
 
                             <!-- While the mod is being written, the close control becomes a
                                  spinner: dismissing the sheet mid-install is not an option. -->
-                            <Border Grid.Column="1" Classes="ManageBusyRing" IsVisible="{Binding IsInstalling}"
+                            <Border Grid.Column="2" Classes="ManageBusyRing" IsVisible="{Binding IsInstalling}"
                                     VerticalAlignment="Top" HorizontalAlignment="Right"
                                     Width="26" Height="26" CornerRadius="13"
                                     Background="#12FFFFFF" BorderBrush="#1FFFFFFF" BorderThickness="1"
@@ -1612,7 +1998,7 @@
                             <StackPanel Spacing="10">
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                                     <StackPanel Grid.Column="0" Spacing="3">
-                                        <TextBlock Text="{Binding Loc.GameExecutable}" FontSize="10" FontWeight="Bold" Foreground="#7C8595" LetterSpacing="0.8" />
+                                        <TextBlock Text="{Binding Loc.GameExecutable}" FontSize="10" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
                                         <TextBlock Text="{Binding ManageExePath}" FontSize="12" Foreground="#E2E8F0"
                                                    TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                                     </StackPanel>
@@ -1626,7 +2012,7 @@
 
                                 <!-- nvngx_dlssnr.dll is the file DLSS 5 cannot run without -->
                                 <StackPanel Spacing="3" IsVisible="{Binding IsTargetDetailsOpen}">
-                                    <TextBlock Text="DLSS 5 STATUS" FontSize="9.5" FontWeight="Bold" Foreground="#7C8595" LetterSpacing="0.8" />
+                                    <TextBlock Text="DLSS 5 STATUS" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
                                     <TextBlock Text="{Binding ManageDlss5Text}" FontSize="12" FontWeight="Bold"
                                                Foreground="{Binding ManageDlss5Brush}" TextWrapping="Wrap" />
                                 </StackPanel>
@@ -1636,15 +2022,15 @@
 
                                 <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8" IsVisible="{Binding IsTargetDetailsOpen}">
                                     <StackPanel Grid.Column="0" Spacing="3">
-                                        <TextBlock Text="RESHADE" FontSize="9.5" FontWeight="Bold" Foreground="#7C8595" LetterSpacing="0.8" />
+                                        <TextBlock Text="RESHADE" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
                                         <TextBlock Text="{Binding ManageReShadeText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#CBD5E1" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Spacing="3">
-                                        <TextBlock Text="DLSS" FontSize="9.5" FontWeight="Bold" Foreground="#7C8595" LetterSpacing="0.8" />
+                                        <TextBlock Text="DLSS" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
                                         <TextBlock Text="{Binding ManageDlssText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#CBD5E1" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2" Spacing="3">
-                                        <TextBlock Text="STREAMLINE" FontSize="9.5" FontWeight="Bold" Foreground="#7C8595" LetterSpacing="0.8" />
+                                        <TextBlock Text="STREAMLINE" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
                                         <TextBlock Text="{Binding ManageStreamlineText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#CBD5E1" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </Grid>
@@ -1657,7 +2043,7 @@
                                 <!-- What the executable and its folder turned out to be -->
                                 <Grid ColumnDefinitions="Auto,*">
                                     <TextBlock Grid.Column="0" Text="{Binding Loc.InstallMode}" FontSize="9.5" FontWeight="Bold"
-                                               Foreground="#7C8595" LetterSpacing="0.8" VerticalAlignment="Center" />
+                                               Foreground="#A3AEC0" LetterSpacing="0.8" VerticalAlignment="Center" />
 
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                                         <Border Classes="DetectChip">
@@ -1711,7 +2097,7 @@
                                      the same files and only differ in which library OptiScaler
                                      hooks; neural upstream is a different build of it. -->
                                 <Grid Classes="RouteReveal" Classes.Shown="{Binding IsOptiApiChoiceVisible}" ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding IsOptiApiChoiceVisible}">
-                                    <TextBlock Grid.Column="0" Text="API" FontSize="9.5" FontWeight="Bold" Foreground="#7C8595"
+                                    <TextBlock Grid.Column="0" Text="API" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0"
                                                LetterSpacing="0.8" VerticalAlignment="Center" />
 
                                     <Border Grid.Column="1" CornerRadius="13" Padding="3" Background="#0C1014"
@@ -1746,7 +2132,7 @@
 
                                 <!-- Build: only DX11 and DX9 come in two -->
                                 <Grid Classes="RouteReveal" Classes.Shown="{Binding IsArchChoiceVisible}" ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding IsArchChoiceVisible}">
-                                    <TextBlock Grid.Column="0" Text="BUILD" FontSize="9.5" FontWeight="Bold" Foreground="#7C8595"
+                                    <TextBlock Grid.Column="0" Text="BUILD" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0"
                                                LetterSpacing="0.8" VerticalAlignment="Center" />
 
                                     <Border Grid.Column="1" CornerRadius="13" Padding="3" Background="#0C1014"
@@ -1799,7 +2185,7 @@
                                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                                         <TextBlock Text="NEURAL UPSTREAM" FontSize="9.5" FontWeight="Bold"
-                                                   Foreground="#7C8595" LetterSpacing="0.8" VerticalAlignment="Center" />
+                                                   Foreground="#A3AEC0" LetterSpacing="0.8" VerticalAlignment="Center" />
                                         <Border Background="#26F59E0B" BorderBrush="#55F59E0B" BorderThickness="1"
                                                 CornerRadius="6" Padding="6,1" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Loc.Beta}" FontSize="8.5" FontWeight="Bold"
@@ -1838,7 +2224,7 @@
                                 CornerRadius="16" Padding="16,13">
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
                                 <TextBlock Grid.Column="0" Text="{Binding Loc.OverlaySection}" FontSize="9.5" FontWeight="Bold"
-                                           Foreground="#7C8595" LetterSpacing="0.8" VerticalAlignment="Center" />
+                                           Foreground="#A3AEC0" LetterSpacing="0.8" VerticalAlignment="Center" />
 
                                 <Border Grid.Column="1" CornerRadius="13" Padding="3" Background="#0C1014"
                                         BorderBrush="#20FFFFFF" BorderThickness="1" HorizontalAlignment="Stretch">
@@ -1926,15 +2312,27 @@
                         </Button>
                     </Grid>
 
-                    <Button Classes="GlassLinkBtn Donate" Click="OnSupportPromptDonateClicked" Cursor="Hand"
-                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                            ToolTip.Tip="ko-fi.com/nodix">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <PathIcon Data="M 12,21.35 L 10.55,20.03 C 5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3 9.24,3 10.91,3.81 12,5.09 13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5 22,12.28 18.6,15.36 13.45,20.04 Z"
-                                      Width="15" Height="15" Foreground="#FF8FB1" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding Loc.BtnSupportKofi}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="9">
+                        <Button Grid.Column="0" Classes="GlassLinkBtn Donate" Click="OnSupportPromptDonateClicked" Cursor="Hand"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                ToolTip.Tip="ko-fi.com/potatoes9411">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M 12,21.35 L 10.55,20.03 C 5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3 9.24,3 10.91,3.81 12,5.09 13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5 22,12.28 18.6,15.36 13.45,20.04 Z"
+                                          Width="15" Height="15" Foreground="#FF8FB1" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding DonateLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="1" Classes="GlassLinkBtn Donate" Click="OnSupportPromptOriginalDonateClicked" Cursor="Hand"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                ToolTip.Tip="ko-fi.com/nodix">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <PathIcon Data="M 12,21.35 L 10.55,20.03 C 5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3 9.24,3 10.91,3.81 12,5.09 13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5 22,12.28 18.6,15.36 13.45,20.04 Z"
+                                          Width="15" Height="15" Foreground="#FF8FB1" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding OriginalDonateLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
                 </StackPanel>
             </Border>
 
@@ -1963,6 +2361,392 @@
                     </Border>
                 </Border>
             </Canvas>
+
+            <!-- ============================================================ -->
+            <!-- COMMUNITY: ONE GAME'S REPORTS                                -->
+            <!-- ============================================================ -->
+            <Panel IsVisible="{Binding Community.IsSheetOpen}" ZIndex="9200">
+                <Border Background="#96000000" PointerPressed="OnCommunitySheetCloseClicked" />
+
+                <Border Classes="GlassModalCard" Width="760" MaxHeight="700"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+                    <Grid RowDefinitions="Auto,Auto,*">
+
+                        <!-- Title and close -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+                            <StackPanel Grid.Column="0" Spacing="3">
+                                <TextBlock Text="{Binding Community.SheetTitle}" FontSize="18" FontWeight="Bold" Foreground="#FFFFFF"
+                                           TextTrimming="CharacterEllipsis" MaxWidth="560" HorizontalAlignment="Left" />
+                                <TextBlock Text="{Binding Loc.CommunitySection}" FontSize="10.5" FontWeight="Bold"
+                                           Foreground="#94A3B8" LetterSpacing="0.6" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Classes="GlassWindowControlBtn Close" Click="OnCommunitySheetCloseClicked"
+                                    VerticalAlignment="Top" ToolTip.Tip="{Binding Loc.Close}">
+                                <PathIcon Data="M 19,6.41 L 17.59,5 L 12,10.59 L 6.41,5 L 5,6.41 L 10.59,12 L 5,17.59 L 6.41,19 L 12,13.41 L 17.59,19 L 19,17.59 L 13.41,12 Z"
+                                          Width="10" Height="10" Foreground="#FF6961" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+
+                        <!-- Which install method worked here. One chip per route
+                             people actually used, with that route's own tally. -->
+                        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                      Margin="0,0,0,14" IsVisible="{Binding Community.HasRouteChips}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Classes="RouteChip" Click="OnCommunitySheetRouteClicked" Tag="" Cursor="Hand" Padding="0">
+                                    <Border Background="#5C121619" BorderBrush="#20FFFFFF" BorderThickness="1"
+                                            CornerRadius="12" Padding="13,9">
+                                        <TextBlock Text="ALL" FontSize="11.5" FontWeight="Bold" Foreground="#E2E8F0" VerticalAlignment="Center" />
+                                    </Border>
+                                </Button>
+
+                                <ItemsControl ItemsSource="{Binding Community.RouteChips}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="8" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RouteChipViewModel">
+                                            <Button Classes="RouteChip" Click="OnCommunitySheetRouteClicked" Tag="{Binding Route}"
+                                                    Cursor="Hand" Padding="0">
+                                                <Border Background="{Binding Tint}" BorderBrush="{Binding Edge}" BorderThickness="1"
+                                                        CornerRadius="12" Padding="13,9">
+                                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                                        <TextBlock Text="{Binding Label}" FontSize="11.5" FontWeight="Bold"
+                                                                   Foreground="{Binding Accent}" VerticalAlignment="Center" />
+                                                        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                <Ellipse Width="6" Height="6" Fill="#22C55E" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding Working}" FontSize="10.5" FontWeight="Bold" Foreground="#CBD5E1" />
+                                                            </StackPanel>
+                                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                <Ellipse Width="6" Height="6" Fill="#F59E0B" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding Mixed}" FontSize="10.5" FontWeight="Bold" Foreground="#CBD5E1" />
+                                                            </StackPanel>
+                                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                <Ellipse Width="6" Height="6" Fill="#EF4444" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding Broken}" FontSize="10.5" FontWeight="Bold" Foreground="#CBD5E1" />
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- The feed -->
+                        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="12">
+
+                                <Border IsVisible="{Binding !Community.HasReports}" Background="#66101418" BorderBrush="#26FFFFFF"
+                                        BorderThickness="1" CornerRadius="16" Padding="24" HorizontalAlignment="Center" Margin="0,20,0,0">
+                                    <TextBlock Text="{Binding Loc.NoReportsTitle}" FontSize="12.5" Foreground="#94A3B8" />
+                                </Border>
+
+                                <ItemsControl ItemsSource="{Binding Community.Reports}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:CommunityReportViewModel">
+                                            <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                                    CornerRadius="16" Padding="16" Margin="0,0,0,10">
+                                                <StackPanel Spacing="11">
+
+                                                    <!-- Who, when, and how it went -->
+                                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                        <Border Grid.Column="0" Width="34" Height="34" CornerRadius="10"
+                                                                Background="#12FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1"
+                                                                VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Initial}" FontSize="14" FontWeight="Bold"
+                                                                       Foreground="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+
+                                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                                <TextBlock Text="{Binding Author}" FontSize="13" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+
+                                                                <!-- The developer's own handle. The server refuses every
+                                                                     name containing "nodix" to anyone else, so this badge
+                                                                     only shows what the server already guaranteed. -->
+                                                                <Border Background="#1A00FF88" BorderBrush="#4400FF88" BorderThickness="1"
+                                                                        CornerRadius="6" Padding="6,1" VerticalAlignment="Center"
+                                                                        IsVisible="{Binding IsVerified}"
+                                                                        ToolTip.Tip="Verified developer">
+                                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                        <PathIcon Data="M 12,2 L 15,5 L 19,5 L 19,9 L 22,12 L 19,15 L 19,19 L 15,19 L 12,22 L 9,19 L 5,19 L 5,15 L 2,12 L 5,9 L 5,5 L 9,5 Z M 10.6,15.6 L 17,9.2 L 15.6,7.8 L 10.6,12.8 L 8.4,10.6 L 7,12 Z"
+                                                                                  Width="10" Height="10" Foreground="#00FF88" VerticalAlignment="Center" />
+                                                                        <TextBlock Text="DEV" FontSize="8.5" FontWeight="Bold" Foreground="#7CFFC4" LetterSpacing="0.6" />
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Ago}" FontSize="10.5" Foreground="#94A3B8" />
+                                                        </StackPanel>
+
+                                                        <Border Grid.Column="2" Background="{Binding StatusTint}" BorderBrush="{Binding StatusEdge}"
+                                                                BorderThickness="1" CornerRadius="8" Padding="10,4" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding StatusText}" FontSize="9.5" FontWeight="Bold"
+                                                                       Foreground="{Binding StatusAccent}" LetterSpacing="0.6" />
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <!-- How it was installed - the part the competitor does not show -->
+                                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                                        <Border Background="{Binding RouteTint}" BorderBrush="{Binding RouteEdge}" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3">
+                                                            <TextBlock Text="{Binding RouteLabel}" FontSize="10.5" FontWeight="Bold" Foreground="{Binding RouteAccent}" />
+                                                        </Border>
+                                                        <Border Background="#12FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3">
+                                                            <TextBlock Text="{Binding TargetLabel}" FontSize="10.5" FontWeight="Bold" Foreground="#94A3B8" />
+                                                        </Border>
+                                                        <Border Background="#1AF59E0B" BorderBrush="#33F59E0B" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3" IsVisible="{Binding HasNeural}">
+                                                            <TextBlock Text="NEURAL" FontSize="10.5" FontWeight="Bold" Foreground="#FCD34D" />
+                                                        </Border>
+                                                        <Border Background="#1A00FF88" BorderBrush="#3300FF88" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3" IsVisible="{Binding HasOverlay}">
+                                                            <TextBlock Text="OVERLAY" FontSize="10.5" FontWeight="Bold" Foreground="#7CFFC4" />
+                                                        </Border>
+                                                    </StackPanel>
+
+                                                    <TextBlock Text="{Binding Body}" IsVisible="{Binding HasBody}" FontSize="12.5"
+                                                               Foreground="#E2E8F0" TextWrapping="Wrap" LineHeight="19" />
+
+                                                    <!-- The machine, only when the poster attached it -->
+                                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3" IsVisible="{Binding HasGpu}">
+                                                            <TextBlock Text="{Binding Gpu}" FontSize="10.5" Foreground="#CBD5E1" />
+                                                        </Border>
+                                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3" IsVisible="{Binding HasDriver}">
+                                                            <TextBlock Text="{Binding Driver}" FontSize="10.5" Foreground="#CBD5E1" />
+                                                        </Border>
+                                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3" IsVisible="{Binding HasCpu}">
+                                                            <TextBlock Text="{Binding Cpu}" FontSize="10.5" Foreground="#CBD5E1" />
+                                                        </Border>
+                                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3" IsVisible="{Binding HasRam}">
+                                                            <TextBlock Text="{Binding Ram}" FontSize="10.5" Foreground="#CBD5E1" />
+                                                        </Border>
+                                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3" IsVisible="{Binding HasOs}">
+                                                            <TextBlock Text="{Binding Os}" FontSize="10.5" Foreground="#CBD5E1" />
+                                                        </Border>
+                                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1"
+                                                                CornerRadius="8" Padding="9,3" IsVisible="{Binding HasVersion}">
+                                                            <TextBlock Text="{Binding AppVersion}" FontSize="10.5" Foreground="#CBD5E1" />
+                                                        </Border>
+                                                    </StackPanel>
+
+                                                    <!-- Reactions and the reply toggle -->
+                                                    <Grid ColumnDefinitions="*,Auto">
+                                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7">
+                                                            <Button Classes="EmojiBtn" Click="OnCommunityReactClicked" Tag="1" Cursor="Hand">
+                                                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                    <TextBlock Text="{Binding Emoji1}" FontSize="13" />
+                                                                    <TextBlock Text="{Binding Count1}" FontSize="10.5" FontWeight="Bold" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button Classes="EmojiBtn" Click="OnCommunityReactClicked" Tag="2" Cursor="Hand">
+                                                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                    <TextBlock Text="{Binding Emoji2}" FontSize="13" />
+                                                                    <TextBlock Text="{Binding Count2}" FontSize="10.5" FontWeight="Bold" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button Classes="EmojiBtn" Click="OnCommunityReactClicked" Tag="3" Cursor="Hand">
+                                                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                    <TextBlock Text="{Binding Emoji3}" FontSize="13" />
+                                                                    <TextBlock Text="{Binding Count3}" FontSize="10.5" FontWeight="Bold" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button Classes="EmojiBtn" Click="OnCommunityReactClicked" Tag="4" Cursor="Hand">
+                                                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                    <TextBlock Text="{Binding Emoji4}" FontSize="13" />
+                                                                    <TextBlock Text="{Binding Count4}" FontSize="10.5" FontWeight="Bold" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button Classes="EmojiBtn" Click="OnCommunityReactClicked" Tag="5" Cursor="Hand">
+                                                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                                                    <TextBlock Text="{Binding Emoji5}" FontSize="13" />
+                                                                    <TextBlock Text="{Binding Count5}" FontSize="10.5" FontWeight="Bold" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </StackPanel>
+
+                                                        <Button Grid.Column="1" Classes="EmptyActionBtn" Click="OnCommunityCommentsClicked"
+                                                                Cursor="Hand" Padding="12,6">
+                                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                                <PathIcon Data="M 20,2 H 4 C 2.9,2 2,2.9 2,4 V 22 L 6,18 H 20 C 21.1,18 22,17.1 22,16 V 4 C 22,2.9 21.1,2 20,2 Z"
+                                                                          Width="12" Height="12" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                <TextBlock Text="{Binding CommentCountText}" FontSize="11" FontWeight="Bold"
+                                                                           Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </Grid>
+
+                                                    <!-- Replies -->
+                                                    <StackPanel Spacing="9" IsVisible="{Binding IsCommentsOpen}">
+                                                        <Rectangle Height="1" Fill="#12FFFFFF" HorizontalAlignment="Stretch" />
+
+                                                        <ItemsControl ItemsSource="{Binding Comments}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="vm:CommunityCommentViewModel">
+                                                                    <Border Background="#66101418" BorderBrush="#14FFFFFF" BorderThickness="1"
+                                                                            CornerRadius="12" Padding="12,9" Margin="0,0,0,7">
+                                                                        <StackPanel Spacing="4">
+                                                                            <StackPanel Orientation="Horizontal" Spacing="9">
+                                                                                <TextBlock Text="{Binding Author}" FontSize="11.5" FontWeight="Bold" Foreground="#E2E8F0" VerticalAlignment="Center" />
+                                                                                <Border Background="#1A00FF88" BorderBrush="#4400FF88" BorderThickness="1"
+                                                                                        CornerRadius="5" Padding="5,0.5" VerticalAlignment="Center"
+                                                                                        IsVisible="{Binding IsVerified}" ToolTip.Tip="Verified developer">
+                                                                                    <TextBlock Text="DEV" FontSize="8" FontWeight="Bold" Foreground="#7CFFC4" LetterSpacing="0.5" />
+                                                                                </Border>
+                                                                                <TextBlock Text="{Binding Ago}" FontSize="10" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            </StackPanel>
+                                                                            <TextBlock Text="{Binding Body}" FontSize="12" Foreground="#CBD5E1"
+                                                                                       TextWrapping="Wrap" LineHeight="18" />
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+
+                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="9">
+                                                            <TextBox Grid.Column="0" Text="{Binding ReplyText, Mode=TwoWay}"
+                                                                     PlaceholderText="{Binding $parent[Window].DataContext.Loc.ReplyPlaceholder}"
+                                                                     MaxLength="400" Height="34" FontSize="12" />
+                                                            <Button Grid.Column="1" Classes="EmptyActionBtn" Click="OnCommunityReplyClicked"
+                                                                    Cursor="Hand" Padding="14,7" IsEnabled="{Binding CanReply}">
+                                                                <TextBlock Text="{Binding $parent[Window].DataContext.Loc.BtnReply}"
+                                                                           FontSize="11" FontWeight="Bold" Foreground="#FFFFFF" />
+                                                            </Button>
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Panel>
+
+            <!-- ============================================================ -->
+            <!-- COMMUNITY: THE COMPOSER                                      -->
+            <!-- Opened from a game's Manage sheet, so the install method is   -->
+            <!-- already known and the user only picks the verdict.            -->
+            <!-- ============================================================ -->
+            <Panel IsVisible="{Binding Community.IsComposerOpen}" ZIndex="9300">
+                <Border Background="#B4000000" PointerPressed="OnComposerCloseClicked" />
+
+                <Border Classes="GlassModalCard" Width="560" MaxHeight="660"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Padding="24">
+                    <StackPanel Spacing="16">
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="3">
+                                <TextBlock Text="{Binding Loc.CommunityPostTitle}" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF" />
+                                <TextBlock Text="{Binding Community.ComposeTitle}" FontSize="12" Foreground="#94A3B8"
+                                           TextTrimming="CharacterEllipsis" MaxWidth="400" HorizontalAlignment="Left" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Classes="GlassWindowControlBtn Close" Click="OnComposerCloseClicked"
+                                    VerticalAlignment="Top" ToolTip.Tip="{Binding Loc.Close}">
+                                <PathIcon Data="M 19,6.41 L 17.59,5 L 12,10.59 L 6.41,5 L 5,6.41 L 10.59,12 L 5,17.59 L 6.41,19 L 12,13.41 L 17.59,19 L 19,17.59 L 13.41,12 Z"
+                                          Width="10" Height="10" Foreground="#FF6961" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+
+                        <!-- Verdict -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding Loc.CommunityResult}" FontSize="10.5" FontWeight="Bold"
+                                       Foreground="#A3AEC0" LetterSpacing="0.6" />
+                            <Border CornerRadius="13" Padding="3" Background="#0C1014" BorderBrush="#20FFFFFF" BorderThickness="1">
+                                <UniformGrid Columns="3">
+                                    <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsStatusWorking}"
+                                            Click="OnComposerStatusClicked" Tag="working" Content="{Binding Loc.StatusWorking}" />
+                                    <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsStatusMixed}"
+                                            Click="OnComposerStatusClicked" Tag="mixed" Content="{Binding Loc.StatusMixed}" />
+                                    <Button Classes="SegmentedTab" Classes.Active="{Binding Community.IsStatusBroken}"
+                                            Click="OnComposerStatusClicked" Tag="broken" Content="{Binding Loc.StatusBroken}" />
+                                </UniformGrid>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- The route, read straight off the install manifest -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding Loc.CommunityInstallMethod}" FontSize="10.5" FontWeight="Bold"
+                                       Foreground="#A3AEC0" LetterSpacing="0.6" />
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <Border Background="#1438BDF8" BorderBrush="#3338BDF8" BorderThickness="1" CornerRadius="9" Padding="11,5">
+                                    <TextBlock Text="{Binding Community.ComposeRouteLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#7DD3FC" />
+                                </Border>
+                                <Border Background="#12FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1" CornerRadius="9" Padding="11,5">
+                                    <TextBlock Text="{Binding Community.ComposeTargetLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8" />
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Note -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding Loc.CommunityNote}" FontSize="10.5" FontWeight="Bold"
+                                       Foreground="#A3AEC0" LetterSpacing="0.6" />
+                            <TextBox Text="{Binding Community.ComposeBody, Mode=TwoWay}"
+                                     PlaceholderText="{Binding Loc.CommunityNotePlaceholder}"
+                                     AcceptsReturn="True" TextWrapping="Wrap" MaxLength="600" Height="86" FontSize="12.5" />
+                        </StackPanel>
+
+                        <!-- Hardware. Nothing is read until Detect is pressed, and
+                             what it found is shown before it is ever sent. -->
+                        <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Loc.CommunitySpecs}" FontSize="10.5" FontWeight="Bold"
+                                           Foreground="#A3AEC0" LetterSpacing="0.6" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="7">
+                                    <Button Classes="EmptyActionBtn" Click="OnComposerDetectSpecsClicked" Cursor="Hand" Padding="12,5"
+                                            IsVisible="{Binding !Community.HasSpecs}" IsEnabled="{Binding !Community.IsDetectingSpecs}">
+                                        <TextBlock Text="{Binding Loc.BtnDetectSpecs}" FontSize="10.5" FontWeight="Bold" Foreground="#FFFFFF" />
+                                    </Button>
+                                    <Button Classes="EmptyActionBtn" Click="OnComposerClearSpecsClicked" Cursor="Hand" Padding="12,5"
+                                            IsVisible="{Binding Community.HasSpecs}">
+                                        <TextBlock Text="{Binding Loc.BtnRemoveSpecs}" FontSize="10.5" FontWeight="Bold" Foreground="#EF4444" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Spacing="7" IsVisible="{Binding Community.HasSpecs}">
+                                <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="8" Padding="9,3">
+                                    <TextBlock Text="{Binding Community.SpecsGpu}" FontSize="10.5" Foreground="#CBD5E1" />
+                                </Border>
+                                <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="8" Padding="9,3">
+                                    <TextBlock Text="{Binding Community.SpecsDriver}" FontSize="10.5" Foreground="#CBD5E1" />
+                                </Border>
+                                <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="8" Padding="9,3">
+                                    <TextBlock Text="{Binding Community.SpecsRam}" FontSize="10.5" Foreground="#CBD5E1" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="{Binding Community.SpecsOs}" IsVisible="{Binding Community.HasSpecs}"
+                                       FontSize="10.5" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Community.SpecsCpu}" IsVisible="{Binding Community.HasSpecs}"
+                                       FontSize="10.5" Foreground="#A3AEC0" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding Community.StatusMessage}" IsVisible="{Binding Community.HasStatusMessage}"
+                                   FontSize="11.5" Foreground="#FCA5A5" TextWrapping="Wrap" />
+
+                        <Button Classes="ApplePrimaryBtn" Click="OnComposerPostClicked" Cursor="Hand"
+                                IsEnabled="{Binding Community.IsIdle}" HorizontalAlignment="Right" Padding="28,10">
+                            <TextBlock Text="{Binding Loc.BtnPost}" FontSize="12" FontWeight="Bold" Foreground="#F5F5F7" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Panel>
         </Panel>
     </Border>
 </Window>

@@ -1,0 +1,60 @@
+DLSS 5 SUITE
+============
+
+This is a modified version of DLSS 5 MANAGER, published with the permission of
+its author.
+
+  Original work:  DLSS 5 MANAGER
+  Built by:       NODIX TECH
+  Published by:   Numidia Studios
+  Download:       https://numidiastudios.com/dlss-5-manager/
+  Terms:          see Copyright.txt in this folder
+
+  This build:     DLSS 5 SUITE 1.2.0-suite.1
+  Built by:       Potatoes9411
+  Published by:   Potatoes-dev - https://potatoes-dev.com
+
+
+PERMISSION AND ITS CONDITIONS
+-----------------------------
+
+NODIX TECH granted permission for this modified build on 2026-09-09, on the
+following conditions. They are not optional and they are not courtesies.
+
+  1. The rights in the original application are respected, and its credits and
+     copyright notices are kept.
+
+  2. The original's download location is not changed or replaced. This build
+     must state that it is a modified version of DLSS 5 MANAGER and must carry
+     the link to the original:
+
+         https://numidiastudios.com/dlss-5-manager/
+
+     Updates to this modified build are served from its own releases; that
+     link is for the original and points at NODIX TECH's own site.
+
+  3. When NODIX TECH launches their community guides website, this build must
+     link to it from within the application.
+
+  4. NODIX TECH may take any change made in this build into DLSS 5 MANAGER
+     itself, at any time, without asking first.
+
+
+WHERE THOSE CONDITIONS LIVE IN THE CODE
+---------------------------------------
+
+  Condition 2   Services/UpdateChecker.fs -> OriginalDownloadUrl
+                Shown in the About card as "Get the original DLSS 5 MANAGER".
+                The About card also carries the "Modified version of
+                DLSS 5 MANAGER" credit line, in all twelve languages.
+
+  Condition 3   Services/UpdateChecker.fs -> GuidesUrl
+                Empty until the site exists. Filling it in makes the button
+                appear; nothing else needs changing.
+
+
+TRADEMARKS
+----------
+
+NVIDIA, DLSS and the NVIDIA eye logo are trademarks of NVIDIA Corporation.
+This project is not affiliated with, endorsed by, or sponsored by NVIDIA.

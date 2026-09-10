@@ -5,7 +5,7 @@
   },
   "projects": {
     "C:\\Users\\oofer\\Documents\\DLSS5 SUITE\\DLSS-5-MANAGER-main\\DLSS 5 SUITE.fsproj": {
-      "version": "1.2.0",
+      "version": "1.2.0-suite.1",
       "restore": {
         "projectUniqueName": "C:\\Users\\oofer\\Documents\\DLSS5 SUITE\\DLSS-5-MANAGER-main\\DLSS 5 SUITE.fsproj",
         "projectName": "DLSS 5 SUITE",
@@ -45,6 +45,11 @@
               "version": "[12.1.0, )",
               "generatePathProperty": true
             },
+            "Avalonia.Controls.ItemsRepeater": {
+              "target": "Package",
+              "version": "[12.0.0, )",
+              "generatePathProperty": true
+            },
             "Avalonia.Desktop": {
               "target": "Package",
               "version": "[12.1.0, )",
@@ -61,8 +66,6 @@
               "generatePathProperty": true
             },
             "AvaloniaUI.DiagnosticsSupport": {
-              "include": "None",
-              "suppressParent": "All",
               "target": "Package",
               "version": "[2.2.3, )",
               "generatePathProperty": true
@@ -100,31 +103,12 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
-              "version": "[8.0.30, 8.0.30]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Runtime.win-x64",
-              "version": "[8.0.30, 8.0.30]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
-              "version": "[8.0.30, 8.0.30]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
             }
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.424/PortableRuntimeIdentifierGraph.json"
-        }
-      },
-      "runtimes": {
-        "win-x64": {
-          "#import": []
         }
       }
     }

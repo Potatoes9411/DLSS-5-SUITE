@@ -6,9 +6,10 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v8.0": {
-      "DLSS 5 SUITE/1.2.0": {
+      "DLSS 5 SUITE/1.2.0-suite.1": {
         "dependencies": {
           "Avalonia": "12.1.0",
+          "Avalonia.Controls.ItemsRepeater": "12.0.0",
           "Avalonia.Desktop": "12.1.0",
           "Avalonia.Fonts.Inter": "12.1.0",
           "Avalonia.Themes.Fluent": "12.1.0",
@@ -95,6 +96,17 @@
         }
       },
       "Avalonia.BuildServices/11.3.2": {},
+      "Avalonia.Controls.ItemsRepeater/12.0.0": {
+        "dependencies": {
+          "Avalonia": "12.1.0"
+        },
+        "runtime": {
+          "lib/net8.0/Avalonia.Controls.ItemsRepeater.dll": {
+            "assemblyVersion": "12.0.0.0",
+            "fileVersion": "12.0.0.0"
+          }
+        }
+      },
       "Avalonia.Desktop/12.1.0": {
         "dependencies": {
           "Avalonia": "12.1.0",
@@ -650,7 +662,7 @@
     }
   },
   "libraries": {
-    "DLSS 5 SUITE/1.2.0": {
+    "DLSS 5 SUITE/1.2.0-suite.1": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
@@ -675,6 +687,13 @@
       "sha512": "sha512-qHDToxto1e3hci5YqbG9n0Ty8mlp3zBUN5wT66wKqaDVzXyQ0do3EnRILd4Ke9jpvsktaPpgE0YjEk7hornryQ==",
       "path": "avalonia.buildservices/11.3.2",
       "hashPath": "avalonia.buildservices.11.3.2.nupkg.sha512"
+    },
+    "Avalonia.Controls.ItemsRepeater/12.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Xf54lAaLU29x50Gl6pHK3UUgGrewkH/Jb6YLSkz/bxj+h1pSutNEsw+1qZ7dcsaRipB9sNLTGzSsQCKBmTD9aQ==",
+      "path": "avalonia.controls.itemsrepeater/12.0.0",
+      "hashPath": "avalonia.controls.itemsrepeater.12.0.0.nupkg.sha512"
     },
     "Avalonia.Desktop/12.1.0": {
       "type": "package",

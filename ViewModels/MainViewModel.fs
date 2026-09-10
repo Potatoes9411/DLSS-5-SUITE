@@ -4,6 +4,8 @@ open System
 open System.Collections.ObjectModel
 open Avalonia
 open Avalonia.Media
+open Avalonia.Media.Imaging
+open Avalonia.Platform
 open Avalonia.Threading
 open DLSS_5_MANAGER.Models
 open DLSS_5_MANAGER.Services
@@ -201,8 +203,134 @@ type AtmosphereOption(key: string) =
 
     override _.ToString() = display
 
+/// One game in the batch sheet.
+///
+/// The route is decided the same way the single-game sheet decides it, from
+/// the API the analyzer recorded: Vulkan can only be OptiScaler because a
+/// Vulkan title never loads dxgi.dll, DX9 and DX11 have exactly one route
+/// each, and DX12 is the only case where there is a real choice to offer -
+/// OptiScaler hooking the game directly, or ReShade + RenoDX. Anything the
+/// analyzer could not read is treated as DX12, which is what the single-game
+/// path does too.
+type BatchRowViewModel(card: GameCardViewModel) =
+    inherit ViewModelBase()
+
+    let analysis = AnalysisStore.tryGet card.Game
+
+    let api =
+        match analysis with
+        | Some a when not (isNull (box a.GraphicsApi)) -> a.GraphicsApi
+        | _ -> ""
+
+    /// Whether THIS app has a mod installed on the game, read from the install
+    /// manifest - exactly what the card badge in the grid reports.
+    ///
+    /// Not Dlss5Present: that only says nvngx_dlssnr.dll is somewhere in the
+    /// folder, which is true of every game that ships DLSS itself, so it
+    /// marked most of the library as installed when nothing had been done to
+    /// it. The manifest is the only thing that knows what this app put there.
+    let readInstalled () =
+        try
+            fst (ModInstaller.installedRouteAndArch card.Game) <> ""
+        with _ ->
+            false
+
+    let mutable installed = readInstalled ()
+
+    let exePath =
+        match analysis with
+        | Some a -> a.ExecutablePath
+        | None -> ""
+
+    let mutable selected = false
+    // Only ever read on the DX12 route, where both options are real.
+    let mutable useOptiScaler = true
+
+    member _.Card = card
+    member _.Game = card.Game
+    member _.Title = card.Game.Title
+    member _.ExecutablePath = exePath
+    member _.Analysis = analysis
+    member _.DetectedApi = api
+    member _.IsInstalled = installed
+
+    /// Re-read after a batch run changes the manifest.
+    member this.RefreshInstalled() =
+        installed <- readInstalled ()
+        this.RaisePropertyChanged("IsInstalled")
+
+    /// Nothing to install into: the resolver never found an executable.
+    member _.IsRunnable = not (String.IsNullOrWhiteSpace(exePath))
+
+    member _.ApiLabel = if api = "" then "UNKNOWN" else api.ToUpperInvariant()
+
+    /// Same localized badge the card grid uses.
+    member _.BadgeInstalled = Localization.current.BadgeInstalled
+
+    member this.Selected
+        with get () = selected
+        and set value = this.SetProperty(&selected, value) |> ignore
+
+    /// DX12 is the only route with a genuine choice. Everything else is forced
+    /// by the API, so the picker is hidden rather than shown disabled.
+    member _.CanChooseRoute = (api = "dx12" || api = "")
+
+    member this.UseOptiScaler
+        with get () = useOptiScaler
+        and set value =
+            if this.SetProperty(&useOptiScaler, value) then
+                this.RaisePropertyChanged("RouteLabel")
+
+    member this.UseReShade
+        with get () = not useOptiScaler
+        and set value = this.UseOptiScaler <- not value
+
+    /// What will actually be run for this game.
+    member _.Mode =
+        if api = "dx9" then ModInstaller.Dx9
+        elif api = "dx10" || api = "dx11" then ModInstaller.Dx11
+        elif api = "vulkan" || api = "opengl" then ModInstaller.OptiScalerMode
+        elif useOptiScaler then ModInstaller.OptiScalerMode
+        else ModInstaller.Dx12Auto
+
+    member this.OptiApi =
+        if api = "vulkan" || api = "opengl" then ModInstaller.OptiVulkan
+        else ModInstaller.OptiDx12
+
+    /// Read from the executable, the same way the single-game sheet does it.
+    /// The analysis cache does not carry it, and a 32-bit game given the
+    /// 64-bit payload cannot load it.
+    member _.Arch =
+        if String.IsNullOrWhiteSpace(exePath) then ModInstaller.Bit64
+        elif GameAnalyzer.detectArchitecture exePath = "32" then ModInstaller.Bit32
+        else ModInstaller.Bit64
+
+    member this.RouteLabel =
+        match this.Mode with
+        | ModInstaller.OptiScalerMode when api = "vulkan" || api = "opengl" -> "OptiScaler (Vulkan)"
+        | ModInstaller.OptiScalerMode -> "OptiScaler"
+        | ModInstaller.Dx12Auto -> "ReShade + RenoDX"
+        | ModInstaller.Dx11 -> "ReShade (DX11)"
+        | ModInstaller.Dx9 -> "ReShade (DX9)"
+        | _ -> "OptiScaler"
+
+    member val Status = "" with get, set
+
+    member this.SetStatus(text: string) =
+        this.Status <- text
+        this.RaisePropertyChanged("Status")
+
 type MainViewModel() as this =
     inherit ViewModelBase()
+
+    /// Backdrop images, decoded once each and held for the life of the app.
+    ///
+    /// `static let`, deliberately. Written as `static member AssetCache = ...`
+    /// this is a property, and F# runs a property's body on every read - so
+    /// each lookup built a brand new empty dictionary, missed, and decoded a
+    /// 3840x2160 JPEG all over again. The cache has to be a binding, not a
+    /// member, or it is not a cache.
+    static let assetCache = Collections.Generic.Dictionary<string, IImage>()
 
     let allGames = ObservableCollection<GameCardViewModel>()
     let filteredGames = ObservableCollection<GameCardViewModel>()
@@ -226,7 +354,13 @@ type MainViewModel() as this =
     let mutable draggedCard: GameCardViewModel option = None
     let mutable isSidebarLayout = false
     let mutable isSettingsOpen = false
+    let mutable isCheckingLosslessScaling = false
+    let mutable losslessScalingStatus = "Check Steam libraries for an existing Lossless Scaling installation."
     let mutable totalGamesCount = 0
+
+    /// The community section. Built with the window so the tab can switch to it
+    /// instantly; it does not touch the network until the tab is opened.
+    let community = CommunityViewModel()
 
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
@@ -252,6 +386,14 @@ type MainViewModel() as this =
     /// Install route. DX12 + OptiScaler is the recommended default; the other
     /// two are the ReShade routes and cannot coexist with it.
     let mutable installMode = ModInstaller.OptiScalerMode
+
+    // ---- Batch sheet -----------------------------------------------------
+    let batchRows = ObservableCollection<BatchRowViewModel>()
+    let mutable isBatchOpen = false
+    let mutable isBatchRunning = false
+    let mutable batchProgress = 0.0
+    let mutable batchStatusText = ""
+    let mutable batchResultText = ""
 
     /// Which build of the mod to deploy. DX11 defaults to 64-bit and DX9 to
     /// 32-bit, matching what those two eras of games actually are.
@@ -400,6 +542,9 @@ type MainViewModel() as this =
     let mutable overlayTheme = ModInstaller.overlayThemes.[0]
     let mutable overlayHotkey = ModInstaller.overlayHotkeys.[0]
 
+    /// How the library grid is ordered. One of GameScanner.sortModes.
+    let mutable sortMode = GameScanner.sortModes.[0]
+
     let createRadialBrush (centerHex: string) =
         let brush = RadialGradientBrush()
         brush.Center <- RelativePoint(0.5, 0.5, RelativeUnit.Relative)
@@ -419,6 +564,50 @@ type MainViewModel() as this =
         brush.GradientStops.Add(GradientStop(Color.FromArgb(0uy, 0uy, 0uy, 0uy), 0.4))
         brush.GradientStops.Add(GradientStop(Color.Parse(edgeHex), 1.0))
         brush
+
+    /// Pushes the current accent into the application's resources.
+    ///
+    /// Styles in App.axaml cannot see a view-model property, so anything themed
+    /// from XAML styles - the scrollbar, toggles, focus rings - used to be a
+    /// hardcoded green and stayed green on every other colour scheme. Publishing
+    /// the accent here lets those styles say {DynamicResource AppAccentBrush}
+    /// and follow the scheme like everything else does.
+    let publishAccent () =
+        match Application.Current with
+        | null -> ()
+        | app ->
+            let c =
+                match motifAccentBrush with
+                | :? SolidColorBrush as b -> b.Color
+                | _ -> Color.Parse("#35D22B")
+
+            let tint (a: byte) = SolidColorBrush(Color.FromArgb(a, c.R, c.G, c.B)) :> IBrush
+            app.Resources.["AppAccentColor"] <- box c
+            app.Resources.["AppAccentBrush"] <- box (SolidColorBrush(c) :> IBrush)
+            app.Resources.["AppAccentStrongBrush"] <- box (tint 220uy)
+            app.Resources.["AppAccentSoftBrush"] <- box (tint 120uy)
+            app.Resources.["AppAccentGlowBrush"] <- box (tint 60uy)
+            app.Resources.["AppAccentFaintBrush"] <- box (tint 28uy)
+
+            // The stock ToggleSwitch reads these by key, so overwriting them is
+            // enough to make every switch in the app follow the scheme - no
+            // control templates to re-declare.
+            app.Resources.["ToggleSwitchFillOn"] <- box (tint 235uy)
+            app.Resources.["ToggleSwitchFillOnPointerOver"] <- box (SolidColorBrush(c) :> IBrush)
+            app.Resources.["ToggleSwitchFillOnPressed"] <- box (tint 200uy)
+            app.Resources.["ToggleSwitchStrokeOn"] <- box (tint 255uy)
+
+            // BoxShadow and Effect are parsed from strings, so a DynamicResource
+            // cannot carry a colour into them from XAML. Building them here and
+            // publishing the finished objects is what lets the API chip's glow
+            // follow the scheme instead of staying green on a blue theme.
+            let hex = sprintf "%02X%02X%02X" c.R c.G c.B
+            app.Resources.["AppAccentChipShadow"] <-
+                box (BoxShadows.Parse(sprintf "0 2 10 0 #99000000, 0 0 12 0 #44%s" hex))
+            app.Resources.["AppAccentPipShadow"] <-
+                box (BoxShadows.Parse(sprintf "0 0 6 0 #CC%s" hex))
+            app.Resources.["AppAccentTextGlow"] <-
+                box (Effect.Parse(sprintf "drop-shadow(0 0 5 #AA%s)" hex))
 
     let applyAtmosphere (colorTheme: string) =
         selectedColorAtmosphere <- colorTheme
@@ -489,6 +678,8 @@ type MainViewModel() as this =
             bgNebulaTintBrush <- SolidColorBrush(Color.Parse("#35D22B"))
             motifAccentBrush <- SolidColorBrush(Color.Parse("#35D22B"))
 
+        publishAccent ()
+
     /// A settings card answers for itself whether the query is about it.
     /// Keywords carry both the English names and whatever the current language
     /// shows, so searching works without having to think in English.
@@ -502,17 +693,67 @@ type MainViewModel() as this =
             |> Seq.exists (fun (k: string) ->
                 not (String.IsNullOrWhiteSpace(k)) && k.ToLowerInvariant().Contains(needle))
 
+    /// Orders the library.
+    ///
+    /// Install time is the install folder's creation date, not the Steam
+    /// manifest's LastUpdated - that one moves every time a game patches, so
+    /// sorting on it put whatever updated last night at the top regardless of
+    /// when it was actually installed.
+    ///
+    /// Release date comes from the Steam store and is cached with the rest of
+    /// the analysis. Anything without one - a non-Steam title, or a lookup
+    /// that failed - sorts to the end in both directions rather than pretending
+    /// to be either the oldest or the newest thing in the library.
+    let analysisDate (pick: AnalysisStore.GameAnalysis -> string) (card: GameCardViewModel) =
+        match AnalysisStore.tryGet card.Game with
+        | Some a ->
+            let raw = pick a
+            if String.IsNullOrWhiteSpace(raw) then None
+            else
+                match DateTime.TryParse(raw, Globalization.CultureInfo.InvariantCulture,
+                                        Globalization.DateTimeStyles.RoundtripKind) with
+                | true, d -> Some d
+                | _ -> None
+        | None -> None
+
+    let sortCards (cards: GameCardViewModel seq) =
+        let byDate pick newestFirst =
+            let dated, undated =
+                cards
+                |> Seq.map (fun c -> c, analysisDate pick c)
+                |> Seq.toList
+                |> List.partition (fun (_, d) -> d.IsSome)
+
+            let ordered =
+                if newestFirst then dated |> List.sortByDescending (fun (_, d) -> d.Value)
+                else dated |> List.sortBy (fun (_, d) -> d.Value)
+
+            // Undated titles trail the list, in name order so they are at
+            // least predictable among themselves.
+            (ordered |> List.map fst)
+            @ (undated |> List.map fst |> List.sortBy (fun c -> c.Title.ToLowerInvariant()))
+            |> Seq.ofList
+
+        match sortMode with
+        | "Name (Z-A)" -> cards |> Seq.sortByDescending (fun c -> c.Title.ToLowerInvariant())
+        | "Recently installed" -> byDate (fun a -> a.InstalledAtUtc) true
+        | "Oldest installed" -> byDate (fun a -> a.InstalledAtUtc) false
+        | "Newest release" -> byDate (fun a -> a.ReleaseDateUtc) true
+        | "Oldest release" -> byDate (fun a -> a.ReleaseDateUtc) false
+        | _ -> cards |> Seq.sortBy (fun c -> c.Title.ToLowerInvariant())
+
     let filterGamesList () =
         filteredGames.Clear()
         let query = searchText.Trim().ToLowerInvariant()
-        for card in allGames do
-            let matchesSearch =
-                if String.IsNullOrWhiteSpace(query) then true
-                else
-                    card.Title.ToLowerInvariant().Contains(query)
-                    || card.LauncherType.ToLowerInvariant().Contains(query)
 
-            if matchesSearch then filteredGames.Add(card)
+        allGames
+        |> Seq.filter (fun card ->
+            if String.IsNullOrWhiteSpace(query) then true
+            else
+                card.Title.ToLowerInvariant().Contains(query)
+                || card.LauncherType.ToLowerInvariant().Contains(query))
+        |> sortCards
+        |> Seq.iter filteredGames.Add
 
     let filterEmulatorsList () =
         filteredEmulators.Clear()
@@ -531,6 +772,7 @@ type MainViewModel() as this =
 
         languageCode <- if Localization.isKnownLanguage settings.Language then settings.Language else "en"
         loc <- Localization.Strings(languageCode)
+        Localization.current <- Localization.Strings(languageCode)
         relabelAtmospheres loc
 
         isAmdMode <- settings.AmdMode
@@ -548,6 +790,12 @@ type MainViewModel() as this =
                 settings.OverlayHotkey
             else
                 ModInstaller.overlayHotkeys.[0]
+
+        sortMode <-
+            if GameScanner.sortModes |> Array.exists (fun m -> m = settings.SortMode) then
+                settings.SortMode
+            else
+                GameScanner.sortModes.[0]
 
         for (key, items) in ExtrasStore.groups () do
             extraRows.Add(ExtraRowViewModel(key, items))
@@ -574,7 +822,8 @@ type MainViewModel() as this =
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
-                      OverlayHotkey = overlayHotkey })
+                      OverlayHotkey = overlayHotkey
+                      SortMode = sortMode })
 
             supportPromptTimer.Start()
 
@@ -637,9 +886,111 @@ type MainViewModel() as this =
     member this.IsEmeraldAtmosphere = (selectedColorAtmosphere = "Neon Emerald")
     member this.IsTintedAtmosphere = (selectedColorAtmosphere <> "Neon Emerald")
 
+    /// Decodes a backdrop image once, then hands out the same one forever.
+    ///
+    /// These used to be bound as strings. Avalonia resolves a string Source
+    /// through its asset loader every time the binding is evaluated, so a 4K
+    /// JPEG was being decoded again and again while the window sat still -
+    /// which is what pegged a core and leaked about a megabyte a second.
+    /// Binding an already-decoded IImage does the work once per theme, and
+    /// coming back to a theme later costs nothing.
+    static member private LoadAsset(fileName: string) : IImage =
+        match assetCache.TryGetValue(fileName) with
+        | true, image -> image
+        | _ ->
+            let image =
+                try
+                    let uri = Uri("avares://DLSS 5 SUITE/Assets/" + fileName)
+                    use stream = AssetLoader.Open(uri)
+                    new Bitmap(stream) :> IImage
+                with _ ->
+                    null
+
+            assetCache.[fileName] <- image
+            image
+
+    /// The atmosphere's asset suffix. One place decides it, so the nebula and
+    /// the mark can never disagree about which theme is on screen.
+    member private this.AtmosphereSlug =
+        match selectedColorAtmosphere with
+        | "Obsidian Onyx" -> "_onyx"
+        | "Supernova Flare" -> "_supernova"
+        | "Cyber Nebula" -> "_cyber"
+        | "Emerald Horizon" -> "_emeraldh"
+        | "Midnight Titanium" -> "_titanium"
+        | "Frost Glacier" -> "_frost"
+        | "Eclipse Crimson" -> "_eclipse"
+        | "Deep Astral" -> "_astral"
+        | _ -> ""
+
+    /// The space plate for this atmosphere, decoded once and kept.
+    ///
+    /// Pre-tinted rather than masked. Filling a Border with the accent colour
+    /// through a 4K OpacityMask cost an offscreen compositor pass every frame
+    /// and kept a second 4K texture resident purely to be a stencil - and it
+    /// threw away the artwork's own shading in the process. Nine images on
+    /// disk is the cheaper trade: only the bound one is ever decoded, and each
+    /// keeps the nebula's real structure in its theme's colour.
+    member this.NebulaSource : IImage = MainViewModel.LoadAsset("bg_nebula" + this.AtmosphereSlug + ".jpg")
+
+    /// The mark, recoloured for the current atmosphere.
+    /// Returns the decoded bitmap, not a path - see LoadAsset.
+    ///
+    /// This used to be a Border filled with the accent colour and masked to
+    /// the mark's shape. That reproduced the silhouette and nothing else - no
+    /// bevel, no rim light - so on every theme but Neon Emerald it vanished
+    /// against the shadow behind it. These are the real artwork with its
+    /// luminance mapped onto each theme's accent, so the shape keeps its
+    /// modelling whatever colour it is wearing.
+    member this.NvidiaMarkSource : IImage =
+        MainViewModel.LoadAsset("bg_nvidia_mark" + this.AtmosphereSlug + ".png")
+
     /// Drives the background animations: only while the window is the active
     /// one, and never in performance mode.
     member this.IsBackgroundMotionOn = isWindowActive && not isPerformanceMode
+
+    // ---------------------------------------------------------------------
+    // LIBRARY ORDER
+    // ---------------------------------------------------------------------
+    /// The labels shown in the sort picker, in the same order as
+    /// GameScanner.sortModes. The modes themselves stay in English because they
+    /// are what gets written to settings.json - translating those would mean a
+    /// saved sort stopped being recognised the moment the language changed.
+    member this.SortOptions =
+        [| loc.SortNameAz
+           loc.SortNameZa
+           loc.SortRecentlyInstalled
+           loc.SortOldestInstalled
+           loc.SortNewestRelease
+           loc.SortOldestRelease |]
+
+    member this.SelectedSortIndex
+        with get () =
+            GameScanner.sortModes
+            |> Array.tryFindIndex ((=) sortMode)
+            |> Option.defaultValue 0
+        and set (index: int) =
+            // A list swap momentarily reports -1; that is not a user choice.
+            if index >= 0 && index < GameScanner.sortModes.Length then
+                let value = GameScanner.sortModes.[index]
+
+                if value <> sortMode then
+                    sortMode <- value
+                    filterGamesList ()
+                    this.RaisePropertyChanged("SelectedSortIndex")
+
+                    GameScanner.saveSettings
+                        { IsSidebarLayout = isSidebarLayout
+                          ColorAtmosphere = selectedColorAtmosphere
+                          GeometricMotif = selectedGeometricMotif
+                          Language = languageCode
+                          SupportPromptVersion = supportPromptVersion
+                          AmdMode = isAmdMode
+                          PerformanceMode = isPerformanceMode
+                          OverlayDisabled = not isOverlayEnabled
+                          OverlayTheme = overlayTheme
+                          OverlayHotkey = overlayHotkey
+                          SortMode = sortMode }
 
     member this.IsWindowActive
         with get () = isWindowActive
@@ -668,7 +1019,8 @@ type MainViewModel() as this =
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
-                      OverlayHotkey = overlayHotkey }
+                      OverlayHotkey = overlayHotkey
+                      SortMode = sortMode }
 
     /// Shown translated, stored in English: `AtmosphereOption.Key` is the
     /// identity. The collection instance is stable for the life of the window.
@@ -697,6 +1049,8 @@ type MainViewModel() as this =
                     this.RaisePropertyChanged("BgNebulaTintBrush")
                     this.RaisePropertyChanged("IsEmeraldAtmosphere")
                     this.RaisePropertyChanged("IsTintedAtmosphere")
+                    this.RaisePropertyChanged("NvidiaMarkSource")
+                    this.RaisePropertyChanged("NebulaSource")
                     this.RaisePropertyChanged("SelectedAtmosphereIndex")
 
                     GameScanner.saveSettings
@@ -709,7 +1063,8 @@ type MainViewModel() as this =
                           PerformanceMode = isPerformanceMode
                           OverlayDisabled = not isOverlayEnabled
                           OverlayTheme = overlayTheme
-                          OverlayHotkey = overlayHotkey }
+                          OverlayHotkey = overlayHotkey
+                          SortMode = sortMode }
 
     member this.SelectedColorAtmosphere
         with get () =
@@ -732,6 +1087,8 @@ type MainViewModel() as this =
                 this.RaisePropertyChanged("BgNebulaTintBrush")
                 this.RaisePropertyChanged("IsEmeraldAtmosphere")
                 this.RaisePropertyChanged("IsTintedAtmosphere")
+                this.RaisePropertyChanged("NvidiaMarkSource")
+                this.RaisePropertyChanged("NebulaSource")
                 this.RaisePropertyChanged("SelectedColorAtmosphere")
                 GameScanner.saveSettings
                     { IsSidebarLayout = isSidebarLayout
@@ -743,7 +1100,8 @@ type MainViewModel() as this =
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
-                      OverlayHotkey = overlayHotkey }
+                      OverlayHotkey = overlayHotkey
+                      SortMode = sortMode }
 
     // ---------------------------------------------------------------------
     // LANGUAGE
@@ -767,6 +1125,7 @@ type MainViewModel() as this =
             if code <> languageCode then
                 languageCode <- code
                 loc <- Localization.Strings(code)
+                Localization.current <- Localization.Strings(code)
 
                 this.RaisePropertyChanged("Loc")
                 this.RaisePropertyChanged("SelectedLanguage")
@@ -775,6 +1134,13 @@ type MainViewModel() as this =
                 relabelAtmospheres loc
                 this.RaisePropertyChanged("TotalGamesText")
                 this.RaisePropertyChanged("InstallModeHintText")
+                // Strings this build added, which are not part of Loc's own
+                // change notification.
+                this.RaisePropertyChanged("SortOptions")
+                this.RaisePropertyChanged("SelectedSortIndex")
+                this.RaisePropertyChanged("SupportPromptText")
+                this.RaisePropertyChanged("DonateLabel")
+                this.RaisePropertyChanged("OriginalDonateLabel")
                 this.RaiseDlss5State()
 
                 GameScanner.saveSettings
@@ -787,7 +1153,8 @@ type MainViewModel() as this =
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
-                      OverlayHotkey = overlayHotkey }
+                      OverlayHotkey = overlayHotkey
+                      SortMode = sortMode }
 
     /// "TOTAL GAMES: 42" in the current language.
     member this.TotalGamesText = loc.TotalGames(totalGamesCount)
@@ -828,7 +1195,8 @@ type MainViewModel() as this =
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
-                      OverlayHotkey = overlayHotkey }
+                      OverlayHotkey = overlayHotkey
+                      SortMode = sortMode }
 
     member this.IsOrbitalSpheresVisible = selectedGeometricMotif = "Orbital Spheres"
     member this.IsPrismAurorasVisible = selectedGeometricMotif = "Prism Auroras"
@@ -854,7 +1222,8 @@ type MainViewModel() as this =
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
-                      OverlayHotkey = overlayHotkey }
+                      OverlayHotkey = overlayHotkey
+                      SortMode = sortMode }
 
     member this.IsTopBarLayout = not isSidebarLayout
 
@@ -874,28 +1243,86 @@ type MainViewModel() as this =
                 this.RaisePropertyChanged("IsEmulatorsViewVisible")
                 this.RaisePropertyChanged("IsGamesTabActive")
                 this.RaisePropertyChanged("IsEmulatorsTabActive")
+                this.RaisePropertyChanged("IsCommunityViewVisible")
+                this.RaisePropertyChanged("IsCommunityTabActive")
                 this.RaisePropertyChanged("SearchPlaceholder")
+
+                // The community grid is server-side, so it is fetched the first
+                // time the section is opened and never before - a user who
+                // never goes there makes no network call at all.
+                if value = "community" then
+                    community.ApplyQuery(searchText)
+                    community.EnsureLoaded()
 
     member this.IsSettingsOpen
         with get () = isSettingsOpen
         and set value = this.ActiveSection <- (if value then "settings" else "games")
 
-    /// One box, three jobs - it says which one it is doing right now.
+    /// One box, four jobs - it says which one it is doing right now.
     member this.SearchPlaceholder =
         match activeSection with
         | "settings" -> "Search settings..."
         | "emulators" -> "Search emulators..."
+        | "community" -> "Search community..."
         | _ -> "Search games..."
 
     member this.IsGamesViewVisible = activeSection = "games"
     member this.IsEmulatorsViewVisible = activeSection = "emulators"
+    member this.IsCommunityViewVisible = activeSection = "community"
     member this.IsGamesTabActive = activeSection = "games"
     member this.IsEmulatorsTabActive = activeSection = "emulators"
+    member this.IsCommunityTabActive = activeSection = "community"
+
+    /// The community section's own state. Exposed so the window can bind to it
+    /// as `Community.X` rather than mirroring three dozen properties here.
+    member _.Community = community
 
     member this.OpenSettings() = this.ActiveSection <- "settings"
+    member _.LosslessScalingStatus = losslessScalingStatus
+    member _.CanCheckLosslessScaling = not isCheckingLosslessScaling
+
+    member this.CheckLosslessScaling() =
+        if not isCheckingLosslessScaling then
+            isCheckingLosslessScaling <- true
+            losslessScalingStatus <- "Checking Steam libraries..."
+            this.RaisePropertyChanged("CanCheckLosslessScaling")
+            this.RaisePropertyChanged("LosslessScalingStatus")
+            async {
+                let! status =
+                    System.Threading.Tasks.Task.Run(fun () ->
+                        try LosslessScalingDetector.discover () |> LosslessScalingDetector.describe
+                        with ex -> "Could not complete discovery: " + ex.Message)
+                    |> Async.AwaitTask
+                Dispatcher.UIThread.Post(fun () ->
+                    losslessScalingStatus <- status
+                    isCheckingLosslessScaling <- false
+                    this.RaisePropertyChanged("LosslessScalingStatus")
+                    this.RaisePropertyChanged("CanCheckLosslessScaling"))
+            } |> Async.Start
     member this.CloseSettings() = this.ActiveSection <- "games"
     member this.ShowGames() = this.ActiveSection <- "games"
     member this.ShowEmulators() = this.ActiveSection <- "emulators"
+    member this.ShowCommunity() = this.ActiveSection <- "community"
+
+    /// "Share result" in the Manage sheet. The post is built from the install
+    /// this app made, so the route, API, bit-width and add-ons are already
+    /// filled in and the user only picks the verdict.
+    member this.ShareToCommunity() =
+        match manageCard with
+        | Some card ->
+            this.IsManageOpen <- false
+
+            community.OpenComposer(
+                card.Game,
+                isOverlayEnabled,
+                ModInstaller.modeKey installMode,
+                ModInstaller.optiApiKey optiApi,
+                ModInstaller.archKey installArch,
+                useNeuralAddon
+            )
+
+            this.ActiveSection <- "community"
+        | None -> ()
 
     member this.ToggleSettings() =
         this.ActiveSection <- (if activeSection = "settings" then "games" else "settings")
@@ -915,8 +1342,11 @@ type MainViewModel() as this =
                 filterEmulatorsList ()
                 this.RaisePropertyChanged("HasGames")
                 this.RaisePropertyChanged("HasEmulators")
-                // The same box filters whichever page is open.
+                // The same box filters whichever page is open. The community
+                // list is filtered by the server, so it only re-queries while
+                // that section is the one on screen.
                 this.RaiseSettingsFilter()
+                if activeSection = "community" then community.ApplyQuery(value)
 
     // ---------------------------------------------------------------------
     // COLLAPSIBLE SETTINGS SECTIONS
@@ -968,7 +1398,7 @@ type MainViewModel() as this =
 
     member this.ShowPayloadCard =
         matchesCard searchText [ loc.ModPayloadFiles; loc.ModPayloadDesc; loc.Replace; loc.Restore
-                                 "mod"; "payload"; "files"; "dlss5-feed.addon64"; "renodx-dlss5.addon64"
+                                 "mod"; "payload"; "files"; "dlss5-feed.addon64"; "renodx-dlss.addon64"; "renodx-dlss5.addon64"
                                  "nvngx_dlssnr.dll"; "replace"; "restore" ]
 
     member this.ShowPerformanceCard =
@@ -978,8 +1408,13 @@ type MainViewModel() as this =
         matchesCard searchText [ "amd"; "rdna"; "radeon"; "amd mode"; "beta"; "gpu" ]
 
     member this.ShowOverlayCard =
-        matchesCard searchText [ loc.OverlaySection; loc.OverlayTitle; loc.OverlayDesc; loc.OverlayStyle
-                                 "overlay"; "hud"; "fps"; "vram"; "telemetry"; "theme"; "in-game" ]
+        matchesCard searchText [ loc.OverlaySection; loc.OverlayTitle; loc.OverlayTagline; loc.OverlayStyle
+                                 "overlay"; "dynamic overlay"; "hud"; "fps"; "vram"; "telemetry"; "theme"; "in-game" ]
+
+    /// The three feature switches share one card, so the card is on screen when
+    /// any of its rows is - each row still hides itself on its own property.
+    member this.ShowFeaturesCard =
+        this.ShowOverlayCard || this.ShowAmdCard || this.ShowPerformanceCard
 
     member this.ShowSupportCard =
         matchesCard searchText [ "support"; "donate"; "ko-fi"; "kofi"; "tutorial"; "tutorials"; "guide"
@@ -988,6 +1423,9 @@ type MainViewModel() as this =
     member this.ShowAboutCard =
         matchesCard searchText [ "about"; "update"; "updates"; "version"; "credits"; "copyright"
                                  "dlss 5 manager"; "nodix"; "numidia" ]
+
+    member this.ShowUniversalCard =
+        matchesCard searchText [ "universal"; "lossless"; "scaling"; "nr"; "neural"; "steam"; "readiness" ]
 
     /// Nothing on the settings page answers the query.
     member this.HasNoSettingsMatch =
@@ -1002,6 +1440,7 @@ type MainViewModel() as this =
             || this.ShowOverlayCard
             || this.ShowSupportCard
             || this.ShowAboutCard
+            || this.ShowUniversalCard
         )
 
     member private this.RaiseSettingsFilter() =
@@ -1025,8 +1464,10 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("ShowPerformanceCard")
         this.RaisePropertyChanged("ShowAmdCard")
         this.RaisePropertyChanged("ShowOverlayCard")
+        this.RaisePropertyChanged("ShowFeaturesCard")
         this.RaisePropertyChanged("ShowSupportCard")
         this.RaisePropertyChanged("ShowAboutCard")
+        this.RaisePropertyChanged("ShowUniversalCard")
         this.RaisePropertyChanged("HasNoSettingsMatch")
 
     member this.IsSearchOpen
@@ -1354,7 +1795,8 @@ type MainViewModel() as this =
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
-                      OverlayHotkey = overlayHotkey }
+                      OverlayHotkey = overlayHotkey
+                      SortMode = sortMode }
 
     /// True while the open sheet will install through the AMD payload.
     member this.IsAmdRouteActive = isAmdMode && not isEmulatorTarget
@@ -1408,7 +1850,8 @@ type MainViewModel() as this =
               PerformanceMode = isPerformanceMode
               OverlayDisabled = not isOverlayEnabled
               OverlayTheme = overlayTheme
-              OverlayHotkey = overlayHotkey }
+              OverlayHotkey = overlayHotkey
+              SortMode = sortMode }
 
     /// What the current sheet would install, so the manage sheet can say
     /// whether the overlay is coming along.
@@ -2049,6 +2492,173 @@ type MainViewModel() as this =
                     this.AnalyzeManageTarget()))
             |> ignore
 
+    // =====================================================================
+    // BATCH INSTALL / UNINSTALL
+    // =====================================================================
+    // One sheet that runs the same installer over many games in turn. The
+    // route per game is not a setting the user picks once for the batch - a
+    // Vulkan title and a DX11 title need different routes and always did - so
+    // each row decides its own from the API the analyzer recorded, and the
+    // only choice offered is the one that is genuinely open: DX12 titles can
+    // take either OptiScaler or ReShade + RenoDX.
+    //
+    // Runs sequentially on one worker. The installer copies into game folders
+    // and rewrites manifests; doing several at once would just contend on the
+    // disk and make a failure much harder to attribute to a game.
+
+    member this.BatchRows = batchRows
+
+    member this.IsBatchOpen
+        with get () = isBatchOpen
+        and set value =
+            if this.SetProperty(&isBatchOpen, value) then
+                this.RaisePropertyChanged("IsBatchClosed")
+
+    member this.IsBatchClosed = not isBatchOpen
+
+    member this.IsBatchRunning
+        with get () = isBatchRunning
+        and set value =
+            if this.SetProperty(&isBatchRunning, value) then
+                this.RaisePropertyChanged("IsBatchIdle")
+                this.RaiseBatchState()
+
+    member this.IsBatchIdle = not isBatchRunning
+
+    member this.BatchProgress
+        with get () = batchProgress
+        and set value = this.SetProperty(&batchProgress, value) |> ignore
+
+    member this.BatchStatusText
+        with get () = batchStatusText
+        and set value = this.SetProperty(&batchStatusText, value) |> ignore
+
+    member this.BatchResultText
+        with get () = batchResultText
+        and set value = this.SetProperty(&batchResultText, value) |> ignore
+
+    member private this.RaiseBatchState() =
+        this.RaisePropertyChanged("SelectedBatchCount")
+        this.RaisePropertyChanged("BatchSummaryText")
+        this.RaisePropertyChanged("CanRunBatch")
+
+    member this.SelectedBatchCount =
+        batchRows |> Seq.filter (fun r -> r.Selected) |> Seq.length
+
+    member this.CanRunBatch = not isBatchRunning && this.SelectedBatchCount > 0
+
+    member this.BatchSummaryText =
+        let n = this.SelectedBatchCount
+        if n = 0 then "No games selected"
+        elif n = 1 then "1 game selected"
+        else sprintf "%d games selected" n
+
+    /// Rebuilt every time the sheet opens, so it reflects the current library
+    /// and the latest scan rather than whatever was there last time.
+    member this.OpenBatch() =
+        batchRows.Clear()
+
+        for card in this.Games do
+            let row = BatchRowViewModel(card)
+            if row.IsRunnable then batchRows.Add(row)
+
+        this.BatchResultText <- ""
+        this.BatchStatusText <- ""
+        this.BatchProgress <- 0.0
+        this.IsBatchOpen <- true
+        this.RaiseBatchState()
+
+    member this.CloseBatch() =
+        if not isBatchRunning then this.IsBatchOpen <- false
+
+    member this.SetAllBatchSelected(value: bool) =
+        for r in batchRows do
+            r.Selected <- value
+        this.RaiseBatchState()
+
+    member this.SelectAllBatch() = this.SetAllBatchSelected(true)
+    member this.ClearBatchSelection() = this.SetAllBatchSelected(false)
+
+    /// Called by the row checkboxes so the counter and the run button keep up.
+    member this.NotifyBatchSelectionChanged() = this.RaiseBatchState()
+
+    member private this.RunBatch(isInstallAction: bool) =
+        let targets = batchRows |> Seq.filter (fun r -> r.Selected) |> Seq.toArray
+
+        if targets.Length > 0 && not isBatchRunning then
+            this.IsBatchRunning <- true
+            this.BatchResultText <- ""
+            this.BatchProgress <- 0.0
+
+            for r in targets do
+                r.SetStatus("Waiting")
+
+            let overlay = this.OverlayOptions
+            let neural = useNeuralAddon
+
+            System.Threading.Tasks.Task.Run(fun () ->
+                let mutable ok = 0
+                let mutable failed = 0
+
+                targets
+                |> Array.iteri (fun i row ->
+                    let label = row.Title
+
+                    Dispatcher.UIThread.Post(fun () ->
+                        row.SetStatus(if isInstallAction then "Installing..." else "Removing...")
+                        this.BatchStatusText <- sprintf "(%d/%d) %s" (i + 1) targets.Length label)
+
+                    // Per-game progress folds into the overall bar: each game
+                    // owns one slice of it, so the bar advances smoothly across
+                    // the whole run instead of resetting per game.
+                    let report: ModInstaller.Progress =
+                        fun _ progress ->
+                            let overall = (float i + progress) / float targets.Length
+                            Dispatcher.UIThread.Post(fun () -> this.BatchProgress <- overall * 100.0)
+
+                    let plan =
+                        row.Analysis
+                        |> Option.map (fun a ->
+                            { ModInstaller.InstallPlan.DlssDirs = a.DlssDirs
+                              ModInstaller.InstallPlan.StreamlineDirs = a.StreamlineDirs })
+
+                    let (succeeded, message) =
+                        try
+                            let outcome =
+                                if isInstallAction then
+                                    ModInstaller.install
+                                        row.Game row.ExecutablePath plan
+                                        row.Mode row.Arch row.OptiApi neural overlay report
+                                else
+                                    ModInstaller.uninstall row.Game row.ExecutablePath plan report
+
+                            (outcome.Success, outcome.Message)
+                        with ex ->
+                            (false, ex.Message)
+
+                    if succeeded then ok <- ok + 1 else failed <- failed + 1
+
+                    Dispatcher.UIThread.Post(fun () ->
+                        row.SetStatus(if succeeded then "Done" else "Failed: " + message)
+                        row.Card.RefreshModBadge()
+                        row.RefreshInstalled()
+                        this.BatchProgress <- (float (i + 1) / float targets.Length) * 100.0))
+
+                Dispatcher.UIThread.Post(fun () ->
+                    this.IsBatchRunning <- false
+                    this.BatchStatusText <- ""
+                    this.BatchProgress <- 100.0
+
+                    this.BatchResultText <-
+                        if failed = 0 then
+                            sprintf "%d of %d completed." ok targets.Length
+                        else
+                            sprintf "%d completed, %d failed." ok failed))
+            |> ignore
+
+    member this.StartBatchInstall() = this.RunBatch(true)
+    member this.StartBatchUninstall() = this.RunBatch(false)
+
     member this.StartInstall() = this.RunModTask(true)
     member this.StartUninstall() = this.RunModTask(false)
 
@@ -2071,11 +2681,28 @@ type MainViewModel() as this =
 
     member this.SupportPromptTitle = "Enjoying DLSS 5 SUITE?"
 
-    member this.SupportPromptText =
-        "You have been using it for a while now. It is free and always will be - a tip on Ko-fi is what pays for the next release."
+    member this.SupportPromptText = loc.SupportPromptText
 
-    member this.DonateUrl = "https://potatoes-dev.com"
-    member this.TutorialsUrl = "https://potatoes-dev.com"
+    // Two donation targets, by agreement with the original developer: tips are
+    // split 50-50 between this fork and the author of DLSS 5 MANAGER. Both
+    // links are shown side by side and each is labelled with whose it is, so a
+    // user always knows who they are actually tipping.
+    member this.DonateUrl = "https://ko-fi.com/potatoes9411"
+    member this.DonateLabel = loc.BtnSupportThisBuild
+
+    member this.OriginalDonateUrl = "https://ko-fi.com/nodix"
+    member this.OriginalDonateLabel = loc.BtnSupportOriginal
+
+    // The two homepages, kept beside the two Ko-fi links so it is obvious
+    // which project each one belongs to.
+    member this.SiteUrl = "https://potatoes-dev.com"
+    member this.SiteLabel = "potatoes-dev.com"
+
+    member this.OriginalSiteUrl = "https://numidiastudios.com"
+    member this.OriginalSiteLabel = "numidiastudios.com"
+    /// Like DonateUrl, this belongs to the original creator - the button is
+    /// labelled "Watch tutorials" and its tooltip names youtube.com/@Nodix-Tech.
+    member this.TutorialsUrl = "https://youtube.com/@Nodix-Tech"
 
     // Authorship & rights, shown in the About card.
     //
@@ -2087,6 +2714,28 @@ type MainViewModel() as this =
         "Modified version of DLSS 5 MANAGER · Built by NODIX TECH · Published by Numidia Studios"
 
     member this.CreditsText = "Built by Potatoes9411 · Published by Potatoes-dev"
+
+    // ---------------------------------------------------------------------
+    // THE ORIGINAL, AND THE TERMS THIS BUILD EXISTS UNDER
+    // ---------------------------------------------------------------------
+    // NODIX TECH gave permission for this modified build on conditions, and
+    // two of them are things the application itself has to carry: the
+    // original's download location must not be changed or replaced, and its
+    // link must be present; and once their community guides site is live, it
+    // must be linked from here too. Both live in UpdateChecker so there is
+    // one place to look.
+    member this.OriginalDownloadUrl = UpdateChecker.OriginalDownloadUrl
+
+    member this.OriginalDownloadText = "Get the original DLSS 5 MANAGER"
+
+    member this.GuidesUrl = UpdateChecker.GuidesUrl
+
+    /// The guides button hides itself until there is a site to point at, so
+    /// shipping before it launches costs nothing and launching it is a
+    /// one-line change.
+    member this.HasGuidesLink = not (String.IsNullOrWhiteSpace(UpdateChecker.GuidesUrl))
+
+    member this.GuidesText = "Community guides"
 
     member this.CopyrightText =
         sprintf "© %d Potatoes-dev. Based on DLSS 5 MANAGER, © %d Numidia Studios. All rights reserved."
