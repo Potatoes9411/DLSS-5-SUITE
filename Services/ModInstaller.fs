@@ -282,12 +282,7 @@ module ModInstaller =
     // =====================================================================
     // DLSS 5 PRESENCE & COMPLETENESS
     // =====================================================================
-    let renodxAddonName = "renodx-dlss.addon64"
-
-    /// What the same add-on was called up to 1.2.0. Nothing deploys it any
-    /// more, but installs made while it had that name still have to come off
-    /// cleanly, so it stays in `exclusiveArtifacts` below.
-    let renodxAddonLegacyName = "renodx-dlss5.addon64"
+    let renodxAddonName = "renodx-dlss5.addon64"
 
     /// Alternate filename retained only so older/experimental Suite installs
     /// can still be removed cleanly. New installs use renodx-dlss5.addon64.

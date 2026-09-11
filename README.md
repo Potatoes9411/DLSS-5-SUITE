@@ -62,7 +62,7 @@ DLSS 5 SUITE checks this repository's stable GitHub releases. When an update is 
 
 The ShaderGlass route independently checks the allowlisted official ShaderGlass and DLSS5-Feeder release sources when **Set up/update & launch ShaderGlass** is selected. This keeps the optional compatibility files current without bundling unverified YouTube packages or asking the user to assemble files manually.
 
-For a valid release, use a version tag such as `v1.2.1-suite.4` and attach files with matching versioned names:
+For a valid release, use a version tag such as `v1.2.1-suite.4` and attach files with matching versioned names. GitHub may display spaces in uploaded filenames as periods; both exact forms are accepted:
 
 ```text
 DLSS 5 SUITE Setup v1.2.1-suite.4.exe

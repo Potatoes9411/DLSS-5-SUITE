@@ -177,11 +177,13 @@ module UpdateChecker =
         use document = JsonDocument.Parse(json)
         let tag = document.RootElement.GetProperty("tag_name").GetString().TrimStart('v', 'V')
         let expectedName = sprintf "DLSS 5 SUITE Setup v%s.exe" tag
+        let githubNormalizedName = expectedName.Replace(" ", ".")
         let asset =
             document.RootElement.GetProperty("assets").EnumerateArray()
             |> Seq.tryFind (fun item ->
                 let name = item.GetProperty("name").GetString()
-                String.Equals(name, expectedName, StringComparison.OrdinalIgnoreCase))
+                String.Equals(name, expectedName, StringComparison.OrdinalIgnoreCase)
+                || String.Equals(name, githubNormalizedName, StringComparison.OrdinalIgnoreCase))
             |> Option.defaultWith (fun () -> failwith "The latest release has no full setup asset.")
         let name = asset.GetProperty("name").GetString()
         let url = asset.GetProperty("browser_download_url").GetString()
