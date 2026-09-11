@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.ViewModels
+namespace DLSS_5_MANAGER.ViewModels
 
 open System
 open System.Collections.ObjectModel
@@ -2146,8 +2146,12 @@ type MainViewModel() as this =
             // DX12 route.
             let mode =
                 match NeedForSpeedProfiles.tryRecommendedRoute manageTitle with
-                | Some "dx11" -> ModInstaller.Dx11
-                | Some "dx12" -> ModInstaller.Dx12Auto
+                | Some "dx11" ->
+                    detectedApi <- "dx11"
+                    ModInstaller.Dx11
+                | Some "dx12" ->
+                    detectedApi <- "dx12"
+                    ModInstaller.Dx12Auto
                 | _ ->
                     if detectedApi = "dx9" then ModInstaller.Dx9
                     elif detectedApi = "dx10" then ModInstaller.Dx11
