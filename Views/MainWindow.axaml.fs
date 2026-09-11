@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Views
+namespace DLSS_5_MANAGER.Views
 
 open System
 open System.Diagnostics
@@ -656,6 +656,11 @@ type MainWindow() as this =
                     overscroll <- Math.Clamp(overscroll - resisted * 0.32, -170.0, 170.0)
                     scrollTargetY <- maxOffset
                 else
+                    // Back inside the valid range: cancel any lingering band
+                    // so it does not fight the new direction.
+                    if abs overscroll > 0.01 then
+                        overscroll <- 0.0
+                        overscrollVelocity <- 0.0
                     scrollTargetY <- proposed
 
                 if not isScrollAnimating then
