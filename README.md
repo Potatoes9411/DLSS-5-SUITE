@@ -6,7 +6,10 @@
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-Version 1.2.1-suite.4 · Windows x64 · .NET 8 · Avalonia UI
+[![Version](https://img.shields.io/badge/Version-1.2.1--suite.4-35d22b?style=flat-square)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-24292e?style=flat-square)]()
+[![Framework](https://img.shields.io/badge/Framework-.NET%208%20|%20Avalonia%20UI-512bd4?style=flat-square)]()
+[![Language](https://img.shields.io/badge/Language-F%23-30b9db?style=flat-square)]()
 
 </div>
 
@@ -23,6 +26,8 @@ The permission granted for DLSS 5 SUITE is specific to this project and its main
 The original and unchanged DLSS 5 MANAGER is available from its developer at:
 
 **https://numidiastudios.com/dlss-5-manager/**
+
+**GitHub:** [https://github.com/NODIX-TECH/DLSS-5-MANAGER](https://github.com/NODIX-TECH/DLSS-5-MANAGER)
 
 DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace or claim ownership of the original application or its download location.
 
@@ -87,10 +92,10 @@ Large mod and NVIDIA runtime payloads are intentionally excluded from the Git re
 DLSS 5 SUITE is a free project. If you find this modified edition useful, you can support the developers through Ko-fi. Tips are split 50-50 between this fork and the original author of DLSS 5 MANAGER.
 
 - **Potatoes9411 (Potatoes-dev)**
-  - Ko-fi: [ko-fi.com/potatoes9411](https://ko-fi.com/potatoes9411)
+  - Ko-fi: [![Ko-Fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/potatoes9411)
   - Website: [potatoes-dev.com](https://potatoes-dev.com)
 - **NODIX TECH (Numidia Studios)**
-  - Ko-fi: [ko-fi.com/nodix](https://ko-fi.com/nodix)
+  - Ko-fi: [![Ko-Fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/nodix)
   - Website: [numidiastudios.com](https://numidiastudios.com)
 
 ## Credits and trademarks
