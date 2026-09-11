@@ -74,7 +74,8 @@ module UpdateChecker =
         c.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json")
         c
 
-    /// "v1.2.3" / "1.2.3-beta" -> [1; 2; 3]
+    /// "v1.2.3-suite.4" -> [1; 2; 3; 4]. A release without a Suite
+    /// revision sorts as revision zero.
     let private parseVersion (raw: string) : int list =
         if String.IsNullOrWhiteSpace(raw) then
             []
@@ -84,12 +85,21 @@ module UpdateChecker =
             if not cleaned.Success then
                 []
             else
-                cleaned.Value.Split('.')
-                |> Array.map (fun p ->
-                    match Int32.TryParse(p) with
-                    | true, v -> v
-                    | _ -> 0)
-                |> Array.toList
+                let core =
+                    cleaned.Value.Split('.')
+                    |> Array.map (fun p ->
+                        match Int32.TryParse(p) with
+                        | true, v -> v
+                        | _ -> 0)
+                    |> Array.toList
+                let suiteMatch = Regex.Match(raw, @"(?i)(?:^|[-_.])suite[.-]?(\d+)")
+                let suiteRevision =
+                    if suiteMatch.Success then
+                        match Int32.TryParse(suiteMatch.Groups.[1].Value) with
+                        | true, v -> v
+                        | _ -> 0
+                    else 0
+                core @ [ suiteRevision ]
 
     /// Positive when `a` is newer than `b`.
     let private compareVersions (a: string) (b: string) : int =

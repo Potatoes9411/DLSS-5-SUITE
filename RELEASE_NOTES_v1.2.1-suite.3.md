@@ -13,6 +13,8 @@ This release introduces verified on-demand compatibility setup and three distrib
 - Keeps compatibility downloads outside the main installer to reduce its size.
 - Excludes the unsafe MV 2.7 / `eurotrucks2.exe` package entirely.
 - Preserves existing game scanning, rendering-API detection, Steam artwork handling, and per-game installation logic.
+- Automates the working Lossless Scaling Discord method with original-file preservation, official LosslessProxy/LSP downloads, FeedKit setup, progress, and display guidance.
+- Fixes Suite revision comparison so suite.3 can recognize suite.4 as newer.
 
 ## Update-flow testing
 

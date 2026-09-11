@@ -34,7 +34,8 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - Steam artwork and library handling improvements.
 - Batch installation with per-game compatibility routing.
 - A separately isolated ShaderGlass compatibility route for games such as Roblox and Minecraft.
-- An optional Lossless Scaling readiness check for experimental external capture.
+- Automated Lossless Scaling setup using official LosslessProxy/LSP releases and the verified FeedKit route.
+- Need for Speed game-aware Feeder guidance, including the verified DXVK-to-Vulkan path for classic 32-bit D3D9 titles and appropriate D3D11/D3D12 profiles for newer games.
 - Automatic, browser-free application and compatibility-component updates with visible progress.
 - DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
 
@@ -61,6 +62,10 @@ Existing installers are retained as separate historical downloads and are never 
 DLSS 5 SUITE checks this repository's stable GitHub releases. When an update is available, the app downloads the exactly matching Full Setup directly, displays progress, verifies GitHub's published SHA-256 digest, and starts Setup without opening a browser. A missing or mismatched release asset is rejected.
 
 The ShaderGlass route independently checks the allowlisted official ShaderGlass and DLSS5-Feeder release sources when **Set up/update & launch ShaderGlass** is selected. This keeps the optional compatibility files current without bundling unverified YouTube packages or asking the user to assemble files manually.
+
+The Lossless Scaling route requires the user's licensed Steam installation. It preserves the original `Lossless.dll`, installs SHA-256-verified official LosslessProxy, LSP-ReShade, and LSP-Windowed releases, then configures current FeedKit components. The app checks the display count and presents the required Discord workflow: game on display 1, Lossless Scaling visible on display 2, apply scaling, select the Lossless Scaling window, and press Home. A virtual phone display may be used as the second display.
+
+For Need for Speed, the app labels the route rather than pretending the games have native DLSS. Community-verified classic titles — Underground, Underground 2, Most Wanted (2005), Shift and ProStreet — use DXVK 3.0.2 x86 to translate D3D9 to Vulkan, then ReShade's Vulkan layer with DLSS5-Feeder addon32, host64 and Lumenite. Modern Frostbite titles use the corresponding D3D11 or D3D12 Feeder route and should be tested offline first. The app never treats a rendering hook as safe for online multiplayer.
 
 For a valid release, use a version tag such as `v1.2.1-suite.4` and attach files with matching versioned names. GitHub may display spaces in uploaded filenames as periods; both exact forms are accepted:
 

@@ -912,11 +912,17 @@
                                         <TextBlock Text="Security: only the exact official v1.3.0 executable is allowed. MV 2.7 and eurotrucks2.exe are not used."
                                                    TextWrapping="Wrap" Foreground="#86EFAC" FontSize="11" />
                                         <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
-                                        <TextBlock Text="Lossless Scaling · optional two-display experiment" FontSize="13.5" FontWeight="SemiBold" Foreground="White" />
+                                        <TextBlock Text="Lossless Scaling · automated two-display setup" FontSize="13.5" FontWeight="SemiBold" Foreground="White" />
                                         <TextBlock Text="{Binding LosslessScalingStatus}" TextWrapping="Wrap" Foreground="#CBD5E1" FontSize="12" />
-                                        <Button Content="Check installation" Click="OnCheckLosslessScalingClicked"
-                                                IsEnabled="{Binding CanCheckLosslessScaling}" HorizontalAlignment="Left" />
-                                        <TextBlock Text="Read-only check: no game or Lossless Scaling files are changed. Automatic NR installation is not available yet; an exact compatible package set and runtime test are still required. Lossless Scaling is optional and external capture does not guarantee anti-cheat approval."
+                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding LosslessScalingProgress}" Height="6"
+                                                     IsVisible="{Binding IsSettingUpLosslessScaling}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <Button Content="Set up/update &amp; launch" Click="OnSetupLosslessScalingClicked"
+                                                    IsEnabled="{Binding CanCheckLosslessScaling}" />
+                                            <Button Content="Check installation" Click="OnCheckLosslessScalingClicked"
+                                                    IsEnabled="{Binding CanCheckLosslessScaling}" />
+                                        </StackPanel>
+                                        <TextBlock Text="Requires a licensed Steam copy. Setup preserves the original engine, uses verified official LosslessProxy/LSP and FeedKit releases, and never installs MV 2.7. Keep the game on display 1 and Lossless Scaling visible on display 2; a virtual phone display can be used."
                                                    TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
                                     </StackPanel>
                                 </Border>

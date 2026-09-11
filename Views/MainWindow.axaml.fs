@@ -1031,6 +1031,19 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.CheckLosslessScaling()
         | _ -> ()
 
+    member this.OnSetupLosslessScalingClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm ->
+            async {
+                let! path = vm.SetupLosslessScaling()
+                match path with
+                | Some executable ->
+                    try Process.Start(ProcessStartInfo(executable, UseShellExecute = true)) |> ignore
+                    with _ -> ()
+                | None -> ()
+            } |> Async.StartImmediate
+        | _ -> ()
+
     member this.OnCheckShaderGlassClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> vm.CheckShaderGlass()

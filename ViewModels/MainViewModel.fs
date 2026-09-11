@@ -356,6 +356,7 @@ type MainViewModel() as this =
     let mutable isSettingsOpen = false
     let mutable isCheckingLosslessScaling = false
     let mutable losslessScalingStatus = "Check Steam libraries for an existing Lossless Scaling installation."
+    let mutable losslessScalingProgress = 0.0
     let mutable shaderGlassStatus = "Check for the verified official ShaderGlass v1.3.0 build."
     let mutable verifiedShaderGlassPath: string option = None
     let mutable isSettingUpShaderGlass = false
@@ -1285,6 +1286,8 @@ type MainViewModel() as this =
     member this.OpenSettings() = this.ActiveSection <- "settings"
     member _.LosslessScalingStatus = losslessScalingStatus
     member _.CanCheckLosslessScaling = not isCheckingLosslessScaling
+    member _.IsSettingUpLosslessScaling = isCheckingLosslessScaling
+    member _.LosslessScalingProgress = losslessScalingProgress
     member _.ShaderGlassStatus = shaderGlassStatus
     member _.CanLaunchShaderGlass = verifiedShaderGlassPath.IsSome
     member _.IsSettingUpShaderGlass = isSettingUpShaderGlass
@@ -1352,6 +1355,40 @@ type MainViewModel() as this =
                     this.RaisePropertyChanged("LosslessScalingStatus")
                     this.RaisePropertyChanged("CanCheckLosslessScaling"))
             } |> Async.Start
+
+    member this.SetupLosslessScaling() = async {
+        if isCheckingLosslessScaling then return None
+        else
+            isCheckingLosslessScaling <- true
+            losslessScalingProgress <- 0.0
+            this.RaisePropertyChanged("CanCheckLosslessScaling")
+            this.RaisePropertyChanged("IsSettingUpLosslessScaling")
+            this.RaisePropertyChanged("LosslessScalingProgress")
+            let! result = async {
+                try
+                    let report text value =
+                        Dispatcher.UIThread.Post(fun () ->
+                            losslessScalingStatus <- text
+                            losslessScalingProgress <- value
+                            this.RaisePropertyChanged("LosslessScalingStatus")
+                            this.RaisePropertyChanged("LosslessScalingProgress"))
+                    let! executable, monitors = LosslessScalingInstaller.setupLatest report |> Async.AwaitTask
+                    let displayNote =
+                        if monitors >= 2 then "Keep the game on display 1 and this Lossless Scaling window visible on display 2."
+                        else "Only one display is detected. Enable a second or virtual phone display, keep the game on display 1, and place Lossless Scaling on display 2."
+                    losslessScalingStatus <- "Setup complete. " + displayNote + " Apply scaling, click the Lossless Scaling window, then press Home to open ReShade. Do not minimize either window."
+                    this.RaisePropertyChanged("LosslessScalingStatus")
+                    return Some executable
+                with ex ->
+                    losslessScalingStatus <- "Setup stopped safely: " + ex.Message
+                    this.RaisePropertyChanged("LosslessScalingStatus")
+                    return None
+            }
+            isCheckingLosslessScaling <- false
+            this.RaisePropertyChanged("CanCheckLosslessScaling")
+            this.RaisePropertyChanged("IsSettingUpLosslessScaling")
+            return result
+    }
     member this.CloseSettings() = this.ActiveSection <- "games"
     member this.ShowGames() = this.ActiveSection <- "games"
     member this.ShowEmulators() = this.ActiveSection <- "emulators"
@@ -2099,15 +2136,19 @@ type MainViewModel() as this =
             this.SetInstallArch(if detectedArch = "32" then ModInstaller.Bit32 else ModInstaller.Bit64)
 
     member this.InstallModeHintText =
-        match installMode with
-        | ModInstaller.OptiScalerMode when optiApi = ModInstaller.OptiNeural ->
-            "The neural upstream build of OptiScaler, hooked the same way. ReShade is not used."
-        | ModInstaller.OptiScalerMode -> "OptiScaler hooks the game directly. ReShade is not used."
-        | ModInstaller.Dx12Auto -> "ReShade + RenoDX with the DLSS 5 effects."
-        | ModInstaller.Dx11 -> "ReShade + RenoDX with the DLSS 5 effects."
-        | ModInstaller.Dx9 -> "dgVoodoo translates Direct3D 9; ReShade moves to the dxgi slot."
-        | ModInstaller.Emulator -> "ReShade on Vulkan with the DLSS 5 emulator payload."
-        | ModInstaller.AmdMode -> "AMD RDNA 4: the AMD payload and the ray reconstruction model, nothing else."
+        let routeHint =
+            match installMode with
+            | ModInstaller.OptiScalerMode when optiApi = ModInstaller.OptiNeural ->
+                "The neural upstream build of OptiScaler, hooked the same way. ReShade is not used."
+            | ModInstaller.OptiScalerMode -> "OptiScaler hooks the game directly. ReShade is not used."
+            | ModInstaller.Dx12Auto -> "ReShade + RenoDX with the DLSS 5 effects."
+            | ModInstaller.Dx11 -> "ReShade + RenoDX with the DLSS 5 effects."
+            | ModInstaller.Dx9 -> "dgVoodoo translates Direct3D 9; ReShade moves to the dxgi slot."
+            | ModInstaller.Emulator -> "ReShade on Vulkan with the DLSS 5 emulator payload."
+            | ModInstaller.AmdMode -> "AMD RDNA 4: the AMD payload and the ray reconstruction model, nothing else."
+        match NeedForSpeedProfiles.tryDescribe manageTitle detectedApi detectedArch with
+        | Some profile -> routeHint + "\n\n" + profile
+        | None -> routeHint
 
     member this.IsModInstalled
         with get () = isModInstalled

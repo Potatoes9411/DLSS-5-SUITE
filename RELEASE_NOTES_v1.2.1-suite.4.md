@@ -12,6 +12,10 @@ This release adds a smooth, browser-free update experience for both DLSS 5 SUITE
 - Web Setup automatically downloads and verifies the matching Portable ZIP before installing.
 - Excludes the unsafe MV 2.7 / `eurotrucks2.exe` package entirely.
 - Preserves the existing game scanner, API detection, and per-game installation routes.
+- Automates the working Lossless Scaling Discord method without redistributing the paid application.
+- Preserves the original Lossless Scaling engine and verifies official LosslessProxy/LSP assets before installation.
+- Fixes update detection between Suite revisions such as suite.3 and suite.4.
+- Adds Need for Speed-aware compatibility guidance: the verified DXVK-to-Vulkan Feeder route for classic D3D9 games, and correct D3D11/D3D12 Feeder guidance for newer titles such as Heat and Unbound.
 
 ## Downloads
 
