@@ -67,13 +67,6 @@ The Lossless Scaling route requires the user's licensed Steam installation. It p
 
 For Need for Speed, the app labels the route rather than pretending the games have native DLSS. Community-verified classic titles — Underground, Underground 2, Most Wanted (2005), Shift and ProStreet — use DXVK 3.0.2 x86 to translate D3D9 to Vulkan, then ReShade's Vulkan layer with DLSS5-Feeder addon32, host64 and Lumenite. Modern Frostbite titles use the corresponding D3D11 or D3D12 Feeder route and should be tested offline first. The app never treats a rendering hook as safe for online multiplayer.
 
-For a valid release, use a version tag such as `v1.2.1-suite.4` and attach files with matching versioned names. GitHub may display spaces in uploaded filenames as periods; both exact forms are accepted:
-
-```text
-DLSS 5 SUITE Setup v1.2.1-suite.4.exe
-DLSS 5 SUITE Web Setup v1.2.1-suite.4.exe
-DLSS 5 SUITE Portable v1.2.1-suite.4.zip
-```
 
 Application data, cached artwork, settings, manifests and backups are stored under:
 
@@ -88,6 +81,17 @@ The existing folder name is retained for compatibility with installations of the
 The source is published for transparency, maintenance and permitted collaboration. Source availability should not be interpreted as public-domain status or as permission to redistribute proprietary payload files.
 
 Large mod and NVIDIA runtime payloads are intentionally excluded from the Git repository. Their absence from a source checkout does not indicate a broken release; authorized release installers package the required files separately.
+
+## Support the Developers
+
+DLSS 5 SUITE is a free project. If you find this modified edition useful, you can support the developers through Ko-fi. Tips are split 50-50 between this fork and the original author of DLSS 5 MANAGER.
+
+- **Potatoes9411 (Potatoes-dev)**
+  - Ko-fi: [ko-fi.com/potatoes9411](https://ko-fi.com/potatoes9411)
+  - Website: [potatoes-dev.com](https://potatoes-dev.com)
+- **NODIX TECH (Numidia Studios)**
+  - Ko-fi: [ko-fi.com/nodix](https://ko-fi.com/nodix)
+  - Website: [numidiastudios.com](https://numidiastudios.com)
 
 ## Credits and trademarks
 
