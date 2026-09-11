@@ -54,6 +54,7 @@
     <Compile Include="Services\LosslessScalingDetector.fs" />
     <Compile Include="Services\LosslessScalingInstaller.fs" />
     <Compile Include="Services\NeedForSpeedProfiles.fs" />
+    <Compile Include="Services\NonGameAppClassifier.fs" />
     <Compile Include="Services\ShaderGlassDetector.fs" />
     <Compile Include="Services\EmulatorCatalog.fs" />
     <Compile Include="Services\ModInstaller.fs" />

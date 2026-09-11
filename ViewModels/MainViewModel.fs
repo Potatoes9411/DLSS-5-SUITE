@@ -362,6 +362,7 @@ type MainViewModel() as this =
     let mutable isSettingUpShaderGlass = false
     let mutable shaderGlassProgress = 0.0
     let mutable totalGamesCount = 0
+    let mutable showNonGameApps = false
 
     /// The community section. Built with the window so the tab can switch to it
     /// instantly; it does not touch the network until the tab is opened.
@@ -754,10 +755,11 @@ type MainViewModel() as this =
 
         allGames
         |> Seq.filter (fun card ->
-            if String.IsNullOrWhiteSpace(query) then true
+            (showNonGameApps || not (NonGameAppClassifier.isUtility card.Game))
+            && (if String.IsNullOrWhiteSpace(query) then true
             else
                 card.Title.ToLowerInvariant().Contains(query)
-                || card.LauncherType.ToLowerInvariant().Contains(query))
+                || card.LauncherType.ToLowerInvariant().Contains(query)))
         |> sortCards
         |> Seq.iter filteredGames.Add
 
@@ -773,6 +775,7 @@ type MainViewModel() as this =
         // 0. Restore saved user preferences (layout + theme atmosphere + motif)
         let settings = GameScanner.loadSettings ()
         isSidebarLayout <- settings.IsSidebarLayout
+        showNonGameApps <- settings.ShowNonGameApps
         selectedGeometricMotif <- settings.GeometricMotif
         applyAtmosphere settings.ColorAtmosphere
 
@@ -829,7 +832,8 @@ type MainViewModel() as this =
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
-                      SortMode = sortMode })
+                      SortMode = sortMode
+                      ShowNonGameApps = showNonGameApps })
 
             supportPromptTimer.Start()
 
@@ -996,7 +1000,8 @@ type MainViewModel() as this =
                           OverlayDisabled = not isOverlayEnabled
                           OverlayTheme = overlayTheme
                           OverlayHotkey = overlayHotkey
-                          SortMode = sortMode }
+                          SortMode = sortMode
+                          ShowNonGameApps = showNonGameApps }
 
     member this.IsWindowActive
         with get () = isWindowActive
@@ -1026,7 +1031,8 @@ type MainViewModel() as this =
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
-                      SortMode = sortMode }
+                      SortMode = sortMode
+                      ShowNonGameApps = showNonGameApps }
 
     /// Shown translated, stored in English: `AtmosphereOption.Key` is the
     /// identity. The collection instance is stable for the life of the window.
@@ -1070,7 +1076,8 @@ type MainViewModel() as this =
                           OverlayDisabled = not isOverlayEnabled
                           OverlayTheme = overlayTheme
                           OverlayHotkey = overlayHotkey
-                          SortMode = sortMode }
+                          SortMode = sortMode
+                          ShowNonGameApps = showNonGameApps }
 
     member this.SelectedColorAtmosphere
         with get () =
@@ -1107,7 +1114,8 @@ type MainViewModel() as this =
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
-                      SortMode = sortMode }
+                      SortMode = sortMode
+                      ShowNonGameApps = showNonGameApps }
 
     // ---------------------------------------------------------------------
     // LANGUAGE
@@ -1160,7 +1168,8 @@ type MainViewModel() as this =
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
-                      SortMode = sortMode }
+                      SortMode = sortMode
+                      ShowNonGameApps = showNonGameApps }
 
     /// "TOTAL GAMES: 42" in the current language.
     member this.TotalGamesText = loc.TotalGames(totalGamesCount)
@@ -1202,7 +1211,8 @@ type MainViewModel() as this =
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
-                      SortMode = sortMode }
+                      SortMode = sortMode
+                      ShowNonGameApps = showNonGameApps }
 
     member this.IsOrbitalSpheresVisible = selectedGeometricMotif = "Orbital Spheres"
     member this.IsPrismAurorasVisible = selectedGeometricMotif = "Prism Auroras"
@@ -1229,7 +1239,8 @@ type MainViewModel() as this =
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
-                      SortMode = sortMode }
+                      SortMode = sortMode
+                      ShowNonGameApps = showNonGameApps }
 
     member this.IsTopBarLayout = not isSidebarLayout
 
@@ -1421,6 +1432,25 @@ type MainViewModel() as this =
     // LIBRARY
     // ---------------------------------------------------------------------
     member this.Games = filteredGames
+    member this.ShowNonGameApps
+        with get () = showNonGameApps
+        and set value =
+            if this.SetProperty(&showNonGameApps, value) then
+                filterGamesList ()
+                this.RaisePropertyChanged("HasGames")
+                GameScanner.saveSettings
+                    { IsSidebarLayout = isSidebarLayout
+                      ColorAtmosphere = selectedColorAtmosphere
+                      GeometricMotif = selectedGeometricMotif
+                      Language = languageCode
+                      SupportPromptVersion = supportPromptVersion
+                      AmdMode = isAmdMode
+                      PerformanceMode = isPerformanceMode
+                      OverlayDisabled = not isOverlayEnabled
+                      OverlayTheme = overlayTheme
+                      OverlayHotkey = overlayHotkey
+                      SortMode = sortMode
+                      ShowNonGameApps = showNonGameApps }
     member this.AllGamesCount = totalGamesCount
     member this.HasGames = filteredGames.Count > 0
 
@@ -1886,7 +1916,8 @@ type MainViewModel() as this =
                       OverlayDisabled = not isOverlayEnabled
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
-                      SortMode = sortMode }
+                      SortMode = sortMode
+                      ShowNonGameApps = showNonGameApps }
 
     /// True while the open sheet will install through the AMD payload.
     member this.IsAmdRouteActive = isAmdMode && not isEmulatorTarget
@@ -1941,7 +1972,8 @@ type MainViewModel() as this =
               OverlayDisabled = not isOverlayEnabled
               OverlayTheme = overlayTheme
               OverlayHotkey = overlayHotkey
-              SortMode = sortMode }
+              SortMode = sortMode
+              ShowNonGameApps = showNonGameApps }
 
     /// What the current sheet would install, so the manage sheet can say
     /// whether the overlay is coming along.
@@ -2113,12 +2145,16 @@ type MainViewModel() as this =
             // for, and anything newer than DX11 - or unreadable - takes the
             // DX12 route.
             let mode =
-                if detectedApi = "dx9" then ModInstaller.Dx9
-                elif detectedApi = "dx10" then ModInstaller.Dx11
-                elif detectedApi = "vulkan" then ModInstaller.OptiScalerMode
-                elif detectedDlss then ModInstaller.OptiScalerMode
-                elif detectedApi = "dx11" then ModInstaller.Dx11
-                else ModInstaller.Dx12Auto
+                match NeedForSpeedProfiles.tryRecommendedRoute manageTitle with
+                | Some "dx11" -> ModInstaller.Dx11
+                | Some "dx12" -> ModInstaller.Dx12Auto
+                | _ ->
+                    if detectedApi = "dx9" then ModInstaller.Dx9
+                    elif detectedApi = "dx10" then ModInstaller.Dx11
+                    elif detectedApi = "vulkan" then ModInstaller.OptiScalerMode
+                    elif detectedDlss then ModInstaller.OptiScalerMode
+                    elif detectedApi = "dx11" then ModInstaller.Dx11
+                    else ModInstaller.Dx12Auto
 
             this.ApplyInstallMode(mode)
 
@@ -2654,7 +2690,7 @@ type MainViewModel() as this =
 
         for card in this.Games do
             let row = BatchRowViewModel(card)
-            if row.IsRunnable then batchRows.Add(row)
+            if row.IsRunnable && not (NonGameAppClassifier.isUtility card.Game) then batchRows.Add(row)
 
         this.BatchResultText <- ""
         this.BatchStatusText <- ""

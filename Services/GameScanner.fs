@@ -1005,6 +1005,8 @@ module GameScanner =
         /// a settings file written before sorting existed, which reads back as
         /// the first entry.
         SortMode: string
+        /// Keep known creator tools in the library only when requested.
+        ShowNonGameApps: bool
     }
 
     /// The orders the library can be shown in, in the order they appear in the
@@ -1035,7 +1037,8 @@ module GameScanner =
           OverlayDisabled = false
           OverlayTheme = "Neon Emerald"
           OverlayHotkey = "Shift+O"
-          SortMode = sortModes.[0] }
+          SortMode = sortModes.[0]
+          ShowNonGameApps = false }
 
     let loadSettings () : AppSettings =
         try

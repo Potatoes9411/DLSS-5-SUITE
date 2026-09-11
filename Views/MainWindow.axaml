@@ -414,7 +414,7 @@
 
                                 <!-- Header: Title + Back Button -->
                                 <Border Background="#10FFFFFF" BorderBrush="#20FFFFFF" BorderThickness="1" CornerRadius="18" Padding="18,12">
-                                    <Grid ColumnDefinitions="*,Auto">
+                                          <Grid ColumnDefinitions="*,Auto">
                                         <TextBlock Grid.Column="0" Text="{Binding Loc.SettingsPreferences}" FontSize="13.5" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" LetterSpacing="0.5" />
 
                                         <Button Grid.Column="1" Classes="EmptyActionBtn" Click="OnBackToGamesClicked" Cursor="Hand" Padding="14,7">
@@ -471,8 +471,20 @@
                                                                   SelectedItem="{Binding SelectedOverlayHotkey, Mode=TwoWay}"
                                                                   HorizontalAlignment="Stretch" Height="34" VerticalAlignment="Center" />
                                                     </Grid>
-                                                </Grid>
-                                            </StackPanel>
+                                          </Grid>
+                                          <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,11">
+                                              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                  <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1A60A5FA" BorderBrush="#3360A5FA" BorderThickness="1" VerticalAlignment="Center">
+                                                      <PathIcon Data="M 5,4 L 19,4 L 19,20 L 5,20 Z M 8,8 L 16,8 M 8,12 L 16,12" Width="15" Height="15" Foreground="#60A5FA" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                  </Border>
+                                                  <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                      <TextBlock Text="Show non-game apps" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                      <TextBlock Text="Show detected utilities in the library. They are never included in batch installs." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                                  </StackPanel>
+                                                  <ToggleSwitch Grid.Column="2" IsChecked="{Binding ShowNonGameApps, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                              </Grid>
+                                          </Border>
+                                          </StackPanel>
                                         </Border>
 
                                         <!-- AMD RDNA 4 -->

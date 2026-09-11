@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Services
+namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -426,7 +426,8 @@ module ModInstaller =
            renodxAddonName; renodxAddonLegacyName
            "nvngx_dlssnr.dll"; "nvngx.dll_dlssnr.dll"; "nvngx.dll.addon64"
            "dlss5-overlay.addon64"; "dlss5-overlay.ini"; "dlss5-overlay.ini.bak"; "dlss5-overlay.log"
-           "OptiScaler.ini"; "OptiScaler.log"; "Remove_OptiScaler.bat"; "setup_windows.bat"
+           "OptiScaler.ini"; "OptiScaler.log"; "OptiScaler.asi"; "Remove_OptiScaler.bat"; "setup_windows.bat"
+           "ReShade64.json"
            "dgVoodoo.conf"; "dgVoodooCpl.exe"
            "deep-fried-chicken-nvngx.dll"; "deep-fried-chicken.addon64"; "deep-fried-chicken.cfg" |]
 
@@ -1669,6 +1670,30 @@ module ModInstaller =
                 { Success = false; Message = elevationNeededMessage }
             else
 
+
+            // =============================================================
+            // PRE-FLIGHT: clear hooks that conflict with the incoming route
+            // =============================================================
+            // A stale ReShade or OptiScaler proxy from a previous install
+            // can clash with the new route and crash the game on startup.
+            // Each check positively identifies our own files before
+            // deleting, so a game's original DLL is never touched.
+            match mode with
+            | OptiScalerMode ->
+                // Installing OptiScaler: clear stale ReShade hooks
+                for name in [ "dxgi.dll"; "d3d9.dll"; "d3d11.dll"; "opengl32.dll"; "vulkan-1.dll" ] do
+                    let p = Path.Combine(exeDir, name)
+                    if isReShadeFile p then try File.Delete(p) with _ -> ()
+            | Dx12Auto | Dx11 | Dx9 | Emulator ->
+                // Installing a ReShade route: clear stale OptiScaler hooks
+                clearStaleOptiScalerHooks exeDir |> ignore
+            | AmdMode ->
+                // AMD is self-contained: clear both
+                clearStaleOptiScalerHooks exeDir |> ignore
+                for name in [ "dxgi.dll"; "d3d9.dll"; "d3d11.dll"; "opengl32.dll"; "vulkan-1.dll" ] do
+                    let p = Path.Combine(exeDir, name)
+                    if isReShadeFile p then try File.Delete(p) with _ -> ()
+
             // =============================================================
             // ROUTE A - DX12 + OPTISCALER (recommended, self-contained)
             // =============================================================
@@ -2123,6 +2148,17 @@ module ModInstaller =
                     copyIfEnabled tracker feedAddonName feedAddonFile (Path.Combine(exeDir, feedAddonName)) |> ignore
                     0
 
+            // For recognised Need for Speed titles the Lumenite kernel
+            // requires motion-vector provider 3.  Write the config once so
+            // the feed add-on picks it up on first launch.
+            let feedCfgPath = Path.Combine(exeDir, "dlss5-feed.cfg")
+            if not (File.Exists(feedCfgPath))
+               && NeedForSpeedProfiles.tryRecommendedRoute game.Title |> Option.isSome then
+                try
+                    File.WriteAllText(feedCfgPath, "DLSS5_MV_PROVIDER=3\n")
+                    tracker.Record(feedCfgPath, false, "")
+                with _ -> ()
+
             // -------------------------------------------------------------
             // 3-4. NVIDIA Streamline + DLSS runtime
             // -------------------------------------------------------------
@@ -2238,7 +2274,9 @@ module ModInstaller =
     // =====================================================================
     /// The mod was put there by something other than this app, so there are no
     /// backups to restore. Removing the ray reconstruction model is enough to
-    /// turn DLSS 5 off, and it is the only file we are certain we may delete.
+    /// turn DLSS 5 off, but we also sweep the files we know are exclusively
+    /// ours and any hooks we can positively identify, so a lost manifest does
+    /// not leave the game folder polluted.
     let private removeForeignInstall (game: GameItem) (exePath: string) (plan: InstallPlan option) (report: Progress) : InstallOutcome =
         try
             report "Locating DLSS 5 files..." 0.15
@@ -2262,7 +2300,7 @@ module ModInstaller =
 
                 status.DlssnrLocations
                 |> Array.iteri (fun index dir ->
-                    report "Removing DLSS 5 files..." (0.2 + 0.7 * float (index + 1) / float total)
+                    report "Removing DLSS 5 files..." (0.2 + 0.5 * float (index + 1) / float total)
 
                     try
                         let target = Path.Combine(dir, dlssnrFileName)
@@ -2273,12 +2311,54 @@ module ModInstaller =
                     with _ ->
                         ())
 
+                // Best-effort sweep of the executable directory for files that
+                // are exclusively ours. Without a manifest we cannot restore
+                // originals, so only files we know we created are touched.
+                let root =
+                    try Path.GetDirectoryName(exePath)
+                    with _ -> ""
+
+                if not (String.IsNullOrWhiteSpace(root)) && Directory.Exists(root) then
+                    report "Sweeping leftover artifacts..." 0.75
+
+                    for name in runtimeLeftovers do
+                        try
+                            let p = Path.Combine(root, name)
+                            if File.Exists(p) then File.Delete(p); removed <- removed + 1
+                        with _ -> ()
+
+                    for name in exclusiveArtifacts do
+                        for dir in [ root; Path.Combine(root, host64DirName) ] do
+                            try
+                                let p = Path.Combine(dir, name)
+                                if File.Exists(p) then File.Delete(p); removed <- removed + 1
+                            with _ -> ()
+
+                    // Positively identified hooks
+                    report "Clearing identified hooks..." 0.85
+                    clearStaleOptiScalerHooks root |> ignore
+
+                    for name in [ "dxgi.dll"; "d3d9.dll"; "d3d11.dll"; "d3d12.dll"; "opengl32.dll"; "vulkan-1.dll"; "ReShade64.dll" ] do
+                        let p = Path.Combine(root, name)
+                        try
+                            if isReShadeFile p then File.Delete(p); removed <- removed + 1
+                        with _ -> ()
+
+                    // Clean empty helper directories
+                    for name in [ "OptiScaler"; "Licenses"; reshadeShadersDirName; host64DirName ] do
+                        let dir = Path.Combine(root, name)
+                        try
+                            if Directory.Exists(dir)
+                               && Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Length = 0 then
+                                Directory.Delete(dir, true)
+                        with _ -> ()
+
                 report "DLSS 5 removed." 1.0
 
                 { Success = true
                   Message =
                     sprintf
-                        "This DLSS 5 install was not made by DLSS 5 SUITE, so only %s was removed (%d location(s)). ReShade and the game's own runtime files were left untouched."
+                        "This DLSS 5 install was not made by DLSS 5 SUITE. Removed %s and swept %d additional artifact(s). Game-owned files that could not be positively identified were left untouched."
                         dlssnrFileName
                         removed }
         with ex ->
@@ -2312,33 +2392,42 @@ module ModInstaller =
                 // leaves behind is picked up by the manifest pass below.
                 let mutable optiNote = ""
 
-                if not (isNull (box manifest.Mode))
-                   && manifest.Mode.Equals("optiscaler", StringComparison.OrdinalIgnoreCase) then
-                    let exeDir =
+                let exeDir =
+                    try
+                        if String.IsNullOrWhiteSpace(exePath) then
+                            Path.GetDirectoryName(manifest.ExecutablePath)
+                        else
+                            Path.GetDirectoryName(exePath)
+                    with _ ->
+                        ""
+
+                if not (String.IsNullOrWhiteSpace(exeDir)) && Directory.Exists(exeDir) then
+                    // Always sweep for stale hooks regardless of manifest mode.
+                    // Both checks positively identify our files before deleting.
+                    report "Removing stale hooks..." 0.15
+
+                    try
+                        let model = Path.Combine(exeDir, dlssnrFileName)
+                        if File.Exists(model) then File.Delete(model)
+                    with _ ->
+                        ()
+
+                    report "Clearing OptiScaler hooks..." 0.25
+                    let cleared = clearStaleOptiScalerHooks exeDir
+
+                    // Also sweep for stale ReShade hooks that may have been
+                    // left behind by a previous non-OptiScaler route.
+                    let mutable reshadeCleared = 0
+                    for name in [ "dxgi.dll"; "d3d9.dll"; "d3d11.dll"; "d3d12.dll"; "opengl32.dll"; "vulkan-1.dll" ] do
+                        let p = Path.Combine(exeDir, name)
                         try
-                            if String.IsNullOrWhiteSpace(exePath) then
-                                Path.GetDirectoryName(manifest.ExecutablePath)
-                            else
-                                Path.GetDirectoryName(exePath)
-                        with _ ->
-                            ""
+                            if isReShadeFile p then
+                                File.Delete(p)
+                                reshadeCleared <- reshadeCleared + 1
+                        with _ -> ()
 
-                    if not (String.IsNullOrWhiteSpace(exeDir)) && Directory.Exists(exeDir) then
-                        report "Removing ray reconstruction model..." 0.15
-
-                        try
-                            let model = Path.Combine(exeDir, dlssnrFileName)
-                            if File.Exists(model) then File.Delete(model)
-                        with _ ->
-                            ()
-
-                        report "Removing OptiScaler hooks..." 0.3
-
-                        // Anything still carrying OptiScaler's version resource
-                        // is ours, whatever name it ended up under.
-                        let cleared = clearStaleOptiScalerHooks exeDir
-
-                        optiNote <- sprintf "OptiScaler removed (%d hook(s)). " cleared
+                    if cleared > 0 || reshadeCleared > 0 then
+                        optiNote <- sprintf "Cleared %d OptiScaler hook(s) and %d ReShade hook(s). " cleared reshadeCleared
 
                 let files = if isNull (box manifest.Files) then [||] else manifest.Files
                 let total = max 1 files.Length
@@ -2373,6 +2462,18 @@ module ModInstaller =
                             with _ ->
                                 ()
 
+                        // Also sweep host64 for runtime leftovers so the
+                        // directory can be removed cleanly afterwards.
+                        let host64Root = Path.Combine(root, host64DirName)
+                        if Directory.Exists(host64Root) then
+                            for name in runtimeLeftovers do
+                                let p = Path.Combine(host64Root, name)
+                                try
+                                    if File.Exists(p) then File.Delete(p)
+                                with _ ->
+                                    ()
+
+
                         // Sweep for our own files the manifest did not account
                         // for - an install made by an older build recorded a
                         // different set of paths, and whatever it left behind
@@ -2403,7 +2504,7 @@ module ModInstaller =
                         // installs it any more, but an install made while the
                         // OptiScaler route briefly hosted the overlay still has
                         // one, and that has to come off cleanly.
-                        for name in [ "dxgi.dll"; "d3d9.dll"; "d3d11.dll"; "d3d12.dll"; "opengl32.dll"
+                        for name in [ "dxgi.dll"; "d3d9.dll"; "d3d11.dll"; "d3d12.dll"; "opengl32.dll"; "vulkan-1.dll"
                                       "ReShade64.dll" ] do
                             let p = Path.Combine(root, name)
 
