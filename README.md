@@ -108,10 +108,10 @@ Large mod and NVIDIA runtime payloads are intentionally excluded from the Git re
 DLSS 5 SUITE is a free project. If you find this modified edition useful, you can support the developers through Ko-fi. Tips are split 50-50 between this fork and the original author of DLSS 5 MANAGER.
 
 - **Potatoes9411 (Potatoes-dev)**
-  - Ko-fi: [![Support this build's dev](https://img.shields.io/badge/Ko--fi-Support%20this%20build's%20dev-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/potatoes9411)
+  - Ko-fi: [![Support this build's dev](https://img.shields.io/badge/Ko--fi-Support%20this%20build's%20dev%20(Potatoes9411)-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/potatoes9411)
   - Website: [potatoes-dev.com](https://potatoes-dev.com)
 - **NODIX TECH (Numidia Studios)**
-  - Ko-fi: [![Support the original creator](https://img.shields.io/badge/Ko--fi-Support%20the%20original%20creator-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/nodix)
+  - Ko-fi: [![Support the original creator](https://img.shields.io/badge/Ko--fi-Support%20the%20original%20creator%20(NODIX%20TECH)-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/nodix)
   - Website: [numidiastudios.com](https://numidiastudios.com)
 
 ## Credits and trademarks
