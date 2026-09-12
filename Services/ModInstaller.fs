@@ -1279,7 +1279,9 @@ module ModInstaller =
     /// utility effects (DisplayDepth, UIMask, ...) bundled under
     /// "mod files\reshade-shaders" - and point ReShade.ini at it.
     let private ensureStandardEffectPaths (tracker: Tracker) (exeDir: string) : string * int =
-        let shadersRoot = Path.Combine(exeDir, reshadeShadersDirName)
+        let isLossless = Path.GetFileNameWithoutExtension(exeDir).Equals("Lossless Scaling", StringComparison.OrdinalIgnoreCase) || Path.GetFileNameWithoutExtension(exeDir).Equals("LosslessScaling", StringComparison.OrdinalIgnoreCase)
+        let root = if isLossless then Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lossless Scaling") else exeDir
+        let shadersRoot = Path.Combine(root, reshadeShadersDirName)
         Directory.CreateDirectory(Path.Combine(shadersRoot, "Shaders")) |> ignore
         Directory.CreateDirectory(Path.Combine(shadersRoot, "Textures")) |> ignore
 
@@ -1398,7 +1400,10 @@ module ModInstaller =
             // backup it does for every other file it puts down.
             let staging = Path.Combine(Path.GetTempPath(), "dlss5-overlay-" + Guid.NewGuid().ToString("N") + ".ini")
             File.WriteAllText(staging, contents)
-            tracker.Copy(staging, Path.Combine(exeDir, overlayConfigName))
+            let isLossless = Path.GetFileNameWithoutExtension(exeDir).Equals("Lossless Scaling", StringComparison.OrdinalIgnoreCase) || Path.GetFileNameWithoutExtension(exeDir).Equals("LosslessScaling", StringComparison.OrdinalIgnoreCase)
+            let root = if isLossless then Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lossless Scaling") else exeDir
+            Directory.CreateDirectory(root) |> ignore
+            tracker.Copy(staging, Path.Combine(root, overlayConfigName))
             try File.Delete(staging) with _ -> ()
         with _ ->
             ()
@@ -1595,6 +1600,8 @@ module ModInstaller =
         (overlay: OverlayOptions)
         (report: Progress)
         : InstallOutcome =
+        let isLosslessScaling = Path.GetFileNameWithoutExtension(exePath).Equals("LosslessScaling", StringComparison.OrdinalIgnoreCase)
+
         // Carry forward what a previous run already recorded, so re-running the
         // installer to repair a broken install stays fully reversible.
         let priorEntries =
@@ -2437,3 +2444,4 @@ module ModInstaller =
                     + sprintf "Restored %d original file(s) and removed %d added file(s)." restored removed }
         with ex ->
             { Success = false; Message = "Uninstall failed: " + ex.Message }
+
