@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <TargetFramework>net8.0</TargetFramework>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
@@ -129,3 +130,4 @@
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\obfuscate.ps1&quot; -Dir &quot;$(_ObfPublishDir)&quot; -Tool &quot;$(MSBuildProjectDirectory)\.obfuscar-tool\obfuscar.console.exe&quot;" />
   </Target>
 </Project>
+
