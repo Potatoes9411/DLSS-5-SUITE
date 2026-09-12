@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Services
+namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -51,7 +51,7 @@ module IconExtractor =
 
     let private getCacheDir () =
         let localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-        let cachePath = Path.Combine(localAppData, "DLSS5Manager", "Cache", "Icons")
+        let cachePath = Path.Combine(localAppData, "DLSS5Suite", "Cache", "Icons")
         if not (Directory.Exists(cachePath)) then
             Directory.CreateDirectory(cachePath) |> ignore
         cachePath

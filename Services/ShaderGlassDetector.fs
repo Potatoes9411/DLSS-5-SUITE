@@ -14,7 +14,7 @@ module ShaderGlassDetector =
     type Status = | Missing | Ready of string | NeedsUpdate of string
     type ReleaseAsset = { Tag: string; Name: string; Url: string; Digest: string }
 
-    let private root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Manager", "Compatibility", "ShaderGlass")
+    let private root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite", "Compatibility", "ShaderGlass")
     let private manifestPath = Path.Combine(root, "suite-component-manifest.json")
     let private client = new HttpClient()
     do client.DefaultRequestHeaders.UserAgent.ParseAdd("DLSS5-SUITE/1.2.1")

@@ -73,7 +73,7 @@ DLSS 5 SUITE Portable v1.2.1-suite.4.zip
 Application data, cached artwork, settings, manifests and backups are stored under:
 
 ```text
-%LOCALAPPDATA%\DLSS5Manager\
+%LOCALAPPDATA%\DLSS5Suite\
 ```
 
 The existing folder name is retained for compatibility with installations of the original application.

@@ -29,7 +29,7 @@ module CommunityShared =
             (let dir =
                 Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "DLSS5Manager",
+                    "DLSS5Suite",
                     "Cache",
                     "Community"
                 )

@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.ViewModels
+namespace DLSS_5_MANAGER.ViewModels
 
 open System
 open System.Collections.ObjectModel
@@ -3117,7 +3117,7 @@ type MainViewModel() as this =
                 let dir =
                     System.IO.Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "DLSS5Manager",
+                        "DLSS5Suite",
                         "Cache",
                         "Posters"
                     )
