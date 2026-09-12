@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v8.0": {
-      "DLSS 5 SUITE/1.2.0-suite.1": {
+      "DLSS 5 SUITE/1.2.1-suite.3": {
         "dependencies": {
           "Avalonia": "12.1.0",
           "Avalonia.Controls.ItemsRepeater": "12.0.0",
@@ -662,7 +662,7 @@
     }
   },
   "libraries": {
-    "DLSS 5 SUITE/1.2.0-suite.1": {
+    "DLSS 5 SUITE/1.2.1-suite.3": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

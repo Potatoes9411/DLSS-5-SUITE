@@ -13,11 +13,15 @@ module NeedForSpeedProfiles =
     let private isNeedForSpeed (title: string) =
         contains "need for speed" title || contains "needforspeed" title || contains "nfs " title
 
+    let private isFortnite (title: string) =
+        contains "fortnite" title
+
     /// A supported in-app route to select automatically. `None` means the
     /// title needs the separate DXVK-to-Vulkan classic bridge and must not be
     /// misrepresented as an ordinary DX9 install.
     let tryRecommendedRoute (title: string) =
-        if not (isNeedForSpeed title) then None
+        if isFortnite title then None
+        elif not (isNeedForSpeed title) then None
         elif contains "unbound" title then Some "dx12"
         elif contains "heat" title || contains "payback" title || contains "rivals" title
              || contains "need for speed 2016" title || contains "most wanted 2012" title
@@ -28,7 +32,9 @@ module NeedForSpeedProfiles =
         else None
 
     let tryDescribe (title: string) (api: string) (arch: string) =
-        if not (isNeedForSpeed title) then None
+        if isFortnite title then
+            Some "Recommended: Lossless Scaling is the only safe method for Fortnite. Online competitive games with anti-cheat like Fortnite will ban you for using direct render hooks (like ReShade or OptiScaler). Lossless Scaling operates safely on the window level."
+        elif not (isNeedForSpeed title) then None
         elif contains "underground 2" title || contains "underground ii" title
              || contains "most wanted" title && contains "2005" title
              || contains "prostreet" title || contains "nfs shift" title

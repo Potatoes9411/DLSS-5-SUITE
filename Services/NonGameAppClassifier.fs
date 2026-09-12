@@ -8,7 +8,8 @@ open DLSS_5_MANAGER.Models
 module NonGameAppClassifier =
     let private markers =
         [| "blender"; "obs studio"; "obs64"; "3dmark"; "clipchamp"; "clipbase"
-           "lossless scaling"; "losslessscaling"; "steamworks common redistributables" |]
+           "lossless scaling"; "losslessscaling"; "steamworks common redistributables"
+           "wallpaper engine"; "wallpaper32"; "wallpaper64" |]
 
     let isUtility (game: GameItem) =
         let text = (game.Title + " " + game.TargetExecutablePath).ToLowerInvariant()

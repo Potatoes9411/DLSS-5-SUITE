@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Services
+namespace DLSS_5_MANAGER.Services
 
 open System
 open System.Net.Http
@@ -11,8 +11,10 @@ open System.Security.Cryptography
 /// the user at the official download page when a newer version exists.
 module UpdateChecker =
 
-    [<Literal>]
-    let CurrentVersion = "1.2.1-suite.4"
+    let CurrentVersion =
+        match System.Reflection.Assembly.GetExecutingAssembly().GetCustomAttributes(typeof<System.Reflection.AssemblyInformationalVersionAttribute>, false) with
+        | [| :? System.Reflection.AssemblyInformationalVersionAttribute as attr |] -> attr.InformationalVersion
+        | _ -> "1.2.1-suite.4"
 
     // =====================================================================
     // WHERE UPDATES COME FROM

@@ -159,7 +159,6 @@ C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod fi
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\if OptiScaler\READ ME - DLSS Neural Rendering.txt
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\if OptiScaler\setup_windows.bat
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\nvngx.dll.addon64
-C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\renodx-dlss5.addon64
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\reshade-shaders\Shaders\Blending.fxh
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\reshade-shaders\Shaders\Daltonize.fx
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\reshade-shaders\Shaders\Deband.fx
@@ -202,3 +201,4 @@ C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod fi
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\streamline_dlss\streamline\sl.pcl.dll
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\streamline_dlss\streamline\sl.reflex.dll
 C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\Avalonia.Controls.ItemsRepeater.dll
+C:\Users\oofer\Documents\DLSS5 SUITE\DLSS-5-MANAGER-main\bin\Debug\net8.0\mod files\renodx-dlss5.addon64

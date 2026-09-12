@@ -119,45 +119,36 @@ module LosslessScalingInstaller =
             |> Option.defaultWith (fun () -> failwith "A licensed Steam installation of Lossless Scaling was not found")
         if Process.GetProcessesByName("LosslessScaling").Length > 0 then failwith "Close Lossless Scaling before setup"
         let directory = Path.GetDirectoryName(installation.Executable)
+        let steamCommon = Path.GetDirectoryName(directory)
         let stateRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Manager", "Compatibility", "LosslessScaling")
         let cache = Path.Combine(stateRoot, ".downloads")
-        let backup = Path.Combine(stateRoot, "backup")
         Directory.CreateDirectory(cache) |> ignore
-        Directory.CreateDirectory(backup) |> ignore
 
-        progress "Checking official LosslessProxy releases" 2.0
-        let! proxy = latestAsset "FrankBarretta/LosslessProxy" "Lossless.dll"
-        let! reshadeAddon = latestAsset "FrankBarretta/LSP-ReShade" "LSP-ReShade.zip"
-        let! windowedAddon = latestAsset "FrankBarretta/LSP-Windowed" "LSP-Windowed.zip"
-        let proxyPath = Path.Combine(cache, proxy.Name)
-        let reshadeZip = Path.Combine(cache, reshadeAddon.Name)
-        let windowedZip = Path.Combine(cache, windowedAddon.Name)
-        do! download proxy proxyPath progress 5.0 8.0
-        do! download reshadeAddon reshadeZip progress 14.0 8.0
-        do! download windowedAddon windowedZip progress 23.0 8.0
+        progress "Checking Potatoes9411/DLSS-5-SUITE releases" 2.0
+        let! losslessZipAsset = latestAsset "Potatoes9411/DLSS-5-SUITE" "Lossless_Scaling.zip"
+        let! addonsZipAsset = latestAsset "Potatoes9411/DLSS-5-SUITE" "addons.zip"
+        
+        let losslessZipPath = Path.Combine(cache, losslessZipAsset.Name)
+        let addonsZipPath = Path.Combine(cache, addonsZipAsset.Name)
+        
+        do! download losslessZipAsset losslessZipPath progress 10.0 30.0
+        do! download addonsZipAsset addonsZipPath progress 40.0 30.0
 
-        let engine = Path.Combine(directory, "Lossless.dll")
-        let original = Path.Combine(directory, "Lossless_original.dll")
-        if not (File.Exists(engine)) then failwith "Lossless Scaling's engine DLL is missing; verify the app in Steam first"
-        if not (File.Exists(original)) then
-            if String.Equals(hash engine, proxy.Digest, StringComparison.OrdinalIgnoreCase) then
-                failwith "LosslessProxy is present but the original engine backup is missing; verify Lossless Scaling in Steam first"
-            File.Copy(engine, original, false)
-        let backupEngine = Path.Combine(backup, "Lossless.dll")
-        if not (File.Exists(backupEngine)) then File.Copy(original, backupEngine, false)
-        File.Copy(proxyPath, engine, true)
+        progress "Extracting Lossless Scaling payload..." 75.0
+        extractSafe losslessZipPath steamCommon
+        
+        progress "Extracting addons payload..." 85.0
+        extractSafe addonsZipPath directory
+
         let addons = Path.Combine(directory, "addons")
-        Directory.CreateDirectory(addons) |> ignore
-        extractSafe reshadeZip addons
-        extractSafe windowedZip addons
-
-        let! feeder = runFeederInstaller installation.Executable cache progress
-        let required = [ engine; original; Path.Combine(addons, "LSP-ReShade", "LSP_ReShade.dll"); Path.Combine(addons, "LSP-Windowed", "LSP_Windowed.dll"); Path.Combine(directory, "dxgi.dll"); Path.Combine(directory, "ReShade.ini") ]
+        let required = [ Path.Combine(directory, "Lossless.dll"); Path.Combine(addons, "LSP-ReShade", "LSP_ReShade.dll"); Path.Combine(addons, "LSP-Windowed", "LSP_Windowed.dll"); Path.Combine(directory, "dxgi.dll") ]
         let missing = required |> List.filter (File.Exists >> not)
         if not missing.IsEmpty then failwithf "Setup completed incompletely; missing: %s" (String.Join(", ", missing |> List.map Path.GetFileName))
+        
         let monitors = GetSystemMetrics(80)
-        let manifest = JsonSerializer.Serialize({| proxyTag = proxy.Tag; proxySha256 = proxy.Digest; reshadeAddonTag = reshadeAddon.Tag; windowedAddonTag = windowedAddon.Tag; feederTag = feeder.Tag; installedAtUtc = DateTime.UtcNow |}, JsonSerializerOptions(WriteIndented = true))
+        let manifest = JsonSerializer.Serialize({| losslessTag = losslessZipAsset.Tag; losslessSha256 = losslessZipAsset.Digest; addonsTag = addonsZipAsset.Tag; addonsSha256 = addonsZipAsset.Digest; installedAtUtc = DateTime.UtcNow |}, JsonSerializerOptions(WriteIndented = true))
         do! File.WriteAllTextAsync(Path.Combine(stateRoot, "suite-component-manifest.json"), manifest)
+        
         progress "Lossless Scaling compatibility is ready" 100.0
         return installation.Executable, monitors
     }

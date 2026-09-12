@@ -9,11 +9,11 @@ open System.Reflection
 
 [<assembly: System.Reflection.AssemblyCompanyAttribute("Potatoes-dev")>]
 [<assembly: System.Reflection.AssemblyConfigurationAttribute("Release")>]
-[<assembly: System.Reflection.AssemblyCopyrightAttribute("© 2026 Potatoes-dev. Based on DLSS 5 MANAGER, © 2026 Numidia Studios. All rights reserved.")>]
-[<assembly: System.Reflection.AssemblyDescriptionAttribute("DLSS 5 SUITE — a modified version of DLSS 5 MANAGER (built by NODIX TECH, published by Numidia Studios). Built by Potatoes9411, published by Potatoes-dev.")>]
-[<assembly: System.Reflection.AssemblyFileVersionAttribute("1.2.0.1")>]
-[<assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.2.0-suite.1+75b250d374d5a1dcca5ac16fc00271e7f192dc8c")>]
+[<assembly: System.Reflection.AssemblyCopyrightAttribute("� 2026 Potatoes-dev. Based on DLSS 5 MANAGER, � 2026 Numidia Studios. All rights reserved.")>]
+[<assembly: System.Reflection.AssemblyDescriptionAttribute("DLSS 5 SUITE � a modified version of DLSS 5 MANAGER (built by NODIX TECH, published by Numidia Studios). Built by Potatoes9411, published by Potatoes-dev.")>]
+[<assembly: System.Reflection.AssemblyFileVersionAttribute("1.2.1.5")>]
+[<assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.2.1-suite.5+0ea0cc9e6848b6f3989d8ef9da96d1652dca747b")>]
 [<assembly: System.Reflection.AssemblyProductAttribute("DLSS 5 SUITE")>]
 [<assembly: System.Reflection.AssemblyTitleAttribute("DLSS 5 SUITE")>]
-[<assembly: System.Reflection.AssemblyVersionAttribute("1.2.0.1")>]
+[<assembly: System.Reflection.AssemblyVersionAttribute("1.2.1.5")>]
 do()

@@ -11,9 +11,9 @@ open System.Reflection
 [<assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")>]
 [<assembly: System.Reflection.AssemblyCopyrightAttribute("© 2026 Potatoes-dev. Based on DLSS 5 MANAGER, © 2026 Numidia Studios. All rights reserved.")>]
 [<assembly: System.Reflection.AssemblyDescriptionAttribute("DLSS 5 SUITE — a modified version of DLSS 5 MANAGER (built by NODIX TECH, published by Numidia Studios). Built by Potatoes9411, published by Potatoes-dev.")>]
-[<assembly: System.Reflection.AssemblyFileVersionAttribute("1.2.0.0")>]
-[<assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.2.0+75b250d374d5a1dcca5ac16fc00271e7f192dc8c")>]
+[<assembly: System.Reflection.AssemblyFileVersionAttribute("1.2.1.3")>]
+[<assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.2.1-suite.3+f46d3fcda607adcf203ba77a9c7614f2f080e9a9")>]
 [<assembly: System.Reflection.AssemblyProductAttribute("DLSS 5 SUITE")>]
 [<assembly: System.Reflection.AssemblyTitleAttribute("DLSS 5 SUITE")>]
-[<assembly: System.Reflection.AssemblyVersionAttribute("1.2.0.0")>]
+[<assembly: System.Reflection.AssemblyVersionAttribute("1.2.1.3")>]
 do()

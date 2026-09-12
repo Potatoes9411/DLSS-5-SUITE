@@ -97,79 +97,36 @@ module ShaderGlassDetector =
         let cache = Path.Combine(root, ".downloads")
         Directory.CreateDirectory(cache) |> ignore
 
-        progress "Checking official ShaderGlass release" 2.0
-        let! shaderGlass = assetFromRelease "mausimus/ShaderGlass" (fun n -> n.StartsWith("ShaderGlass-") && n.EndsWith("-win-x64.zip"))
-        let shaderZip = Path.Combine(cache, shaderGlass.Name)
-        do! download shaderGlass shaderZip progress 4.0 20.0
+        progress "Checking Potatoes9411/DLSS-5-SUITE releases" 2.0
+        let! shaderGlassAsset = assetFromRelease "Potatoes9411/DLSS-5-SUITE" (fun n -> String.Equals(n, "ShaderGlass_DLSS_5.zip", StringComparison.OrdinalIgnoreCase))
+        
+        let shaderZip = Path.Combine(cache, shaderGlassAsset.Name)
+        do! download shaderGlassAsset shaderZip progress 10.0 50.0
 
         let staging = Path.Combine(root, ".staging")
         if Directory.Exists(staging) then Directory.Delete(staging, true)
         Directory.CreateDirectory(staging) |> ignore
-        progress "Extracting verified ShaderGlass" 27.0
+        
+        progress "Extracting verified ShaderGlass payload..." 75.0
         extractSafe shaderZip staging
+        
+        // Find ShaderGlass.exe wherever it is in the staging zip structure
         let stagedExe = Directory.GetFiles(staging, "ShaderGlass.exe", SearchOption.AllDirectories) |> Array.tryHead |> Option.defaultWith (fun () -> failwith "ShaderGlass.exe missing from official archive")
         let stagedRoot = Path.GetDirectoryName(stagedExe)
+        
         for file in Directory.GetFiles(stagedRoot, "*", SearchOption.AllDirectories) do
             let relative = Path.GetRelativePath(stagedRoot, file)
             let destination = Path.Combine(root, relative)
             Directory.CreateDirectory(Path.GetDirectoryName(destination)) |> ignore
             File.Copy(file, destination, true)
 
-        progress "Checking official DLSS5-Feeder release" 32.0
-        let! feeder = assetFromRelease "jlrouzies-fr/DLSS5-Feeder" (fun n -> n.StartsWith("DLSS5-Feeder-") && n.EndsWith(".zip"))
-        let feederZip = Path.Combine(cache, feeder.Name)
-        do! download feeder feederZip progress 34.0 6.0
-
-        // The release ZIP digest authenticates the payload. The installer is
-        // fetched at that immutable release tag and sanity-checked before use.
-        let scriptUrl = sprintf "https://raw.githubusercontent.com/jlrouzies-fr/DLSS5-Feeder/%s/tools/Install-DLSS5Feeder.ps1" feeder.Tag
-        let scriptPath = Path.Combine(cache, sprintf "Install-DLSS5Feeder-%s.ps1" feeder.Tag)
-        progress "Downloading the release-matched installer" 42.0
-        let! scriptText = client.GetStringAsync(scriptUrl)
-        if not (scriptText.Contains("[CmdletBinding()]") && scriptText.Contains("$GameExe") && scriptText.Contains("$Consumer")) then
-            failwith "Downloaded Feeder installer did not match the expected script structure"
-        do! File.WriteAllTextAsync(scriptPath, scriptText)
-
-        progress "Installing current verified components" 45.0
-        let psi = ProcessStartInfo("powershell.exe")
-        psi.UseShellExecute <- false
-        psi.CreateNoWindow <- true
-        psi.RedirectStandardOutput <- true
-        psi.RedirectStandardError <- true
-        psi.ArgumentList.Add("-NoProfile")
-        psi.ArgumentList.Add("-ExecutionPolicy")
-        psi.ArgumentList.Add("Bypass")
-        psi.ArgumentList.Add("-File")
-        psi.ArgumentList.Add(scriptPath)
-        psi.ArgumentList.Add(exePath())
-        psi.ArgumentList.Add("-Api")
-        psi.ArgumentList.Add("D3D")
-        psi.ArgumentList.Add("-Consumer")
-        psi.ArgumentList.Add("RenoDX")
-        psi.ArgumentList.Add("-Yes")
-        psi.ArgumentList.Add("-NoElevate")
-        psi.ArgumentList.Add("-NoPause")
-        psi.ArgumentList.Add("-Downloads")
-        psi.ArgumentList.Add(cache)
-        use installerProcess = new Process(StartInfo = psi)
-        installerProcess.Start() |> ignore
-        let mutable line = installerProcess.StandardOutput.ReadLine()
-        let mutable step = 46.0
-        while not (isNull line) do
-            if not (String.IsNullOrWhiteSpace(line)) then
-                step <- min 94.0 (step + 0.35)
-                progress line step
-            line <- installerProcess.StandardOutput.ReadLine()
-        let! errors = installerProcess.StandardError.ReadToEndAsync()
-        do! installerProcess.WaitForExitAsync()
-        if installerProcess.ExitCode <> 0 then failwithf "Automatic component setup failed: %s" errors
-
-        let required = [ "dxgi.dll"; "dlss5-feed.addon64"; "renodx-dlss5.addon64"; "nvngx_dlssnr.dll"; "nvngx_dlss.dll"; "ReShade.ini" ]
+        let required = [ "ShaderGlass.exe"; "nvngx_dlssnr.dll" ]
         let missing = required |> List.filter (fun name -> not (File.Exists(Path.Combine(root, name))))
         if not missing.IsEmpty then failwithf "Setup finished but required files are missing: %s" (String.Join(", ", missing))
 
-        let manifest = JsonSerializer.Serialize({| shaderGlassTag = shaderGlass.Tag; shaderGlassSha256 = hash (exePath()); feederTag = feeder.Tag; feederAssetSha256 = feeder.Digest; checkedAtUtc = DateTime.UtcNow |}, JsonSerializerOptions(WriteIndented = true))
+        let manifest = JsonSerializer.Serialize({| shaderGlassTag = shaderGlassAsset.Tag; shaderGlassSha256 = hash (exePath()); checkedAtUtc = DateTime.UtcNow |}, JsonSerializerOptions(WriteIndented = true))
         do! File.WriteAllTextAsync(manifestPath, manifest)
+        
         if Directory.Exists(staging) then Directory.Delete(staging, true)
         progress "ShaderGlass compatibility is ready" 100.0
         return exePath()

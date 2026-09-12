@@ -1,4 +1,4 @@
-ï»¿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
@@ -12,12 +12,12 @@
     <AssemblyTitle>DLSS 5 SUITE</AssemblyTitle>
     <Company>Potatoes-dev</Company>
     <Authors>Potatoes9411</Authors>
-    <Description>DLSS 5 SUITE â€” a modified version of DLSS 5 MANAGER (built by NODIX TECH, published by Numidia Studios). Built by Potatoes9411, published by Potatoes-dev.</Description>
-    <Copyright>Â© 2026 Potatoes-dev. Based on DLSS 5 MANAGER, Â© 2026 Numidia Studios. All rights reserved.</Copyright>
-    <Version>1.2.1-suite.4</Version>
-    <AssemblyVersion>1.2.1.4</AssemblyVersion>
-    <FileVersion>1.2.1.4</FileVersion>
-    <InformationalVersion>1.2.1-suite.4</InformationalVersion>
+    <Description>DLSS 5 SUITE — a modified version of DLSS 5 MANAGER (built by NODIX TECH, published by Numidia Studios). Built by Potatoes9411, published by Potatoes-dev.</Description>
+    <Copyright>© 2026 Potatoes-dev. Based on DLSS 5 MANAGER, © 2026 Numidia Studios. All rights reserved.</Copyright>
+    <Version>1.2.1-suite.5</Version>
+    <AssemblyVersion>1.2.1.5</AssemblyVersion>
+    <FileVersion>1.2.1.5</FileVersion>
+    <InformationalVersion>1.2.1-suite.5</InformationalVersion>
 
     <!-- ================================================================= -->
     <!-- RUNTIME FOOTPRINT                                                  -->
