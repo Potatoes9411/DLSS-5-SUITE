@@ -54,13 +54,28 @@ The ShaderGlass route only uses allowlisted official upstream projects. Release 
 
 ## Installation
 
-Choose one of three versioned packages from this repository's Releases page:
+🚨 **STOP! READ THIS BEFORE DOWNLOADING!** 🚨
+*(Leia isto antes de baixar! / ¡Lee esto antes de descargar!)*
 
-- **Full Setup** — contains the application payload and can install offline.
-- **Web Setup** — a smaller installer that downloads and verifies the Portable ZIP for the same release.
-- **Portable ZIP** — extract and run without installing.
+**🇬🇧 ENGLISH:**
+* 🟢 **Easiest Install:** Download DLSS.5.SUITE.Web.Setup.exe (Downloads everything else for you automatically!)
+* 🔵 **Offline Install:** Download DLSS.5.SUITE.Setup.exe (Huge file, has everything included).
+* 🟡 **No Install Required:** Download DLSS.5.SUITE.Portable.zip and just extract it.
+* ❌ **DO NOT DOWNLOAD** Lossless_Scaling.zip, ddons.zip, or ShaderGlass_DLSS_5.zip manually. The application will fetch them for you!
 
-Existing installers are retained as separate historical downloads and are never silently overwritten with a different build.
+**🇧🇷 PORTUGUÊS (PT-BR):**
+* 🟢 **Instalação mais fácil:** Baixe o DLSS.5.SUITE.Web.Setup.exe (Ele baixa o resto para você automaticamente!)
+* 🔵 **Instalação Offline:** Baixe o DLSS.5.SUITE.Setup.exe (Arquivo grande, já inclui tudo).
+* 🟡 **Não requer instalação:** Baixe o DLSS.5.SUITE.Portable.zip e apenas extraia.
+* ❌ **NÃO BAIXE** Lossless_Scaling.zip, ddons.zip ou ShaderGlass_DLSS_5.zip manualmente. O aplicativo fará isso por você!
+
+**🇪🇸 ESPAÑOL:**
+* 🟢 **Instalación más fácil:** Descarga DLSS.5.SUITE.Web.Setup.exe (¡Descarga todo lo demás por ti automáticamente!)
+* 🔵 **Instalación sin conexión:** Descarga DLSS.5.SUITE.Setup.exe (Archivo grande, incluye todo).
+* 🟡 **Sin instalación:** Descarga DLSS.5.SUITE.Portable.zip y simplemente extráelo.
+* ❌ **NO DESCARGUES** Lossless_Scaling.zip, ddons.zip ni ShaderGlass_DLSS_5.zip manualmente. ¡La aplicación los descargará por ti!
+
+*(Existing installers are retained as separate historical downloads and are never silently overwritten with a different build.)*
 
 ## Updates
 
