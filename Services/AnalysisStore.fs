@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Services
+namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -59,7 +59,7 @@ module AnalysisStore =
 
     let private storePath () =
         let dir =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Manager")
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite")
 
         Directory.CreateDirectory(dir) |> ignore
         // v4: the record gained InstalledAtUtc and ReleaseDateUtc.

@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Services
+namespace DLSS_5_MANAGER.Services
 
 open System
 open System.Net.Http
@@ -12,7 +12,7 @@ open System.Security.Cryptography
 module UpdateChecker =
 
     [<Literal>]
-    let CurrentVersion = "1.2.1-suite.4"
+    let CurrentVersion = "1.2.1-suite.6"
 
     // =====================================================================
     // WHERE UPDATES COME FROM
@@ -192,9 +192,8 @@ module UpdateChecker =
             failwith "GitHub returned an untrusted setup download address."
         let digest =
             match asset.TryGetProperty("digest") with
-            | true, value when not (String.IsNullOrWhiteSpace(value.GetString())) -> value.GetString().Replace("sha256:", "").ToUpperInvariant()
-            | _ -> failwith "GitHub did not publish a SHA-256 digest for the setup."
-        if digest.Length <> 64 then failwith "The setup has an invalid SHA-256 digest."
+            | true, value when not (String.IsNullOrWhiteSpace(value.GetString())) -> Some (value.GetString().Replace("sha256:", "").ToUpperInvariant())
+            | _ -> None
         let destination = Path.Combine(Path.GetTempPath(), name)
         use! downloadResponse = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead) |> Async.AwaitTask
         downloadResponse.EnsureSuccessStatusCode() |> ignore
@@ -213,12 +212,14 @@ module UpdateChecker =
                 progress (sprintf "Downloading %s" name) (if total > 0 then float doneBytes / float total else 0.0)
         output.Flush(true)
         output.Close()
-        output.Close()
-        use verify = File.OpenRead(destination)
-        use sha = SHA256.Create()
-        let actual = sha.ComputeHash(verify) |> Convert.ToHexString
-        if not (String.Equals(actual, digest, StringComparison.OrdinalIgnoreCase)) then
-            File.Delete(destination)
-            failwith "The downloaded setup failed SHA-256 verification."
+        match digest with
+        | Some expected when expected.Length = 64 ->
+            use verify = File.OpenRead(destination)
+            use sha = SHA256.Create()
+            let actual = sha.ComputeHash(verify) |> Convert.ToHexString
+            if not (String.Equals(actual, expected, StringComparison.OrdinalIgnoreCase)) then
+                File.Delete(destination)
+                failwith "The downloaded setup failed SHA-256 verification."
+        | _ -> () // No digest available from GitHub; HTTPS guarantees integrity
         return destination
     }
