@@ -29,8 +29,6 @@ The original and unchanged DLSS 5 MANAGER is available from its developer at:
 
 **GitHub:** [https://github.com/NODIX-TECH/DLSS-5-MANAGER](https://github.com/NODIX-TECH/DLSS-5-MANAGER)
 
-**GitHub:** [https://github.com/NODIX-TECH/DLSS-5-MANAGER](https://github.com/NODIX-TECH/DLSS-5-MANAGER)
-
 DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace or claim ownership of the original application or its download location.
 
 ## What this edition provides
@@ -94,10 +92,10 @@ Large mod and NVIDIA runtime payloads are intentionally excluded from the Git re
 DLSS 5 SUITE is a free project. If you find this modified edition useful, you can support the developers through Ko-fi. Tips are split 50-50 between this fork and the original author of DLSS 5 MANAGER.
 
 - **Potatoes9411 (Potatoes-dev)**
-  - Ko-fi: [![Ko-Fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/potatoes9411)
+  - Ko-fi: [![Support Potatoes9411](https://img.shields.io/badge/Ko--fi-Support%20Potatoes9411-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/potatoes9411)
   - Website: [potatoes-dev.com](https://potatoes-dev.com)
 - **NODIX TECH (Numidia Studios)**
-  - Ko-fi: [![Ko-Fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/nodix)
+  - Ko-fi: [![Support NODIX TECH](https://img.shields.io/badge/Ko--fi-Support%20NODIX%20TECH-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/nodix)
   - Website: [numidiastudios.com](https://numidiastudios.com)
 
 ## Credits and trademarks
