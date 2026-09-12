@@ -6,7 +6,7 @@
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-Version 1.2.1-suite.4 · Windows x64 · .NET 8 · Avalonia UI
+Version 1.2.1-suite.6 · Windows x64 · .NET 8 · Avalonia UI
 
 </div>
 
@@ -62,12 +62,12 @@ DLSS 5 SUITE checks this repository's stable GitHub releases. When an update is 
 
 The ShaderGlass route independently checks the allowlisted official ShaderGlass and DLSS5-Feeder release sources when **Set up/update & launch ShaderGlass** is selected. This keeps the optional compatibility files current without bundling unverified YouTube packages or asking the user to assemble files manually.
 
-For a valid release, use a version tag such as `v1.2.1-suite.4` and attach files with matching versioned names. GitHub may display spaces in uploaded filenames as periods; both exact forms are accepted:
+For a valid release, use a version tag such as `v1.2.1-suite.6` and attach files with matching versioned names. GitHub may display spaces in uploaded filenames as periods; both exact forms are accepted:
 
 ```text
-DLSS 5 SUITE Setup v1.2.1-suite.4.exe
-DLSS 5 SUITE Web Setup v1.2.1-suite.4.exe
-DLSS 5 SUITE Portable v1.2.1-suite.4.zip
+DLSS 5 SUITE Setup v1.2.1-suite.6.exe
+DLSS 5 SUITE Web Setup v1.2.1-suite.6.exe
+DLSS 5 SUITE Portable v1.2.1-suite.6.zip
 ```
 
 Application data, cached artwork, settings, manifests and backups are stored under:
@@ -94,3 +94,4 @@ Large mod and NVIDIA runtime payloads are intentionally excluded from the Git re
 NVIDIA, DLSS and the NVIDIA eye logo are trademarks of NVIDIA Corporation. DLSS 5 SUITE is not affiliated with, endorsed by, or sponsored by NVIDIA.
 
 For the exact conditions governing this modified edition, read [NOTICE.txt](NOTICE.txt).
+
