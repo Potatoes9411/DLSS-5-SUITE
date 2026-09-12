@@ -474,6 +474,8 @@ type MainViewModel() as this =
     let mutable updateStatusText = ""
     let mutable updateDownloadProgress = 0.0
     let mutable hasUpdateAvailable = false
+    let mutable showUpdateSuccessMessage = false
+    let mutable updateSuccessVersion = ""
     let mutable latestVersionFound = ""
 
     let mutable selectedColorAtmosphere = "Neon Emerald"
@@ -2968,6 +2970,14 @@ type MainViewModel() as this =
 
     member this.HasUpdateStatus = not (String.IsNullOrWhiteSpace(updateStatusText))
 
+    member this.ShowUpdateSuccessMessage
+        with get () = showUpdateSuccessMessage
+        and set value = this.SetProperty(&showUpdateSuccessMessage, value) |> ignore
+
+    member this.UpdateSuccessVersion
+        with get () = updateSuccessVersion
+        and set value = this.SetProperty(&updateSuccessVersion, value) |> ignore
+
     member this.HasUpdateAvailable
         with get () = hasUpdateAvailable
         and set value =
@@ -3039,6 +3049,9 @@ type MainViewModel() as this =
 
     /// Runs once on every launch, quietly. Only a confirmed newer build says
     /// anything - a failed check must never greet the user with an error.
+    member this.DimissUpdateMessage()
+        = this.ShowUpdateSuccessMessage <- false
+
     member this.CheckForUpdatesOnStartup() =
         async {
             let! result = UpdateChecker.check ()

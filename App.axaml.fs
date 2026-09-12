@@ -15,7 +15,14 @@ type App() =
     override this.OnFrameworkInitializationCompleted() =
         match this.ApplicationLifetime with
         | :? IClassicDesktopStyleApplicationLifetime as desktop ->
-            desktop.MainWindow <- MainWindow(DataContext = MainViewModel())
+            let vm = MainViewModel()
+            if not (isNull desktop.Args) then
+                let args = desktop.Args
+                let updateIndex = Array.tryFindIndex (fun (a: string) -> a.Equals("--updated", System.StringComparison.OrdinalIgnoreCase)) args
+                if updateIndex.IsSome && updateIndex.Value + 1 < args.Length then
+                    vm.ShowUpdateSuccessMessage <- true
+                    vm.UpdateSuccessVersion <- args.[updateIndex.Value + 1]
+            desktop.MainWindow <- MainWindow(DataContext = vm)
         | _ -> ()
 
         base.OnFrameworkInitializationCompleted()

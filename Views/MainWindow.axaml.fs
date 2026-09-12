@@ -1593,7 +1593,13 @@ type MainWindow() as this =
             let! setupPath = vm.DownloadUpdate()
             match setupPath with
             | Some path ->
-                try Process.Start(ProcessStartInfo(path, UseShellExecute = true)) |> ignore
+                try 
+                    let args = sprintf "--silent --dir \"%s\"" (AppContext.BaseDirectory.TrimEnd('\\', '/'))
+                    let startInfo = ProcessStartInfo(path, Arguments = args, UseShellExecute = true)
+                    if AppContext.BaseDirectory.StartsWith(@"C:\Program Files", StringComparison.OrdinalIgnoreCase) then
+                        startInfo.Verb <- "runas"
+                    Process.Start(startInfo) |> ignore
+                    Environment.Exit(0)
                 with ex -> vm.UpdateStatusText <- "The verified setup could not start: " + ex.Message
             | None -> ()
         }
