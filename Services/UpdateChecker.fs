@@ -84,12 +84,21 @@ module UpdateChecker =
             if not cleaned.Success then
                 []
             else
-                cleaned.Value.Split('.')
-                |> Array.map (fun p ->
-                    match Int32.TryParse(p) with
-                    | true, v -> v
-                    | _ -> 0)
-                |> Array.toList
+                let core = 
+                    cleaned.Value.Split('.')
+                    |> Array.map (fun p ->
+                        match Int32.TryParse(p) with
+                        | true, v -> v
+                        | _ -> 0)
+                    |> Array.toList
+                let suiteMatch = Regex.Match(raw, @"(?i)(?:^|[-_.])suite[.-]?(\d+)")
+                let suiteRevision = 
+                    if suiteMatch.Success then
+                        match Int32.TryParse(suiteMatch.Groups.[1].Value) with
+                        | true, v -> v
+                        | _ -> 0
+                    else 0
+                core @ [suiteRevision]
 
     /// Positive when `a` is newer than `b`.
     let private compareVersions (a: string) (b: string) : int =
