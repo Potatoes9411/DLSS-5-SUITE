@@ -213,6 +213,7 @@ module UpdateChecker =
                 progress (sprintf "Downloading %s" name) (if total > 0 then float doneBytes / float total else 0.0)
         output.Flush(true)
         output.Close()
+        output.Close()
         use verify = File.OpenRead(destination)
         use sha = SHA256.Create()
         let actual = sha.ComputeHash(verify) |> Convert.ToHexString
