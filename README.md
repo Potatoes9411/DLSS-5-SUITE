@@ -54,26 +54,27 @@ The ShaderGlass route only uses allowlisted official upstream projects. Release 
 
 ## Installation
 
-🚨 **STOP! READ THIS BEFORE DOWNLOADING!** 🚨
-*(Leia isto antes de baixar! / ¡Lee esto antes de descargar!)*
-
-**🇬🇧 ENGLISH:**
-* 🟢 **Easiest Install:** Download DLSS.5.SUITE.Web.Setup.exe (Downloads everything else for you automatically!)
-* 🔵 **Offline Install:** Download DLSS.5.SUITE.Setup.exe (Huge file, has everything included).
-* 🟡 **No Install Required:** Download DLSS.5.SUITE.Portable.zip and just extract it.
-* ❌ **DO NOT DOWNLOAD** Lossless_Scaling.zip, ddons.zip, or ShaderGlass_DLSS_5.zip manually. The application will fetch them for you!
-
-**🇧🇷 PORTUGUÊS (PT-BR):**
-* 🟢 **Instalação mais fácil:** Baixe o DLSS.5.SUITE.Web.Setup.exe (Ele baixa o resto para você automaticamente!)
-* 🔵 **Instalação Offline:** Baixe o DLSS.5.SUITE.Setup.exe (Arquivo grande, já inclui tudo).
-* 🟡 **Não requer instalação:** Baixe o DLSS.5.SUITE.Portable.zip e apenas extraia.
-* ❌ **NÃO BAIXE** Lossless_Scaling.zip, ddons.zip ou ShaderGlass_DLSS_5.zip manualmente. O aplicativo fará isso por você!
-
-**🇪🇸 ESPAÑOL:**
-* 🟢 **Instalación más fácil:** Descarga DLSS.5.SUITE.Web.Setup.exe (¡Descarga todo lo demás por ti automáticamente!)
-* 🔵 **Instalación sin conexión:** Descarga DLSS.5.SUITE.Setup.exe (Archivo grande, incluye todo).
-* 🟡 **Sin instalación:** Descarga DLSS.5.SUITE.Portable.zip y simplemente extráelo.
-* ❌ **NO DESCARGUES** Lossless_Scaling.zip, ddons.zip ni ShaderGlass_DLSS_5.zip manualmente. ¡La aplicación los descargará por ti!
+> [!IMPORTANT]
+> 🚨 **STOP! READ THIS BEFORE DOWNLOADING!** 🚨
+> *(Leia isto antes de baixar! / ¡Lee esto antes de descargar!)*
+> 
+> **🇬🇧 ENGLISH:**
+> * 🟢 **Easiest Install:** Download DLSS.5.SUITE.Web.Setup.exe (Downloads everything else for you automatically!)
+> * 🔵 **Offline Install:** Download DLSS.5.SUITE.Setup.exe (Huge file, has everything included).
+> * 🟡 **No Install Required:** Download DLSS.5.SUITE.Portable.zip and just extract it.
+> * ❌ **DO NOT DOWNLOAD** Lossless_Scaling.zip, ddons.zip, or ShaderGlass_DLSS_5.zip manually. The application will fetch them for you!
+> 
+> **🇧🇷 PORTUGUÊS (PT-BR):**
+> * 🟢 **Instalação mais fácil:** Baixe o DLSS.5.SUITE.Web.Setup.exe (Ele baixa o resto para você automaticamente!)
+> * 🔵 **Instalação Offline:** Baixe o DLSS.5.SUITE.Setup.exe (Arquivo grande, já inclui tudo).
+> * 🟡 **Não requer instalação:** Baixe o DLSS.5.SUITE.Portable.zip e apenas extraia.
+> * ❌ **NÃO BAIXE** Lossless_Scaling.zip, ddons.zip ou ShaderGlass_DLSS_5.zip manualmente. O aplicativo fará isso por você!
+> 
+> **🇪🇸 ESPAÑOL:**
+> * 🟢 **Instalación más fácil:** Descarga DLSS.5.SUITE.Web.Setup.exe (¡Descarga todo lo demás por ti automáticamente!)
+> * 🔵 **Instalación sin conexión:** Descarga DLSS.5.SUITE.Setup.exe (Archivo grande, incluye todo).
+> * 🟡 **Sin instalación:** Descarga DLSS.5.SUITE.Portable.zip y simplemente extráelo.
+> * ❌ **NO DESCARGUES** Lossless_Scaling.zip, ddons.zip ni ShaderGlass_DLSS_5.zip manualmente. ¡La aplicación los descargará por ti!
 
 *(Existing installers are retained as separate historical downloads and are never silently overwritten with a different build.)*
 
@@ -107,10 +108,10 @@ Large mod and NVIDIA runtime payloads are intentionally excluded from the Git re
 DLSS 5 SUITE is a free project. If you find this modified edition useful, you can support the developers through Ko-fi. Tips are split 50-50 between this fork and the original author of DLSS 5 MANAGER.
 
 - **Potatoes9411 (Potatoes-dev)**
-  - Ko-fi: [![Support Potatoes9411](https://img.shields.io/badge/Ko--fi-Support%20Potatoes9411-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/potatoes9411)
+  - Ko-fi: [![Support this build's dev](https://img.shields.io/badge/Ko--fi-Support%20this%20build's%20dev-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/potatoes9411)
   - Website: [potatoes-dev.com](https://potatoes-dev.com)
 - **NODIX TECH (Numidia Studios)**
-  - Ko-fi: [![Support NODIX TECH](https://img.shields.io/badge/Ko--fi-Support%20NODIX%20TECH-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/nodix)
+  - Ko-fi: [![Support the original creator](https://img.shields.io/badge/Ko--fi-Support%20the%20original%20creator-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/nodix)
   - Website: [numidiastudios.com](https://numidiastudios.com)
 
 ## Credits and trademarks
