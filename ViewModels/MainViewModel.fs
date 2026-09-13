@@ -1,4 +1,4 @@
-namespace DLSS_5_MANAGER.ViewModels
+﻿namespace DLSS_5_MANAGER.ViewModels
 
 open System
 open System.Collections.ObjectModel
@@ -815,6 +815,30 @@ type MainViewModel() as this =
         supportPromptVersion <-
             if isNull (box settings.SupportPromptVersion) then "" else settings.SupportPromptVersion
 
+        // The updater writes this file immediately before it relaunches the
+        // app, and it is the thing that actually decides whether to show the
+        // "Successfully updated" popup.
+        //
+        // It replaces two channels that could not be relied on. The --updated
+        // argument only works if the new build both handles it and wires it to
+        // IsUpdateSuccessVisible, and those varied between releases. The
+        // LastRunVersion comparison only works if every build that ever saved
+        // settings knew about that field - a build whose settings record lacked
+        // it would drop it on save, and the comparison then saw an empty value
+        // and treated the update as a fresh install. A file the updater writes
+        // and this deletes depends on neither, and fires exactly once.
+        let updateMarker =
+            IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DLSS5Suite",
+                "update_completed.txt")
+
+        if IO.File.Exists(updateMarker) then
+            // Delete before showing, so a crash while the popup is up cannot
+            // leave it to reappear on every launch after.
+            (try IO.File.Delete(updateMarker) with _ -> ())
+            this.IsUpdateSuccessVisible <- true
+
         lastRunVersion <- if isNull (box settings.LastRunVersion) then "" else settings.LastRunVersion
         if lastRunVersion <> "" && lastRunVersion <> UpdateChecker.CurrentVersion then
             this.IsUpdateSuccessVisible <- true
@@ -833,7 +857,8 @@ type MainViewModel() as this =
                   OverlayDisabled = not isOverlayEnabled
                   OverlayTheme = overlayTheme
                   OverlayHotkey = overlayHotkey
-                  SortMode = sortMode }
+                  SortMode = sortMode
+                  ShowNonGameApps = showNonGameApps }
 
         // Only arm it when this build has not asked yet. A single tick, then
         // the timer stops for good.
@@ -1475,6 +1500,7 @@ type MainViewModel() as this =
                       GeometricMotif = selectedGeometricMotif
                       Language = languageCode
                       SupportPromptVersion = supportPromptVersion
+                      LastRunVersion = lastRunVersion
                       AmdMode = isAmdMode
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
