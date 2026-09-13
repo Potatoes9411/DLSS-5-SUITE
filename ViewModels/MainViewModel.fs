@@ -3437,3 +3437,4 @@ type MainViewModel() as this =
             ExtrasStore.removeGroup row.Key
             this.ReloadExtras()
             this.PayloadStatusText <- row.Title + " removed from the extras."
+
