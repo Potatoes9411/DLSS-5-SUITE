@@ -982,6 +982,7 @@ module GameScanner =
         /// The app version whose support prompt has already been shown. It
         /// appears once per machine, and once more after each update.
         SupportPromptVersion: string
+        LastRunVersion: string
         /// AMD RDNA 4 route. Off unless the user turns it on, and then every
         /// game installs through that one payload instead of the usual routes.
         AmdMode: bool
@@ -1032,6 +1033,7 @@ module GameScanner =
           GeometricMotif = "Orbital Spheres"
           Language = Localization.systemLanguage ()
           SupportPromptVersion = ""
+          LastRunVersion = ""
           AmdMode = false
           PerformanceMode = false
           OverlayDisabled = false
@@ -1064,7 +1066,8 @@ module GameScanner =
                     OverlayTheme = overlayTheme
                     OverlayHotkey =
                         (if String.IsNullOrWhiteSpace(s.OverlayHotkey) then "Shift+O" else s.OverlayHotkey)
-                    SupportPromptVersion = (if isNull s.SupportPromptVersion then "" else s.SupportPromptVersion) }
+                    SupportPromptVersion = (if isNull s.SupportPromptVersion then "" else s.SupportPromptVersion)
+                    LastRunVersion = (if isNull s.LastRunVersion then "" else s.LastRunVersion) }
             else defaultSettings ()
         with _ -> defaultSettings ()
 

@@ -488,6 +488,9 @@ type MainViewModel() as this =
     let mutable supportPromptVersion = ""
     let mutable isSupportPromptVisible = false
 
+    let mutable lastRunVersion = ""
+    let mutable isUpdateSuccessVisible = false
+
     /// Ten minutes in, once, and never again for this build.
     let supportPromptTimer =
         DispatcherTimer(Interval = TimeSpan.FromMinutes(10.0))
@@ -812,6 +815,12 @@ type MainViewModel() as this =
         supportPromptVersion <-
             if isNull (box settings.SupportPromptVersion) then "" else settings.SupportPromptVersion
 
+        lastRunVersion <- if isNull (box settings.LastRunVersion) then "" else settings.LastRunVersion
+        if lastRunVersion <> "" && lastRunVersion <> UpdateChecker.CurrentVersion then
+            this.IsUpdateSuccessVisible <- true
+        
+        lastRunVersion <- UpdateChecker.CurrentVersion
+
         // Only arm it when this build has not asked yet. A single tick, then
         // the timer stops for good.
         if supportPromptVersion <> UpdateChecker.CurrentVersion then
@@ -827,6 +836,7 @@ type MainViewModel() as this =
                       GeometricMotif = selectedGeometricMotif
                       Language = languageCode
                       SupportPromptVersion = supportPromptVersion
+                      LastRunVersion = lastRunVersion
                       AmdMode = isAmdMode
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
@@ -995,6 +1005,7 @@ type MainViewModel() as this =
                           GeometricMotif = selectedGeometricMotif
                           Language = languageCode
                           SupportPromptVersion = supportPromptVersion
+                          LastRunVersion = lastRunVersion
                           AmdMode = isAmdMode
                           PerformanceMode = isPerformanceMode
                           OverlayDisabled = not isOverlayEnabled
@@ -1026,6 +1037,7 @@ type MainViewModel() as this =
                       GeometricMotif = selectedGeometricMotif
                       Language = languageCode
                       SupportPromptVersion = supportPromptVersion
+                      LastRunVersion = lastRunVersion
                       AmdMode = isAmdMode
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
@@ -1071,6 +1083,7 @@ type MainViewModel() as this =
                           GeometricMotif = selectedGeometricMotif
                           Language = languageCode
                           SupportPromptVersion = supportPromptVersion
+                          LastRunVersion = lastRunVersion
                           AmdMode = isAmdMode
                           PerformanceMode = isPerformanceMode
                           OverlayDisabled = not isOverlayEnabled
@@ -1109,6 +1122,7 @@ type MainViewModel() as this =
                       GeometricMotif = selectedGeometricMotif
                       Language = languageCode
                       SupportPromptVersion = supportPromptVersion
+                      LastRunVersion = lastRunVersion
                       AmdMode = isAmdMode
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
@@ -1163,6 +1177,7 @@ type MainViewModel() as this =
                       GeometricMotif = selectedGeometricMotif
                       Language = code
                       SupportPromptVersion = supportPromptVersion
+                      LastRunVersion = lastRunVersion
                       AmdMode = isAmdMode
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
@@ -1206,6 +1221,7 @@ type MainViewModel() as this =
                       GeometricMotif = value
                       Language = languageCode
                       SupportPromptVersion = supportPromptVersion
+                      LastRunVersion = lastRunVersion
                       AmdMode = isAmdMode
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
@@ -1234,6 +1250,7 @@ type MainViewModel() as this =
                       GeometricMotif = selectedGeometricMotif
                       Language = languageCode
                       SupportPromptVersion = supportPromptVersion
+                      LastRunVersion = lastRunVersion
                       AmdMode = isAmdMode
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
@@ -1911,6 +1928,7 @@ type MainViewModel() as this =
                       GeometricMotif = selectedGeometricMotif
                       Language = languageCode
                       SupportPromptVersion = supportPromptVersion
+                      LastRunVersion = lastRunVersion
                       AmdMode = isAmdMode
                       PerformanceMode = isPerformanceMode
                       OverlayDisabled = not isOverlayEnabled
@@ -1967,6 +1985,7 @@ type MainViewModel() as this =
               GeometricMotif = selectedGeometricMotif
               Language = languageCode
               SupportPromptVersion = supportPromptVersion
+              LastRunVersion = lastRunVersion
               AmdMode = isAmdMode
               PerformanceMode = isPerformanceMode
               OverlayDisabled = not isOverlayEnabled
@@ -2812,6 +2831,19 @@ type MainViewModel() as this =
         and set value = this.SetProperty(&isSupportPromptVisible, value) |> ignore
 
     member this.DismissSupportPrompt() = this.IsSupportPromptVisible <- false
+
+    member this.IsUpdateSuccessVisible
+        with get () = isUpdateSuccessVisible
+        and set value =
+            isUpdateSuccessVisible <- value
+            this.RaisePropertyChanged("IsUpdateSuccessVisible")
+
+    member this.UpdateSuccessText = sprintf "Successfully updated to %s!" UpdateChecker.CurrentVersion
+
+    member this.CloseUpdateSuccessPrompt() =
+        this.IsUpdateSuccessVisible <- false
+
+    member this.DismissActionText = "DISMISS"
 
     member this.SupportPromptTitle = "Enjoying DLSS 5 SUITE?"
 

@@ -1,4 +1,4 @@
-﻿<Window xmlns="https://github.com/avaloniaui"
+<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DLSS_5_MANAGER.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -2321,6 +2321,30 @@
                     </StackPanel>
                 </Border>
             </Panel>
+
+            <!-- ============================================================ -->
+            <!-- UPDATE SUCCESS PROMPT                                        -->
+            <!-- Appears once after an update.                                -->
+            <!-- ============================================================ -->
+            <Border Classes="GlassModalCard" IsVisible="{Binding IsUpdateSuccessVisible}"
+                    ZIndex="9500" Width="460" Padding="22,18"
+                    HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,34,0,0">
+                <StackPanel Spacing="14">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <StackPanel Grid.Column="0" Spacing="5">
+                            <TextBlock Text="UPDATE COMPLETE" FontSize="14" FontWeight="Bold" Foreground="#34D399" />
+                            <TextBlock Text="{Binding UpdateSuccessText}" FontSize="12.5" Foreground="#94A3B8"
+                                       TextWrapping="Wrap" LineHeight="17" />
+                        </StackPanel>
+                        
+                        <Button Grid.Column="1" Classes="Destructive" Padding="12,6"
+                                VerticalAlignment="Center"
+                                Command="{Binding CloseUpdateSuccessPrompt}">
+                            <TextBlock Text="{Binding DismissActionText}" FontSize="11" FontWeight="SemiBold" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
 
             <!-- ============================================================ -->
             <!-- SUPPORT PROMPT                                               -->
