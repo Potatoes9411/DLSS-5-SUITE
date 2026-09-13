@@ -819,7 +819,21 @@ type MainViewModel() as this =
         if lastRunVersion <> "" && lastRunVersion <> UpdateChecker.CurrentVersion then
             this.IsUpdateSuccessVisible <- true
         
-        lastRunVersion <- UpdateChecker.CurrentVersion
+        if lastRunVersion <> UpdateChecker.CurrentVersion then
+            lastRunVersion <- UpdateChecker.CurrentVersion
+            GameScanner.saveSettings
+                { IsSidebarLayout = isSidebarLayout
+                  ColorAtmosphere = selectedColorAtmosphere
+                  GeometricMotif = selectedGeometricMotif
+                  Language = languageCode
+                  SupportPromptVersion = supportPromptVersion
+                  LastRunVersion = lastRunVersion
+                  AmdMode = isAmdMode
+                  PerformanceMode = isPerformanceMode
+                  OverlayDisabled = not isOverlayEnabled
+                  OverlayTheme = overlayTheme
+                  OverlayHotkey = overlayHotkey
+                  SortMode = sortMode }
 
         // Only arm it when this build has not asked yet. A single tick, then
         // the timer stops for good.
