@@ -27,14 +27,13 @@ public static class RunningApp
     /// </summary>
     public static List<Process> FindBlocking(string installDir)
     {
-        var name = Path.GetFileNameWithoutExtension(Model.InstallPlan.ExeName);
         var found = new List<Process>();
 
         string target;
         try { target = Path.GetFullPath(installDir).TrimEnd('\\'); }
         catch { return found; }
 
-        foreach (var p in Process.GetProcessesByName(name))
+        foreach (var p in ProcessNames.SelectMany(Process.GetProcessesByName))
         {
             try
             {
@@ -61,6 +60,16 @@ public static class RunningApp
 
         return found;
     }
+
+    /// <summary>
+    /// The app, and the screen engine it runs as a separate process from
+    /// engine\ - that executable is locked in the same way while it runs.
+    /// </summary>
+    static readonly string[] ProcessNames =
+    {
+        Path.GetFileNameWithoutExtension(Model.InstallPlan.ExeName),
+        "FullScreenWrapperForDLSS5",
+    };
 
     public static bool IsRunning(string installDir)
     {

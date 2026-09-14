@@ -56,6 +56,20 @@ dotnet publish "$APP/DLSS 5 SUITE.fsproj" -c Release -r win-x64 --self-contained
 
 echo "ShaderGlass compatibility components download on demand"
 
+# The screen engine ships in publish/engine/. A setup without it would show
+# the Screen Engine page with nothing behind it, so a failed engine build stops
+# here; SKIP_ENGINE=1 builds without it on purpose.
+if [ "$SKIP_ENGINE" = "1" ]; then
+    echo "--- screen engine skipped (SKIP_ENGINE=1) ---"
+else
+    echo "--- building screen engine ---"
+    cmd //c "$(printf '%s' "$APP/tools/build-engine.bat" | sed 's#/#\\#g')"
+    mkdir -p "$APP/publish/engine"
+    cp "$APP/Engine/build/FullScreenWrapperForDLSS5.exe" "$APP/publish/engine/"
+    cp "$APP/Engine/build/nvngx_dlss.dll" "$APP/publish/engine/"
+    cp "$APP/Engine/LICENSE" "$APP/publish/engine/LICENSE.txt"
+fi
+
 if [ "$1" = "--app-only" ]; then
     echo "done: $APP/publish"
     exit 0

@@ -244,15 +244,87 @@ module ScreenEngine =
 
     let private settingsPath () = Path.Combine(dataDir (), "settings.json")
 
-    /// Shipped beside the app, like the mod payload.
+    /// Shipped beside the app, like the mod payload. The executable keeps the
+    /// name and copyright notice its build gives it.
+    [<Literal>]
+    let EngineFileName = "FullScreenWrapperForDLSS5.exe"
+
     let enginePath () =
-        Path.Combine(AppContext.BaseDirectory, "engine", "DLSS5 SUITE Screen Engine.exe")
+        Path.Combine(AppContext.BaseDirectory, "engine", EngineFileName)
 
     /// The folder holding the nvngx_dlssnr.dll SUITE already bundles.
     let neuralRuntimeDir () =
         Path.Combine(ModInstaller.modFilesRoot (), "dlss 5")
 
     let isAvailable () = File.Exists(enginePath ())
+
+    // =====================================================================
+    // MONITORS
+    // =====================================================================
+    type MonitorEntry =
+        { Left: int
+          Top: int
+          Width: int
+          Height: int
+          IsPrimary: bool }
+
+    /// The order the engine numbers monitors in (interior::Ordered): primary
+    /// first, then left edge, then top edge. --monitor N and --target N are
+    /// indexes into this order, so SUITE must use the same one.
+    let engineOrder (monitors: MonitorEntry list) =
+        monitors |> List.sortBy (fun m -> (not m.IsPrimary), m.Left, m.Top)
+
+    module private Native =
+        open System.Runtime.InteropServices
+
+        [<Struct; StructLayout(LayoutKind.Sequential)>]
+        type RECT =
+            val mutable left: int
+            val mutable top: int
+            val mutable right: int
+            val mutable bottom: int
+
+        [<Struct; StructLayout(LayoutKind.Sequential)>]
+        type MONITORINFO =
+            val mutable cbSize: int
+            val mutable rcMonitor: RECT
+            val mutable rcWork: RECT
+            val mutable dwFlags: uint32
+
+        type MonitorEnumProc = delegate of nativeint * nativeint * nativeint * nativeint -> bool
+
+        [<DllImport("user32.dll")>]
+        extern bool EnumDisplayMonitors(nativeint hdc, nativeint clip, MonitorEnumProc callback, nativeint data)
+
+        [<DllImport("user32.dll")>]
+        extern bool GetMonitorInfoW(nativeint monitor, MONITORINFO& info)
+
+    /// Every connected monitor, in the engine's order. Empty if Windows will
+    /// not say.
+    let listMonitors () =
+        let found = Collections.Generic.List<MonitorEntry>()
+
+        let callback =
+            Native.MonitorEnumProc(fun handle _ _ _ ->
+                let mutable info = Native.MONITORINFO()
+                info.cbSize <- Runtime.InteropServices.Marshal.SizeOf<Native.MONITORINFO>()
+                if Native.GetMonitorInfoW(handle, &info) then
+                    let r = info.rcMonitor
+                    found.Add
+                        { Left = r.left
+                          Top = r.top
+                          Width = r.right - r.left
+                          Height = r.bottom - r.top
+                          IsPrimary = (info.dwFlags &&& 1u) <> 0u }
+                true)
+
+        try
+            Native.EnumDisplayMonitors(0n, 0n, callback, 0n) |> ignore
+            GC.KeepAlive(callback)
+        with _ ->
+            ()
+
+        engineOrder (List.ofSeq found)
 
     // =====================================================================
     // PERSISTENCE
@@ -401,14 +473,21 @@ module ScreenEngine =
                 let psi = ProcessStartInfo(enginePath ())
                 psi.UseShellExecute <- false
                 psi.CreateNoWindow <- true
-                psi.WorkingDirectory <- Path.GetDirectoryName(enginePath ())
+                // The engine writes its trace file into the working directory,
+                // and the install folder under Program Files is not writable.
+                psi.WorkingDirectory <- data
                 for a in toArguments data (neuralRuntimeDir ()) current do
                     psi.ArgumentList.Add(a)
 
                 let p = new Process(StartInfo = psi, EnableRaisingEvents = true)
 
                 p.Exited.Add(fun _ ->
-                    if not stopping then
+                    // Exit code 0 is the engine's own quit (Ctrl+Alt+Shift+Q),
+                    // which is a request to stop, not a crash.
+                    let quitByUser = (try p.ExitCode = 0 with _ -> false)
+                    if not stopping && quitByUser then
+                        stateChanged.Trigger "Stopped"
+                    elif not stopping then
                         let now = DateTime.UtcNow
                         restarts.Enqueue(now)
                         while restarts.Count > 0 && now - restarts.Peek() > TimeSpan.FromMinutes(1.0) do

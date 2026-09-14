@@ -121,3 +121,14 @@ let ``settings survive being saved and loaded`` () =
 let ``an unreadable settings file gives the defaults`` () =
     Assert.Equal(defaults, deserialize "{ not json")
     Assert.Equal(defaults, deserialize "")
+
+[<Fact>]
+let ``monitors are numbered primary first, then left to right, then top to bottom`` () =
+    // interior::Ordered in the engine; --monitor 1 has to mean the same screen on both sides.
+    let m left top primary = { Left = left; Top = top; Width = 1920; Height = 1080; IsPrimary = primary }
+    let ordered = engineOrder [ m 1920 0 false; m -1920 0 false; m 0 0 true; m 1920 -1080 false ]
+    Assert.Equal<MonitorEntry list>([ m 0 0 true; m -1920 0 false; m 1920 -1080 false; m 1920 0 false ], ordered)
+
+[<Fact>]
+let ``SUITE looks for the engine under the name its build gives it`` () =
+    Assert.EndsWith("FullScreenWrapperForDLSS5.exe", enginePath ())

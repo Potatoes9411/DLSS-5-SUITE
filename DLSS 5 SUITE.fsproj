@@ -68,6 +68,7 @@
     <Compile Include="ViewModels\ViewModelBase.fs" />
     <Compile Include="ViewModels\GameCardViewModel.fs" />
     <Compile Include="ViewModels\CommunityViewModel.fs" />
+    <Compile Include="ViewModels\ScreenEngineViewModel.fs" />
     <Compile Include="ViewModels\MainViewModel.fs" />
     <Compile Include="Views\MainWindow.axaml.fs" />
     <Compile Include="ViewLocator.fs" />

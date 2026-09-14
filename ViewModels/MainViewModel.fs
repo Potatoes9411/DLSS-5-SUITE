@@ -368,6 +368,9 @@ type MainViewModel() as this =
     /// instantly; it does not touch the network until the tab is opened.
     let community = CommunityViewModel()
 
+    /// DLSS 5 over the whole screen, run by the bundled engine.
+    let screenEngine = new ScreenEngineViewModel()
+
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
@@ -608,6 +611,14 @@ type MainViewModel() as this =
             app.Resources.["ToggleSwitchFillOnPointerOver"] <- box (SolidColorBrush(c) :> IBrush)
             app.Resources.["ToggleSwitchFillOnPressed"] <- box (tint 200uy)
             app.Resources.["ToggleSwitchStrokeOn"] <- box (tint 255uy)
+
+            // Sliders (the Screen Engine card) follow the scheme the same way.
+            app.Resources.["SliderTrackValueFill"] <- box (tint 235uy)
+            app.Resources.["SliderTrackValueFillPointerOver"] <- box (SolidColorBrush(c) :> IBrush)
+            app.Resources.["SliderTrackValueFillPressed"] <- box (tint 200uy)
+            app.Resources.["SliderThumbBackground"] <- box (tint 255uy)
+            app.Resources.["SliderThumbBackgroundPointerOver"] <- box (SolidColorBrush(c) :> IBrush)
+            app.Resources.["SliderThumbBackgroundPressed"] <- box (tint 200uy)
 
             // BoxShadow and Effect are parsed from strings, so a DynamicResource
             // cannot carry a colour into them from XAML. Building them here and
@@ -1351,6 +1362,7 @@ type MainViewModel() as this =
     /// The community section's own state. Exposed so the window can bind to it
     /// as `Community.X` rather than mirroring three dozen properties here.
     member _.Community = community
+    member _.ScreenEngine = screenEngine
 
     member this.OpenSettings() = this.ActiveSection <- "settings"
     member _.LosslessScalingStatus = losslessScalingStatus
@@ -1606,6 +1618,10 @@ type MainViewModel() as this =
     member this.ShowUniversalCard =
         matchesCard searchText [ "universal"; "lossless"; "scaling"; "nr"; "neural"; "steam"; "readiness" ]
 
+    member this.ShowScreenEngineCard =
+        matchesCard searchText [ "screen engine"; "full screen"; "fullscreen"; "wrapper"; "monitor"; "window"
+                                 "neural"; "nr"; "dlss 5"; "intensity"; "desktop"; "upscale" ]
+
     /// Nothing on the settings page answers the query.
     member this.HasNoSettingsMatch =
         not (String.IsNullOrWhiteSpace(searchText))
@@ -1620,6 +1636,7 @@ type MainViewModel() as this =
             || this.ShowSupportCard
             || this.ShowAboutCard
             || this.ShowUniversalCard
+            || this.ShowScreenEngineCard
         )
 
     member private this.RaiseSettingsFilter() =
@@ -1647,6 +1664,7 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("ShowSupportCard")
         this.RaisePropertyChanged("ShowAboutCard")
         this.RaisePropertyChanged("ShowUniversalCard")
+        this.RaisePropertyChanged("ShowScreenEngineCard")
         this.RaisePropertyChanged("HasNoSettingsMatch")
 
     member this.IsSearchOpen

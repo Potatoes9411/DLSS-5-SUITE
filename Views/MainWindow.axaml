@@ -939,6 +939,119 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- Card 3d: Screen Engine (full-screen DLSS 5) -->
+                                <Border Classes="SettingsCard" Classes.Shown="{Binding IsSettingsOpen}" IsVisible="{Binding ShowScreenEngineCard}"
+                                        Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                    <StackPanel Spacing="12" DataContext="{Binding ScreenEngine}">
+                                        <TextBlock Text="SCREEN ENGINE · DLSS 5 ON ANY SCREEN" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8" />
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                            <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Full-screen DLSS 5 Neural Rendering" FontSize="13.5" FontWeight="SemiBold" Foreground="White" />
+                                                <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="#CBD5E1" FontSize="12" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <Button Classes="PrimaryActionBtn" Content="Start" Click="OnScreenEngineStartClicked" IsVisible="{Binding CanStart}" />
+                                                <Button Content="Apply changes" Click="OnScreenEngineApplyClicked" IsVisible="{Binding HasPendingChanges}" />
+                                                <Button Content="Stop" Click="OnScreenEngineStopClicked" IsVisible="{Binding IsRunning}" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                            <StackPanel Grid.Column="0" Spacing="4">
+                                                <TextBlock Text="Capture" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                                <ComboBox Classes="GlassComboBox" ItemsSource="{Binding SourceOptions}"
+                                                          SelectedIndex="{Binding SelectedSourceIndex, Mode=TwoWay}"
+                                                          HorizontalAlignment="Stretch" Height="34" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="Show on" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                                <ComboBox Classes="GlassComboBox" ItemsSource="{Binding TargetOptions}"
+                                                          SelectedIndex="{Binding SelectedTargetIndex, Mode=TwoWay}"
+                                                          IsEnabled="{Binding CanPickTarget}"
+                                                          HorizontalAlignment="Stretch" Height="34" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="One window instead (title, optional)" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                            <TextBox Text="{Binding Window, Mode=TwoWay}" PlaceholderText="Leave empty to capture the monitor" Height="34" />
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="11">
+                                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="Neural Rendering" FontSize="13" FontWeight="SemiBold" Foreground="White" />
+                                                <TextBlock Text="Off leaves only super resolution, when a second monitor is the output." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding NeuralRendering, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                        </Grid>
+
+                                        <StackPanel Spacing="10" IsVisible="{Binding NeuralRendering}">
+                                            <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                                <TextBlock Grid.Column="0" Text="Intensity" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Intensity, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding IntensityText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                                <TextBlock Grid.Column="0" Text="Local structure" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding LocalStructure, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding LocalStructureText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                                <TextBlock Grid.Column="0" Text="Local tone" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding LocalTone, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding LocalToneText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                                <TextBlock Grid.Column="0" Text="Passes" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <Slider Grid.Column="1" Minimum="1" Maximum="4" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                        Value="{Binding Passes, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding PassesText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="Style" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" Width="110" />
+                                                    <ComboBox Classes="GlassComboBox" ItemsSource="{Binding StyleOptions}"
+                                                              SelectedIndex="{Binding SelectedStyleIndex, Mode=TwoWay}" MinWidth="150" Height="34" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <TextBlock Text="Auto mask" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                    <ToggleSwitch IsChecked="{Binding AutoMask, Mode=TwoWay}" OnContent="" OffContent="" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                            <StackPanel Grid.Column="0" Spacing="4">
+                                                <TextBlock Text="Super resolution" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                                <ComboBox Classes="GlassComboBox" ItemsSource="{Binding SuperResolutionOptions}"
+                                                          SelectedIndex="{Binding SelectedSuperResolutionIndex, Mode=TwoWay}"
+                                                          HorizontalAlignment="Stretch" Height="34" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="Compare with the original" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                                <ComboBox Classes="GlassComboBox" ItemsSource="{Binding CompareOptions}"
+                                                          SelectedIndex="{Binding SelectedCompareIndex, Mode=TwoWay}"
+                                                          HorizontalAlignment="Stretch" Height="34" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <TextBlock Text="VSync" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <ToggleSwitch IsChecked="{Binding VSync, Mode=TwoWay}" OnContent="" OffContent="" />
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Content="Reset to defaults" Click="OnScreenEngineResetClicked" />
+                                        </Grid>
+
+                                        <TextBlock Text="Needs an NVIDIA RTX GPU and a driver with DLSS 5 support. Hotkeys while running: Ctrl+Alt+Shift+O original/processed, Ctrl+Alt+Shift+C split view, Ctrl+Alt+Shift+Q stop. Engine: Full-Screen Wrapper for DLSS5."
+                                                   TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
+                                    </StackPanel>
+                                </Border>
+
                                 <Border Classes="SettingsCard Stagger5" Classes.Shown="{Binding IsSettingsOpen}"
                                         IsVisible="{Binding ShowSupportCard}"
                                         Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">

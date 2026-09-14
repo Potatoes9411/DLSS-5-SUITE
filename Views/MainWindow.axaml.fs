@@ -1031,6 +1031,26 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.ToggleSettings()
         | _ -> ()
 
+    member this.OnScreenEngineStartClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.Start()
+        | _ -> ()
+
+    member this.OnScreenEngineApplyClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.Apply()
+        | _ -> ()
+
+    member this.OnScreenEngineStopClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.Stop()
+        | _ -> ()
+
+    member this.OnScreenEngineResetClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.ResetToDefaults()
+        | _ -> ()
+
     member this.OnCheckLosslessScalingClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> vm.CheckLosslessScaling()
