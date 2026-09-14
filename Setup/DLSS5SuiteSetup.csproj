@@ -1,0 +1,91 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <OutputType>WinExe</OutputType>
+    <!-- -windows brings the registry and COM interop in without extra
+         packages; the shortcut writer and the uninstall entry need both. -->
+    <!-- The 10.0.19041 flavour is what brings the WinRT projections in, and
+         Windows.UI.Shell.TaskbarManager is the only supported way to ask
+         Windows for a taskbar pin. See Services/TaskbarPin.cs. -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <!-- Controls and InitializeComponent are explicitly declared in SetupWindow.
+         Do not generate duplicate members when building with a newer SDK. -->
+    <AvaloniaNameGeneratorIsEnabled>false</AvaloniaNameGeneratorIsEnabled>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <AssemblyName>DLSS 5 SUITE Setup</AssemblyName>
+    <RootNamespace>Dlss5Suite.Setup</RootNamespace>
+    <ApplicationIcon>..\Assets\logo.ico</ApplicationIcon>
+
+    <!-- Starts unelevated on purpose. A per-user install never needs more,
+         and the elevated run is asked for only when the chosen location or
+         scope actually requires it - see Elevation.cs. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <Product>DLSS 5 SUITE Setup</Product>
+    <AssemblyTitle>DLSS 5 SUITE Setup</AssemblyTitle>
+    <Company>Potatoes-dev</Company>
+    <Authors>Potatoes9411</Authors>
+    <Description>Installer for DLSS 5 SUITE — built by Potatoes9411, published by Potatoes-dev.</Description>
+    <Copyright>© 2026 Potatoes-dev. Based on DLSS 5 MANAGER, © 2026 Numidia Studios. All rights reserved.</Copyright>
+
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+  </PropertyGroup>
+
+  <!-- ===================================================================== -->
+  <!-- PAYLOAD                                                                -->
+  <!-- The published application folder, zipped and embedded so the setup     -->
+  <!-- ships as the single executable a user can download and run.            -->
+  <!--                                                                        -->
+  <!-- Point PayloadDir at the publish output:                                -->
+  <!--   dotnet publish "DLSS 5 SUITE.fsproj" -c Release -r win-x64           -->
+  <!--   dotnet publish Setup -c Release -p:PayloadDir=<that folder>          -->
+  <!--                                                                        -->
+  <!-- With no PayloadDir the project still builds and runs, so the wizard    -->
+  <!-- can be worked on without a 200 MB payload in the loop; it refuses to   -->
+  <!-- install and says why.                                                  -->
+  <!-- ===================================================================== -->
+  <PropertyGroup>
+    <PayloadDir Condition="'$(PayloadDir)' == ''"></PayloadDir>
+    <PayloadZip>$(IntermediateOutputPath)payload.zip</PayloadZip>
+    <WebSetup Condition="'$(WebSetup)' == ''">false</WebSetup>
+    <DefineConstants Condition="'$(WebSetup)' == 'true'">$(DefineConstants);WEB_SETUP</DefineConstants>
+  </PropertyGroup>
+
+  <Target Name="PackPayload" BeforeTargets="PrepareForBuild" Condition="'$(PayloadDir)' != ''">
+    <Error Condition="!Exists('$(PayloadDir)')"
+           Text="PayloadDir '$(PayloadDir)' does not exist. Publish the application first." />
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Delete Files="$(PayloadZip)" />
+    <ZipDirectory SourceDirectory="$(PayloadDir)" DestinationFile="$(PayloadZip)" />
+    <Message Importance="high" Text="Setup: embedded payload from $(PayloadDir)" />
+  </Target>
+
+  <ItemGroup Condition="'$(PayloadDir)' != ''">
+    <EmbeddedResource Include="$(PayloadZip)" LogicalName="payload.zip" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.0" />
+  </ItemGroup>
+</Project>
+
+
+
+
+
+
+
+
+
+

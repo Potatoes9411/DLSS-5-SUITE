@@ -6,3 +6,5 @@ setup-out/
 mod files/
 .obfuscar-tool/
 *.user
+payload.zip
+AvaloniaUI/

@@ -14,7 +14,9 @@ module UpdateChecker =
     let CurrentVersion =
         match System.Reflection.Assembly.GetExecutingAssembly().GetCustomAttributes(typeof<System.Reflection.AssemblyInformationalVersionAttribute>, false) with
         | [| :? System.Reflection.AssemblyInformationalVersionAttribute as attr |] -> attr.InformationalVersion
-        | _ -> "1.2.1-suite.4"
+        // No attribute means a broken build, not an old one. Reporting a real
+        // version number here would make the updater compare against a lie.
+        | _ -> "0.0.0"
 
     // =====================================================================
     // WHERE UPDATES COME FROM

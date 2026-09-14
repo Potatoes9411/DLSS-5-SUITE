@@ -1,0 +1,133 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Dlss5Suite.Setup.App"
+             RequestedThemeVariant="Dark">
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <!-- ================================================================= -->
+    <!-- THEME                                                              -->
+    <!-- Lifted from the application's Neon Emerald atmosphere, so the      -->
+    <!-- setup and the thing it installs look like one product: the same    -->
+    <!-- near-black ground, the same #35D22B accent, the same translucent   -->
+    <!-- white cards and 12-16px radii.                                     -->
+    <!-- ================================================================= -->
+    <Style Selector="Window">
+      <Setter Property="FontFamily" Value="Segoe UI, Inter, SF Pro Display, System-UI, sans-serif" />
+    </Style>
+
+    <Style Selector="TextBlock.H1">
+      <Setter Property="FontSize" Value="23" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#F5F5F7" />
+    </Style>
+
+    <Style Selector="TextBlock.Sub">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="#94A3B8" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style Selector="TextBlock.Body">
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="Foreground" Value="#CBD5E1" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- A selectable card, used for the install-scope choice. -->
+    <Style Selector="RadioButton.Card">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Shell" CornerRadius="14" Padding="16,14" Background="#12FFFFFF"
+                  BorderBrush="#20FFFFFF" BorderThickness="1">
+            <ContentPresenter Content="{TemplateBinding Content}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="RadioButton.Card:pointerover /template/ Border#Shell">
+      <Setter Property="Background" Value="#1AFFFFFF" />
+      <Setter Property="BorderBrush" Value="#3AFFFFFF" />
+    </Style>
+    <Style Selector="RadioButton.Card:checked /template/ Border#Shell">
+      <Setter Property="Background" Value="#2235D22B" />
+      <Setter Property="BorderBrush" Value="#35D22B" />
+    </Style>
+
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="#E2E8F0" />
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+
+    <Style Selector="Button.Primary">
+      <Setter Property="Background" Value="#35D22B" />
+      <Setter Property="Foreground" Value="#06210A" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="26,11" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.Primary:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#43E838" />
+      <Setter Property="Foreground" Value="#06210A" />
+    </Style>
+    <Style Selector="Button.Primary:disabled /template/ ContentPresenter">
+      <Setter Property="Background" Value="#2A3A2C" />
+      <Setter Property="Foreground" Value="#6B7B6D" />
+    </Style>
+
+    <Style Selector="Button.Ghost">
+      <Setter Property="Background" Value="#14FFFFFF" />
+      <Setter Property="Foreground" Value="#E2E8F0" />
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="22,11" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="#25FFFFFF" />
+    </Style>
+    <Style Selector="Button.Ghost:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#22FFFFFF" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+
+    <Style Selector="Button.Close">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#94A3B8" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.Close:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#60FF453A" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#14FFFFFF" />
+      <Setter Property="Foreground" Value="#F5F5F7" />
+      <Setter Property="CaretBrush" Value="#35D22B" />
+      <Setter Property="BorderBrush" Value="#25FFFFFF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="12,10" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style Selector="ProgressBar">
+      <Setter Property="Foreground" Value="#35D22B" />
+      <Setter Property="Background" Value="#18FFFFFF" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Height" Value="6" />
+    </Style>
+  </Application.Styles>
+</Application>

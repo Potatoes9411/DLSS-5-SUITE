@@ -1,0 +1,41 @@
+<Project>
+  <!--
+    THE VERSION. Change it here and nowhere else.
+
+    Both the app (DLSS 5 SUITE.fsproj) and the installer (Setup/) read this
+    file automatically, and everything that reports a version derives from it:
+    the file properties Windows shows, the version the updater compares against
+    GitHub, the installer's "Version ... will replace" text and the uninstall
+    entry.
+
+    Before this, the version was set by hand in seven places - four fields in
+    the app project, three in the installer project, a constant in
+    InstallPlan.cs and a fallback in UpdateChecker - and they drifted. Releases
+    shipped reporting the wrong version, and one was built with a setup whose
+    constant still named the previous release.
+
+    Format: MAJOR.MINOR.PATCH-suite.N
+  -->
+  <PropertyGroup>
+    <SuiteVersion>1.2.2-suite.1</SuiteVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Windows version resources hold four numbers and no text, so the suite
+         number becomes the fourth: 1.2.2-suite.1 -> 1.2.2.1. That keeps every
+         suite build distinguishable in the file's own properties. -->
+    <_SuiteBase>$([System.Text.RegularExpressions.Regex]::Match('$(SuiteVersion)', '^\d+\.\d+\.\d+').Value)</_SuiteBase>
+    <_SuiteRevision>$([System.Text.RegularExpressions.Regex]::Match('$(SuiteVersion)', 'suite\.(\d+)').Groups[1].Value)</_SuiteRevision>
+    <_SuiteRevision Condition="'$(_SuiteRevision)' == ''">0</_SuiteRevision>
+
+    <Version>$(SuiteVersion)</Version>
+    <InformationalVersion>$(SuiteVersion)</InformationalVersion>
+    <AssemblyVersion>$(_SuiteBase).$(_SuiteRevision)</AssemblyVersion>
+    <FileVersion>$(_SuiteBase).$(_SuiteRevision)</FileVersion>
+
+    <!-- Otherwise .NET appends "+<git commit hash>" to InformationalVersion,
+         and the updater's version comparison sees a string that matches no
+         release. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+</Project>
