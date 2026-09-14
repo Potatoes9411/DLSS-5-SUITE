@@ -221,6 +221,13 @@ using Caption = real::ChoiceText;
     return b.geometry.source.At(0).handle;
 }
 
+// Snapshots and recordings go under --app-data when one is given: an installed copy's own folder, under
+// Program Files, is not writable. Without it they stay beside the executable, as before.
+[[nodiscard]] interior::DirectoryPath CaptureRootOf(const Base& b) noexcept
+{
+    return b.options.appDataPath.IsEmpty() ? b.executableDirectory : b.options.appDataPath;
+}
+
 [[nodiscard]] Result<real::RealEnvironment, Error> Environment(const Console& console, const Base& b, Devices d, const SessionPlan& plan, const real::ControlPanel* panel) noexcept
 {
     static constexpr auto CreatedWindow = [] [[nodiscard]] (const Console& console, const Base& b) noexcept -> Result<real::OutputWindow, Error> {
@@ -489,6 +496,9 @@ struct Ended
                                                                    called, expected.data())
                                        .Get());
                     };
+                    if (model.suitePinned)
+                        return Log(console, LogLevel::Warn,
+                                   infra::Formatted<kLineCapacity>("{} matches DLSS 5 SUITE's pinned compatibility-model SHA-256 and is accepted without an Authenticode signature", name).Get());
                     const std::array<char, real::ProductName::Capacity + 1> called = infra::NarrowedChars<real::ProductName::Capacity + 1>(model.product.Get());
                     if (product.has_value() && model.product.Get() != *product)
                         return Warned(console, name, called.data(), *product);
@@ -497,7 +507,7 @@ struct Ended
 
                 static constexpr auto Checked = [] [[nodiscard]] (const Console& console, const interior::FilePath& file, real::ModelKind kind,
                                                                   std::string_view name) noexcept -> Result<std::optional<real::TrustedFile>, Error> {
-                    return real::OpenTrusted(file, kind).and_then([&console, kind, name](real::TrustedFile model) {
+                    return real::OpenApproved(file, kind).and_then([&console, kind, name](real::TrustedFile model) {
                         return Reported(console, model, name, ProductOf(kind)).transform([&model] { return std::optional<real::TrustedFile>{ std::move(model) }; });
                     });
                 };
@@ -672,7 +682,7 @@ struct Ended
                                         .superResolution = OffersSuperResolution(d),
                                         .opticalFlow = kHasOpticalFlow,
                                         .modelAsNamed = ModelAsNamed(d),
-                                        .captureFolder = interior::DefaultCaptureFolder(b.executableDirectory),
+                                        .captureFolder = interior::DefaultCaptureFolder(CaptureRootOf(b)),
                                         .window = FollowedWindow(b) };
         };
 

@@ -59,6 +59,91 @@ module ScreenEngine =
         | CompareSplit
         | CompareOriginal
 
+    /// Everything past the everyday controls, one field per engine option.
+    ///
+    /// Plain values only (no unions or options), so the record is stored as it
+    /// is. Where an option can be left out, a sentinel says so: -1 for the
+    /// adapter, MvScaleAuto for the motion scales, "" for the NGX ids.
+    [<CLIMutable>]
+    type AdvancedSettings =
+        { /// Runs the engine's own control panel (--gui on) alongside SUITE:
+          /// snapshots, recording, sweeps and the window-picking crosshair.
+          ShowPanel: bool
+          NrPreset: int
+          UiCorrection: bool
+          /// 0 to 15; 0 is DLSS's own choice.
+          SrPreset: int
+          /// Finest block-matching level, 0 to 7.
+          MvLevel: int
+          /// 1, 2 or 4.
+          NvofGrid: int
+          /// "slow", "medium" or "fast".
+          NvofPerf: string
+          /// 0 to 1.
+          DepthValue: float
+          DepthInverted: bool
+          /// Left out, the engine works the scale out from the two sizes.
+          MvScaleAuto: bool
+          MvScaleX: float
+          MvScaleY: float
+          /// 0 to 1.
+          ResetThreshold: float
+          CaptureBorder: bool
+          /// 0 off, 1 on, 2 verbose.
+          NgxLog: int
+          /// Hex, non-zero; "" uses the project id instead.
+          NgxAppId: string
+          /// A GUID; "" keeps the engine's own.
+          NgxProjectId: string
+          Indicator: bool
+          CubinCache: bool
+          /// Keeps the output window out of capture. Off feeds the output back
+          /// into its own capture.
+          Affinity: bool
+          Topmost: bool
+          ClickThrough: bool
+          RedirectionBitmap: bool
+          /// -1 is the first NVIDIA adapter.
+          Adapter: int
+          DebugLayer: bool
+          /// 0 debug, 1 info, 2 warn, 3 error.
+          LogLevel: int
+          ExcludeOwnWindows: bool
+          ExclusionLog: bool
+          ShowInert: bool }
+
+    /// The engine's own defaults (interior::DefaultOptions).
+    let advancedDefaults =
+        { ShowPanel = false
+          NrPreset = 1
+          UiCorrection = true
+          SrPreset = 0
+          MvLevel = 1
+          NvofGrid = 1
+          NvofPerf = "medium"
+          DepthValue = 0.5
+          DepthInverted = false
+          MvScaleAuto = true
+          MvScaleX = 1.0
+          MvScaleY = 1.0
+          ResetThreshold = 0.5
+          CaptureBorder = false
+          NgxLog = 0
+          NgxAppId = ""
+          NgxProjectId = ""
+          Indicator = false
+          CubinCache = true
+          Affinity = true
+          Topmost = false
+          ClickThrough = true
+          RedirectionBitmap = false
+          Adapter = -1
+          DebugLayer = false
+          LogLevel = 1
+          ExcludeOwnWindows = true
+          ExclusionLog = false
+          ShowInert = false }
+
     type Settings =
         { Source: Source
           /// A window title (or 0xHANDLE). When set, one window is the source
@@ -83,7 +168,8 @@ module ScreenEngine =
           Cursor: Cursor
           VSync: bool
           Compare: Compare
-          HighPrecisionColour: bool }
+          HighPrecisionColour: bool
+          Advanced: AdvancedSettings }
 
     /// The engine's own defaults, so a fresh install behaves like the engine
     /// run with no options.
@@ -104,9 +190,23 @@ module ScreenEngine =
           Cursor = CursorAuto
           VSync = false
           Compare = CompareOff
-          HighPrecisionColour = false }
+          HighPrecisionColour = false
+          Advanced = advancedDefaults }
 
     let private kMaxMonitorIndex = 16
+
+    /// The engine's --ngx-app-id: hex, optional 0x, not zero, fits 64 bits.
+    let isValidAppId (text: string) =
+        let digits =
+            if text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) then text.Substring(2) else text
+        let ok, value =
+            UInt64.TryParse(digits, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture)
+        digits.Length > 0 && ok && value <> 0UL
+
+    /// The engine's --ngx-project-id: a GUID written out with dashes.
+    let isValidProjectId (text: string) =
+        let ok, _ = Guid.TryParseExact(text, "D")
+        ok
 
     let private finiteOr (fallback: float) (value: float) =
         if Double.IsFinite(value) then value else fallback
@@ -115,6 +215,32 @@ module ScreenEngine =
     /// the engine's parser enforces by refusing to start, so fixing it here
     /// means a bad saved value degrades to something sensible instead of the
     /// engine silently failing to launch.
+    let normalizeAdvanced (a: AdvancedSettings) =
+        let d = advancedDefaults
+        // A stored file from an older build can hold null strings.
+        let text (value: string) = if isNull value then "" else value.Trim()
+        let appId = text a.NgxAppId
+        let projectId = text a.NgxProjectId
+
+        { a with
+            NrPreset = max 0 a.NrPreset
+            SrPreset = Math.Clamp(a.SrPreset, 0, 15)
+            MvLevel = Math.Clamp(a.MvLevel, 0, 7)
+            NvofGrid = (if a.NvofGrid = 1 || a.NvofGrid = 2 || a.NvofGrid = 4 then a.NvofGrid else d.NvofGrid)
+            NvofPerf =
+                (match text a.NvofPerf with
+                 | "slow" | "medium" | "fast" as p -> p
+                 | _ -> d.NvofPerf)
+            DepthValue = Math.Clamp(finiteOr d.DepthValue a.DepthValue, 0.0, 1.0)
+            MvScaleX = finiteOr d.MvScaleX a.MvScaleX
+            MvScaleY = finiteOr d.MvScaleY a.MvScaleY
+            ResetThreshold = Math.Clamp(finiteOr d.ResetThreshold a.ResetThreshold, 0.0, 1.0)
+            NgxLog = Math.Clamp(a.NgxLog, 0, 2)
+            NgxAppId = (if isValidAppId appId then appId else "")
+            NgxProjectId = (if isValidProjectId projectId then projectId else "")
+            Adapter = max -1 a.Adapter
+            LogLevel = Math.Clamp(a.LogLevel, 0, 3) }
+
     let normalize (s: Settings) =
         let source =
             match s.Source with
@@ -139,7 +265,8 @@ module ScreenEngine =
                 | SkinStrength v when Double.IsFinite(v) -> SkinStrength(max 0.0 v)
                 | SkinStrength _ -> FollowStructure
                 | FollowStructure -> FollowStructure
-            Passes = max 1 s.Passes }
+            Passes = max 1 s.Passes
+            Advanced = normalizeAdvanced s.Advanced }
 
     // =====================================================================
     // ARGUMENTS
@@ -159,9 +286,13 @@ module ScreenEngine =
     /// what a saved setting means.
     let toArguments (engineDataDir: string) (neuralRuntimeDir: string) (settings: Settings) : string list =
         let s = normalize settings
+        let a = s.Advanced
+        let opt (name: string) (value: string) = "--" + name + "=" + value
 
-        [ yield! [ "--gui"; "off"; "--console"; "off" ]
+        [ yield opt "gui" (onOff a.ShowPanel)
+          yield opt "console" "off"
 
+          // Paths and titles stay two arguments: they may contain "=".
           if not (String.IsNullOrEmpty(neuralRuntimeDir)) then
               yield! [ "--ngx-path"; neuralRuntimeDir ]
 
@@ -172,66 +303,103 @@ module ScreenEngine =
           if s.Window <> "" then
               yield! [ "--window"; s.Window ]
           else
-              yield "--monitor"
               yield
-                  match s.Source with
-                  | PrimaryMonitor -> "primary"
-                  | AllMonitors -> "all"
-                  | Monitor i -> string i
+                  opt "monitor" (
+                      match s.Source with
+                      | PrimaryMonitor -> "primary"
+                      | AllMonitors -> "all"
+                      | Monitor i -> string i
+                  )
 
           match s.Target with
-          | Some t -> yield! [ "--target"; string t ]
+          | Some t -> yield opt "target" (string t)
           | None -> ()
 
-          yield! [ "--nr"; onOff s.NeuralRendering ]
-          yield! [ "--nr-intensity"; num s.Intensity ]
-          yield "--nr-style"
+          yield opt "nr" (onOff s.NeuralRendering)
+          yield opt "nr-intensity" (num s.Intensity)
           yield
-              match s.Style with
-              | Standard -> "0"
-              | Natural -> "1"
-              | Cinematic -> "2"
-          yield! [ "--nr-local-structure"; num s.LocalStructure ]
-          yield! [ "--nr-local-tone"; num s.LocalTone ]
-          yield "--nr-skin"
+              opt "nr-style" (
+                  match s.Style with
+                  | Standard -> "0"
+                  | Natural -> "1"
+                  | Cinematic -> "2"
+              )
+          yield opt "nr-local-structure" (num s.LocalStructure)
+          yield opt "nr-local-tone" (num s.LocalTone)
           yield
-              match s.Skin with
-              | FollowStructure -> "-1"
-              | SkinStrength v -> num v
-          yield! [ "--nr-automask"; onOff s.AutoMask ]
-          yield! [ "--nr-passes"; string s.Passes ]
+              opt "nr-skin" (
+                  match s.Skin with
+                  | FollowStructure -> "-1"
+                  | SkinStrength v -> num v
+              )
+          yield opt "nr-automask" (onOff s.AutoMask)
+          yield opt "nr-passes" (string s.Passes)
+          yield opt "nr-preset" (string a.NrPreset)
+          yield opt "nr-ui-correction" (onOff a.UiCorrection)
 
-          yield "--sr"
           yield
-              match s.SuperResolution with
-              | SrAuto -> "auto"
-              | SrDlaa -> "dlaa"
-              | SrOff -> "off"
+              opt "sr" (
+                  match s.SuperResolution with
+                  | SrAuto -> "auto"
+                  | SrDlaa -> "dlaa"
+                  | SrOff -> "off"
+              )
+          yield opt "sr-preset" (string a.SrPreset)
 
-          yield "--mv"
           yield
-              match s.Motion with
-              | BuiltIn -> "builtin"
-              | NvidiaOpticalFlow -> "nvof"
-              | NoMotion -> "none"
+              opt "mv" (
+                  match s.Motion with
+                  | BuiltIn -> "builtin"
+                  | NvidiaOpticalFlow -> "nvof"
+                  | NoMotion -> "none"
+              )
+          yield opt "mv-level" (string a.MvLevel)
+          yield opt "nvof-grid" (string a.NvofGrid)
+          yield opt "nvof-perf" a.NvofPerf
+          yield opt "depth-value" (num a.DepthValue)
+          yield opt "depth-inverted" (onOff a.DepthInverted)
+          if not a.MvScaleAuto then
+              yield opt "mv-scale-x" (num a.MvScaleX)
+              yield opt "mv-scale-y" (num a.MvScaleY)
+          yield opt "reset-threshold" (num a.ResetThreshold)
 
-          yield "--cursor"
           yield
-              match s.Cursor with
-              | CursorAuto -> "auto"
-              | CursorOn -> "on"
-              | CursorOff -> "off"
-
-          yield! [ "--vsync"; onOff s.VSync ]
-
-          yield "--compare"
+              opt "cursor" (
+                  match s.Cursor with
+                  | CursorAuto -> "auto"
+                  | CursorOn -> "on"
+                  | CursorOff -> "off"
+              )
+          yield opt "capture-border" (onOff a.CaptureBorder)
+          yield opt "vsync" (onOff s.VSync)
           yield
-              match s.Compare with
-              | CompareOff -> "off"
-              | CompareSplit -> "split"
-              | CompareOriginal -> "original"
+              opt "compare" (
+                  match s.Compare with
+                  | CompareOff -> "off"
+                  | CompareSplit -> "split"
+                  | CompareOriginal -> "original"
+              )
+          yield opt "format" (if s.HighPrecisionColour then "rgba16f" else "rgba8")
 
-          yield! [ "--format"; (if s.HighPrecisionColour then "rgba16f" else "rgba8") ] ]
+          yield opt "ngx-log" (string a.NgxLog)
+          if a.NgxAppId <> "" then
+              yield opt "ngx-app-id" a.NgxAppId
+          if a.NgxProjectId <> "" then
+              yield opt "ngx-project-id" a.NgxProjectId
+          yield opt "indicator" (onOff a.Indicator)
+          yield opt "cubin-cache" (onOff a.CubinCache)
+
+          yield opt "affinity" (onOff a.Affinity)
+          yield opt "topmost" (onOff a.Topmost)
+          yield opt "click-through" (onOff a.ClickThrough)
+          yield opt "redirection-bitmap" (onOff a.RedirectionBitmap)
+          if a.Adapter >= 0 then
+              yield opt "adapter" (string a.Adapter)
+          yield opt "debug-layer" (onOff a.DebugLayer)
+          yield opt "log-level" (string a.LogLevel)
+          yield opt "exclude-own-windows" (onOff a.ExcludeOwnWindows)
+          yield opt "exclusion-log" (onOff a.ExclusionLog)
+          yield opt "show-inert" (onOff a.ShowInert) ]
 
     // =====================================================================
     // WHERE THINGS LIVE
@@ -355,7 +523,8 @@ module ScreenEngine =
           Cursor: string
           VSync: bool
           Compare: string
-          HighPrecisionColour: bool }
+          HighPrecisionColour: bool
+          Advanced: AdvancedSettings }
 
     let private toStored (s: Settings) : StoredSettings =
         { Source =
@@ -380,7 +549,8 @@ module ScreenEngine =
           Cursor = (match s.Cursor with CursorAuto -> "auto" | CursorOn -> "on" | CursorOff -> "off")
           VSync = s.VSync
           Compare = (match s.Compare with CompareOff -> "off" | CompareSplit -> "split" | CompareOriginal -> "original")
-          HighPrecisionColour = s.HighPrecisionColour }
+          HighPrecisionColour = s.HighPrecisionColour
+          Advanced = s.Advanced }
 
     let private fromStored (d: StoredSettings) : Settings =
         let pick (value: string) (choices: (string * 'a) list) (fallback: 'a) =
@@ -407,16 +577,34 @@ module ScreenEngine =
               Cursor = pick d.Cursor [ "auto", CursorAuto; "on", CursorOn; "off", CursorOff ] CursorAuto
               VSync = d.VSync
               Compare = pick d.Compare [ "off", CompareOff; "split", CompareSplit; "original", CompareOriginal ] CompareOff
-              HighPrecisionColour = d.HighPrecisionColour }
+              HighPrecisionColour = d.HighPrecisionColour
+              Advanced = (if isNull (box d.Advanced) then advancedDefaults else d.Advanced) }
 
     let serialize (s: Settings) =
         JsonSerializer.Serialize(toStored (normalize s), JsonSerializerOptions(WriteIndented = true))
 
+    /// Copies every key the file has over the defaults, one level into objects.
+    ///
+    /// A file written before a field existed has no value for it, and the
+    /// serializer would fill the gap with false or 0 rather than the default -
+    /// silently turning click-through or capture exclusion off for anyone who
+    /// upgrades.
+    let rec private overlay (onto: Nodes.JsonObject) (from: Nodes.JsonObject) =
+        for KeyValue(key, value) in List.ofSeq from do
+            match onto.[key], value with
+            | (:? Nodes.JsonObject as target), (:? Nodes.JsonObject as source) -> overlay target source
+            | _ -> onto.[key] <- (if isNull value then null else value.DeepClone())
+
     /// Anything unreadable falls back to the defaults rather than failing.
     let deserialize (json: string) =
         try
-            let stored = JsonSerializer.Deserialize<StoredSettings>(json)
-            if isNull (box stored) then defaults else fromStored stored
+            let merged = JsonSerializer.SerializeToNode(toStored defaults).AsObject()
+            match Nodes.JsonNode.Parse(json) with
+            | :? Nodes.JsonObject as loaded ->
+                overlay merged loaded
+                let stored = merged.Deserialize<StoredSettings>()
+                if isNull (box stored) then defaults else fromStored stored
+            | _ -> defaults
         with _ ->
             defaults
 

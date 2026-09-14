@@ -4,6 +4,7 @@
 #include "effects/real/trust.h"
 
 #include <softpub.h>
+#include <bcrypt.h>
 #include <wintrust.h>
 #include <winver.h>
 
@@ -35,6 +36,11 @@ constexpr std::size_t kKeyCapacity = 64;
 constexpr DWORD kMaxSecondarySignatures = 15;
 // How long the chain build may spend on each thing it fetches, a root Microsoft lists that the machine does not hold yet above all.
 constexpr DWORD kFetchMilliseconds = 15000;
+constexpr LONGLONG kMaximumPinnedModelBytes = 256LL * 1024LL * 1024LL;
+constexpr std::array<unsigned char, 32> kSuiteCompatibilityModelSha256{
+    0xE6, 0x7D, 0xEE, 0x20, 0x93, 0x20, 0xCD, 0xAF, 0xE0, 0xE9, 0x3E, 0x45, 0x67, 0x5D, 0x7A, 0xA3,
+    0x43, 0x23, 0xA5, 0x3A, 0xCC, 0x57, 0xA7, 0x2B, 0x2E, 0x40, 0xA1, 0x81, 0x58, 0x1C, 0x98, 0x9A
+};
 
 // The calls a check on one of the files fails with, so a refusal names the file it is about.
 struct Refusals
@@ -93,6 +99,90 @@ struct ChainFreer
 };
 using UniqueChain = std::unique_ptr<const CERT_CHAIN_CONTEXT, ChainFreer>;
 
+struct AlgorithmCloser
+{
+    void operator()(void* algorithm) const noexcept { ENSURE(::BCryptCloseAlgorithmProvider(algorithm, 0) == 0); }
+};
+using UniqueAlgorithm = std::unique_ptr<void, AlgorithmCloser>;
+
+struct ViewUnmapper
+{
+    void operator()(const void* view) const noexcept { ENSURE(::UnmapViewOfFile(view) != FALSE); }
+};
+using UniqueMappedView = std::unique_ptr<const void, ViewUnmapper>;
+
+struct MappedFile
+{
+    UniqueHandle mapping;
+    UniqueMappedView view;
+    ULONG size;
+};
+
+[[nodiscard]] bool IsSuiteCompatibilityModel(ModelKind kind) noexcept
+{
+    return kind == ModelKind::NeuralRendering;
+}
+
+[[nodiscard]] bool IsPinnedModelSize(LONGLONG size) noexcept
+{
+    return size > 0 && size <= kMaximumPinnedModelBytes;
+}
+
+[[nodiscard]] std::optional<ULONG> PinnedModelSizeOf(void* file) noexcept
+{
+    LARGE_INTEGER size{}; // WAIVER(R2): one OS out-parameter, read only after the call.
+    if (::GetFileSizeEx(file, &size) == FALSE || !IsPinnedModelSize(size.QuadPart))
+        return std::nullopt;
+    return static_cast<ULONG>(size.QuadPart);
+}
+
+// WAIVER(R1): mapping one already-held file is one bounded Windows platform operation; every acquired
+// resource is immediately placed in its owner and no mapped bytes are changed.
+[[nodiscard]] std::optional<MappedFile> MappedFileOf(void* file) noexcept
+{
+    const std::optional<ULONG> size = PinnedModelSizeOf(file);
+    if (!size.has_value())
+        return std::nullopt;
+    UniqueHandle mapping(::CreateFileMappingW(file, nullptr, PAGE_READONLY, 0, 0, nullptr));
+    if (mapping == nullptr)
+        return std::nullopt;
+    UniqueMappedView view(::MapViewOfFile(mapping.get(), FILE_MAP_READ, 0, 0, *size));
+    if (view == nullptr)
+        return std::nullopt;
+    return MappedFile{ std::move(mapping), std::move(view), *size };
+}
+
+// WAIVER(R1): CNG's one-shot SHA-256 operation requires acquiring and owning its algorithm provider around
+// one hash call; the mapped input is bounded by kMaximumPinnedModelBytes and is read-only.
+[[nodiscard]] std::optional<std::array<unsigned char, 32>> Sha256Of(const void* bytes, ULONG size) noexcept
+{
+    BCRYPT_ALG_HANDLE raw = nullptr; // WAIVER(R2): one OS out-parameter, immediately owned after the call.
+    if (::BCryptOpenAlgorithmProvider(&raw, BCRYPT_SHA256_ALGORITHM, nullptr, 0) != 0)
+        return std::nullopt;
+    const UniqueAlgorithm algorithm(raw);
+    std::array<unsigned char, 32> digest{}; // WAIVER(R2): a fixed output buffer filled once by CNG.
+    const NTSTATUS status = ::BCryptHash(algorithm.get(), nullptr, 0, reinterpret_cast<PUCHAR>(const_cast<void*>(bytes)), size, digest.data(), static_cast<ULONG>(digest.size()));
+    if (status != 0)
+        return std::nullopt;
+    return digest;
+}
+
+[[nodiscard]] std::optional<std::array<unsigned char, 32>> FileSha256(void* file) noexcept
+{
+    const std::optional<MappedFile> mapped = MappedFileOf(file);
+    return mapped.has_value() ? Sha256Of(mapped->view.get(), mapped->size) : std::nullopt;
+}
+
+[[nodiscard]] bool HasSuiteCompatibilityDigest(void* handle) noexcept
+{
+    return FileSha256(handle) == kSuiteCompatibilityModelSha256;
+}
+
+[[nodiscard]] bool IsPinnedSuiteModel(void* handle, ModelKind kind) noexcept
+{
+    return IsSuiteCompatibilityModel(kind) && HasSuiteCompatibilityDigest(handle);
+}
+
 // One entry of a version resource's translation table: which language its strings are kept under.
 struct Translation
 {
@@ -149,7 +239,7 @@ struct Translation
 
 } // namespace
 
-Result<TrustedFile, Error> OpenTrusted(const interior::FilePath& path, ModelKind kind) noexcept
+Result<TrustedFile, Error> OpenApproved(const interior::FilePath& path, ModelKind kind) noexcept
 {
     // Shared for reading only, so nothing else may write to the file, delete it or rename it while it is held.
     static constexpr auto OpenForReading = [] [[nodiscard]] (const wchar_t* path, ModelKind kind) noexcept -> Result<UniqueHandle, Error> {
@@ -336,7 +426,10 @@ Result<TrustedFile, Error> OpenTrusted(const interior::FilePath& path, ModelKind
     };
     // The product name is read only of a file that has passed, and says nothing about whether it passed.
     return OpenForReading(path.CString(), kind).and_then([&path, kind](UniqueHandle handle) {
-        return Verified(path.CString(), handle.get(), kind).transform([&path, &handle] { return TrustedFile{ std::move(handle), ProductNameOf(path.CString()) }; });
+        if (IsPinnedSuiteModel(handle.get(), kind))
+            return Result<TrustedFile, Error>{ TrustedFile{ std::move(handle), ProductNameOf(path.CString()), true } };
+        return Verified(path.CString(), handle.get(), kind).transform(
+            [&path, &handle] { return TrustedFile{ std::move(handle), ProductNameOf(path.CString()), false }; });
     });
 }
 

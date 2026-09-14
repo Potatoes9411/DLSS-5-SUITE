@@ -19,6 +19,7 @@ type ScreenEngineViewModel() as this =
     let mutable monitors: MonitorEntry list = []
     let mutable status = ""
     let mutable hasPendingChanges = false
+    let mutable isAdvancedOpen = false
 
     let styles = [ Standard, "Standard"; Natural, "Natural"; Cinematic, "Cinematic" ]
     let superResolutions = [ SrAuto, "Automatic"; SrDlaa, "DLAA (native resolution)"; SrOff, "Off" ]
@@ -57,6 +58,9 @@ type ScreenEngineViewModel() as this =
     member _.IsRunning = host.IsRunning
     member this.CanStart = this.IsAvailable && not host.IsRunning
     member _.HasPendingChanges = hasPendingChanges
+    member this.IsAdvancedOpen
+        with get () = isAdvancedOpen
+        and set value = this.SetProperty(&isAdvancedOpen, value) |> ignore
 
     member private this.Change(updated: Settings) =
         settings <- normalize updated
@@ -220,6 +224,192 @@ type ScreenEngineViewModel() as this =
                 this.Change { settings with VSync = value }
                 this.RaisePropertyChanged("VSync")
 
+    // ----- advanced engine controls -----
+    member private this.ChangeAdvanced(update: AdvancedSettings -> AdvancedSettings, name: string) =
+        this.Change { settings with Advanced = update settings.Advanced }
+        this.RaisePropertyChanged(name)
+
+    member _.ShowPanel
+        with get () = settings.Advanced.ShowPanel
+        and set value = if value <> settings.Advanced.ShowPanel then this.ChangeAdvanced((fun a -> { a with ShowPanel = value }), "ShowPanel")
+
+    member _.NrPreset
+        with get () = float settings.Advanced.NrPreset
+        and set (value: float) =
+            let v = int (Math.Round value)
+            if v <> settings.Advanced.NrPreset then this.ChangeAdvanced((fun a -> { a with NrPreset = v }), "NrPreset")
+
+    member _.SrPreset
+        with get () = float settings.Advanced.SrPreset
+        and set (value: float) =
+            let v = int (Math.Round value)
+            if v <> settings.Advanced.SrPreset then this.ChangeAdvanced((fun a -> { a with SrPreset = v }), "SrPreset")
+
+    member _.MvLevel
+        with get () = float settings.Advanced.MvLevel
+        and set (value: float) =
+            let v = int (Math.Round value)
+            if v <> settings.Advanced.MvLevel then this.ChangeAdvanced((fun a -> { a with MvLevel = v }), "MvLevel")
+
+    member _.ResetThreshold
+        with get () = settings.Advanced.ResetThreshold
+        and set value = if value <> settings.Advanced.ResetThreshold then this.ChangeAdvanced((fun a -> { a with ResetThreshold = value }), "ResetThreshold")
+
+    member _.MvScaleAuto
+        with get () = settings.Advanced.MvScaleAuto
+        and set value = if value <> settings.Advanced.MvScaleAuto then this.ChangeAdvanced((fun a -> { a with MvScaleAuto = value }), "MvScaleAuto")
+
+    member this.UseManualMvScale
+        with get () = not settings.Advanced.MvScaleAuto
+        and set value =
+            if value <> this.UseManualMvScale then
+                this.ChangeAdvanced((fun a -> { a with MvScaleAuto = not value }), "MvScaleAuto")
+                this.RaisePropertyChanged("UseManualMvScale")
+
+    member _.MvScaleX
+        with get () = settings.Advanced.MvScaleX
+        and set value = if value <> settings.Advanced.MvScaleX then this.ChangeAdvanced((fun a -> { a with MvScaleX = value }), "MvScaleX")
+
+    member _.MvScaleY
+        with get () = settings.Advanced.MvScaleY
+        and set value = if value <> settings.Advanced.MvScaleY then this.ChangeAdvanced((fun a -> { a with MvScaleY = value }), "MvScaleY")
+
+    member _.CaptureBorder
+        with get () = settings.Advanced.CaptureBorder
+        and set value = if value <> settings.Advanced.CaptureBorder then this.ChangeAdvanced((fun a -> { a with CaptureBorder = value }), "CaptureBorder")
+
+    member _.Affinity
+        with get () = settings.Advanced.Affinity
+        and set value = if value <> settings.Advanced.Affinity then this.ChangeAdvanced((fun a -> { a with Affinity = value }), "Affinity")
+
+    member _.Topmost
+        with get () = settings.Advanced.Topmost
+        and set value = if value <> settings.Advanced.Topmost then this.ChangeAdvanced((fun a -> { a with Topmost = value }), "Topmost")
+
+    member _.ClickThrough
+        with get () = settings.Advanced.ClickThrough
+        and set value = if value <> settings.Advanced.ClickThrough then this.ChangeAdvanced((fun a -> { a with ClickThrough = value }), "ClickThrough")
+
+    member _.ExcludeOwnWindows
+        with get () = settings.Advanced.ExcludeOwnWindows
+        and set value = if value <> settings.Advanced.ExcludeOwnWindows then this.ChangeAdvanced((fun a -> { a with ExcludeOwnWindows = value }), "ExcludeOwnWindows")
+
+    member _.Indicator
+        with get () = settings.Advanced.Indicator
+        and set value = if value <> settings.Advanced.Indicator then this.ChangeAdvanced((fun a -> { a with Indicator = value }), "Indicator")
+
+    member _.CubinCache
+        with get () = settings.Advanced.CubinCache
+        and set value = if value <> settings.Advanced.CubinCache then this.ChangeAdvanced((fun a -> { a with CubinCache = value }), "CubinCache")
+
+    member _.DebugLayer
+        with get () = settings.Advanced.DebugLayer
+        and set value = if value <> settings.Advanced.DebugLayer then this.ChangeAdvanced((fun a -> { a with DebugLayer = value }), "DebugLayer")
+
+    member _.ExclusionLog
+        with get () = settings.Advanced.ExclusionLog
+        and set value = if value <> settings.Advanced.ExclusionLog then this.ChangeAdvanced((fun a -> { a with ExclusionLog = value }), "ExclusionLog")
+
+    member _.RedirectionBitmap
+        with get () = settings.Advanced.RedirectionBitmap
+        and set value = if value <> settings.Advanced.RedirectionBitmap then this.ChangeAdvanced((fun a -> { a with RedirectionBitmap = value }), "RedirectionBitmap")
+
+    member _.ShowInert
+        with get () = settings.Advanced.ShowInert
+        and set value = if value <> settings.Advanced.ShowInert then this.ChangeAdvanced((fun a -> { a with ShowInert = value }), "ShowInert")
+
+    member _.UiCorrection
+        with get () = settings.Advanced.UiCorrection
+        and set value = if value <> settings.Advanced.UiCorrection then this.ChangeAdvanced((fun a -> { a with UiCorrection = value }), "UiCorrection")
+
+    member _.DepthValue
+        with get () = settings.Advanced.DepthValue
+        and set value = if value <> settings.Advanced.DepthValue then this.ChangeAdvanced((fun a -> { a with DepthValue = value }), "DepthValue")
+
+    member _.DepthInverted
+        with get () = settings.Advanced.DepthInverted
+        and set value = if value <> settings.Advanced.DepthInverted then this.ChangeAdvanced((fun a -> { a with DepthInverted = value }), "DepthInverted")
+
+    member _.NvofGridOptions = [ "1 × 1"; "2 × 2"; "4 × 4" ]
+
+    member _.SelectedNvofGridIndex
+        with get () = [ 1; 2; 4 ] |> List.tryFindIndex ((=) settings.Advanced.NvofGrid) |> Option.defaultValue 0
+        and set value =
+            let values = [ 1; 2; 4 ]
+            if value >= 0 && value < values.Length && values.[value] <> settings.Advanced.NvofGrid then
+                this.ChangeAdvanced((fun a -> { a with NvofGrid = values.[value] }), "SelectedNvofGridIndex")
+
+    member _.NvofPerfOptions = [ "Slow"; "Medium"; "Fast" ]
+    member _.SelectedNvofPerfIndex
+        with get () = [ "slow"; "medium"; "fast" ] |> List.tryFindIndex ((=) settings.Advanced.NvofPerf) |> Option.defaultValue 1
+        and set value =
+            let values = [ "slow"; "medium"; "fast" ]
+            if value >= 0 && value < values.Length then this.ChangeAdvanced((fun a -> { a with NvofPerf = values.[value] }), "SelectedNvofPerfIndex")
+
+    member _.NgxLogOptions = [ "Off"; "On"; "Verbose" ]
+    member _.SelectedNgxLogIndex
+        with get () = settings.Advanced.NgxLog
+        and set value = if value >= 0 && value <= 2 then this.ChangeAdvanced((fun a -> { a with NgxLog = value }), "SelectedNgxLogIndex")
+
+    member _.LogLevelOptions = [ "Debug"; "Info"; "Warn"; "Error" ]
+    member _.SelectedLogLevelIndex
+        with get () = settings.Advanced.LogLevel
+        and set value = if value >= 0 && value <= 3 then this.ChangeAdvanced((fun a -> { a with LogLevel = value }), "SelectedLogLevelIndex")
+
+    member _.AdapterOptions = [ yield "First NVIDIA adapter"; yield! [ 0 .. 7 ] |> List.map (sprintf "Adapter %d") ]
+    member _.SelectedAdapterIndex
+        with get () = settings.Advanced.Adapter + 1
+        and set value = if value >= 0 && value <= 8 then this.ChangeAdvanced((fun a -> { a with Adapter = value - 1 }), "SelectedAdapterIndex")
+
+    member _.NgxAppId
+        with get () = settings.Advanced.NgxAppId
+        and set value = this.ChangeAdvanced((fun a -> { a with NgxAppId = if isNull value then "" else value }), "NgxAppId")
+
+    member _.NgxProjectId
+        with get () = settings.Advanced.NgxProjectId
+        and set value = this.ChangeAdvanced((fun a -> { a with NgxProjectId = if isNull value then "" else value }), "NgxProjectId")
+
+    member _.SkinFollowsStructure
+        with get () = match settings.Skin with FollowStructure -> true | _ -> false
+        and set value =
+            let skin = if value then FollowStructure else SkinStrength 1.0
+            if skin <> settings.Skin then
+                this.Change { settings with Skin = skin }
+                this.RaisePropertyChanged("SkinFollowsStructure")
+                this.RaisePropertyChanged("SkinStrength")
+
+    member _.SkinStrength
+        with get () = match settings.Skin with FollowStructure -> 1.0 | SkinStrength v -> v
+        and set value =
+            if not this.SkinFollowsStructure && settings.Skin <> SkinStrength value then
+                this.Change { settings with Skin = SkinStrength value }
+                this.RaisePropertyChanged("SkinStrength")
+
+    member _.MotionOptions = [ "Built-in"; "None" ]
+    member _.SelectedMotionIndex
+        with get () = match settings.Motion with NoMotion -> 1 | _ -> 0
+        and set value =
+            let motion = if value = 1 then NoMotion else BuiltIn
+            if motion <> settings.Motion then
+                this.Change { settings with Motion = motion }
+                this.RaisePropertyChanged("SelectedMotionIndex")
+
+    member _.CursorOptions = [ "Automatic"; "On"; "Off" ]
+    member _.SelectedCursorIndex
+        with get () = match settings.Cursor with CursorAuto -> 0 | CursorOn -> 1 | CursorOff -> 2
+        and set value =
+            let cursor = if value = 1 then CursorOn elif value = 2 then CursorOff else CursorAuto
+            if cursor <> settings.Cursor then
+                this.Change { settings with Cursor = cursor }
+                this.RaisePropertyChanged("SelectedCursorIndex")
+
+    member _.HighPrecisionColour
+        with get () = settings.HighPrecisionColour
+        and set value =
+            if value <> settings.HighPrecisionColour then
+                this.Change { settings with HighPrecisionColour = value }
+                this.RaisePropertyChanged("HighPrecisionColour")
+
     // ----- running it -----
     member this.Start() =
         hasPendingChanges <- false
@@ -246,7 +436,14 @@ type ScreenEngineViewModel() as this =
             [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "NeuralRendering"
               "Intensity"; "IntensityText"; "LocalStructure"; "LocalStructureText"; "LocalTone"; "LocalToneText"
               "Passes"; "PassesText"; "AutoMask"; "SelectedStyleIndex"; "SelectedSuperResolutionIndex"
-              "SelectedCompareIndex"; "VSync" ] do
+              "SelectedCompareIndex"; "VSync"; "ShowPanel"; "NrPreset"; "SrPreset"; "MvLevel"
+              "ResetThreshold"; "MvScaleAuto"; "UseManualMvScale"; "MvScaleX"; "MvScaleY"
+              "CaptureBorder"; "Affinity"; "Topmost"; "ClickThrough"; "ExcludeOwnWindows"
+              "Indicator"; "CubinCache"; "DebugLayer"; "ExclusionLog"; "RedirectionBitmap"
+              "ShowInert"; "UiCorrection"; "DepthValue"; "DepthInverted"; "SelectedNvofGridIndex"
+              "SelectedNvofPerfIndex"; "SelectedNgxLogIndex"; "SelectedLogLevelIndex"
+              "SelectedAdapterIndex"; "NgxAppId"; "NgxProjectId"; "SkinFollowsStructure"
+              "SkinStrength"; "SelectedMotionIndex"; "SelectedCursorIndex"; "HighPrecisionColour" ] do
             this.RaisePropertyChanged(name)
         if host.IsRunning then
             hasPendingChanges <- true

@@ -1620,7 +1620,9 @@ type MainViewModel() as this =
 
     member this.ShowScreenEngineCard =
         matchesCard searchText [ "screen engine"; "full screen"; "fullscreen"; "wrapper"; "monitor"; "window"
-                                 "neural"; "nr"; "dlss 5"; "intensity"; "desktop"; "upscale" ]
+                                 "neural"; "nr"; "dlss 5"; "intensity"; "desktop"; "upscale"; "motion vector"
+                                 "optical flow"; "nvof"; "skin"; "cursor"; "capture"; "ngx"; "adapter"
+                                 "debug"; "vsync"; "preset"; "super resolution"; "colour"; "color" ]
 
     /// Nothing on the settings page answers the query.
     member this.HasNoSettingsMatch =

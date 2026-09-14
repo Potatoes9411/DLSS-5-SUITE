@@ -6,7 +6,7 @@
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-[![Version](https://img.shields.io/badge/Version-1.2.1--suite.5-35d22b?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.2.2--suite.1-35d22b?style=flat-square)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-24292e?style=flat-square)]()
 [![Framework](https://img.shields.io/badge/Framework-.NET%208%20|%20Avalonia%20UI-512bd4?style=flat-square)]()
 [![Language](https://img.shields.io/badge/Language-F%23-30b9db?style=flat-square)]()
@@ -42,6 +42,7 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - Automated Lossless Scaling setup using official LosslessProxy/LSP releases and the verified FeedKit route.
 - Need for Speed game-aware Feeder guidance, including the verified DXVK-to-Vulkan path for classic 32-bit D3D9 titles and appropriate D3D11/D3D12 profiles for newer games.
 - Automatic, browser-free application and compatibility-component updates with visible progress.
+- An integrated Screen Engine for applying DLSS 5 Neural Rendering to a full monitor or selected window, with capture, output, model, motion, cursor, skin, diagnostics and advanced controls.
 - DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
 
 Compatibility varies by game, graphics hardware, anti-cheat system and game update. The project does not promise that every title will work, and it does not bypass anti-cheat protections.
@@ -85,6 +86,8 @@ DLSS 5 SUITE checks this repository's stable GitHub releases. When an update is 
 The ShaderGlass route independently checks the allowlisted official ShaderGlass and DLSS5-Feeder release sources when **Set up/update & launch ShaderGlass** is selected. This keeps the optional compatibility files current without bundling unverified YouTube packages or asking the user to assemble files manually.
 
 The Lossless Scaling route requires the user's licensed Steam installation. It preserves the original `Lossless.dll`, installs SHA-256-verified official LosslessProxy, LSP-ReShade, and LSP-Windowed releases, then configures current FeedKit components. The app checks the display count and presents the required Discord workflow: game on display 1, Lossless Scaling visible on display 2, apply scaling, select the Lossless Scaling window, and press Home. A virtual phone display may be used as the second display.
+
+The Screen Engine accepts NVIDIA-signed runtime components. Its bundled neural-rendering compatibility model is the sole exception: the engine accepts only the exact SUITE-pinned SHA-256 (`E67DEE209320CDAFE0E93E45675D7AA34323A53ACC57A72B2E40A181581C989A`) while holding the file open to prevent replacement after verification. A different unsigned DLL is rejected.
 
 For Need for Speed, the app labels the route rather than pretending the games have native DLSS. Community-verified classic titles — Underground, Underground 2, Most Wanted (2005), Shift and ProStreet — use DXVK 3.0.2 x86 to translate D3D9 to Vulkan, then ReShade's Vulkan layer with DLSS5-Feeder addon32, host64 and Lumenite. Modern Frostbite titles use the corresponding D3D11 or D3D12 Feeder route and should be tested offline first. The app never treats a rendering hook as safe for online multiplayer.
 

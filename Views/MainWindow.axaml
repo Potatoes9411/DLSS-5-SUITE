@@ -1039,6 +1039,61 @@
                                             </StackPanel>
                                         </Grid>
 
+                                        <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="Engine control panel" FontSize="12" Foreground="#CBD5E1" />
+                                                <TextBlock Text="Adds the engine's snapshots, recording, sweeps and window-picker crosshair." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowPanel, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <ToggleButton Content="Advanced engine options" IsChecked="{Binding IsAdvancedOpen, Mode=TwoWay}" />
+                                        <StackPanel Spacing="10" IsVisible="{Binding IsAdvancedOpen}">
+                                            <TextBlock Text="MODEL" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                            <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                                <TextBlock Grid.Column="0" Text="NR preset" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <Slider Grid.Column="1" Minimum="0" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding NrPreset, Mode=TwoWay}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding NrPreset}" Foreground="White" HorizontalAlignment="Right" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                                <TextBlock Grid.Column="0" Text="SR preset" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <Slider Grid.Column="1" Minimum="0" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding SrPreset, Mode=TwoWay}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding SrPreset}" Foreground="White" HorizontalAlignment="Right" />
+                                            </Grid>
+                                            <TextBlock Text="MOTION" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                                <ComboBox Grid.Column="0" Classes="GlassComboBox" ItemsSource="{Binding MotionOptions}" SelectedIndex="{Binding SelectedMotionIndex, Mode=TwoWay}" Height="34" />
+                                                <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding CursorOptions}" SelectedIndex="{Binding SelectedCursorIndex, Mode=TwoWay}" Height="34" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Skin follows structure" Foreground="#CBD5E1" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding SkinFollowsStructure, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10" IsVisible="{Binding !SkinFollowsStructure}"><TextBlock Grid.Column="0" Text="Skin strength" Foreground="#CBD5E1" VerticalAlignment="Center" /><Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding SkinStrength, Mode=TwoWay}" /><TextBlock Grid.Column="2" Text="{Binding SkinStrength}" Foreground="White" HorizontalAlignment="Right" /></Grid>
+                                            <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                                <TextBlock Grid.Column="0" Text="MV level" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <Slider Grid.Column="1" Minimum="0" Maximum="7" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding MvLevel, Mode=TwoWay}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding MvLevel}" Foreground="White" HorizontalAlignment="Right" />
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Set motion-vector scale manually" Foreground="#CBD5E1" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding UseManualMvScale, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding UseManualMvScale}"><TextBox Text="{Binding MvScaleX, Mode=TwoWay}" PlaceholderText="MV scale X" /><TextBox Grid.Column="1" Text="{Binding MvScaleY, Mode=TwoWay}" PlaceholderText="MV scale Y" /></Grid>
+                                            <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10"><TextBlock Grid.Column="0" Text="Reset threshold" Foreground="#CBD5E1" VerticalAlignment="Center" /><Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding ResetThreshold, Mode=TwoWay}" /><TextBlock Grid.Column="2" Text="{Binding ResetThreshold}" Foreground="White" HorizontalAlignment="Right" /></Grid>
+                                            <TextBlock Text="CAPTURE AND WINDOW" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Capture border" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding CaptureBorder, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Keep output out of capture" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding Affinity, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Always on top" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding Topmost, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Click through output" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ClickThrough, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Use redirection bitmap capture" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding RedirectionBitmap, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Exclude engine windows" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ExcludeOwnWindows, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <TextBlock Text="NGX AND DIAGNOSTICS" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10"><ComboBox Grid.Column="0" Classes="GlassComboBox" ItemsSource="{Binding NgxLogOptions}" SelectedIndex="{Binding SelectedNgxLogIndex, Mode=TwoWay}" Height="34" /><ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding LogLevelOptions}" SelectedIndex="{Binding SelectedLogLevelIndex, Mode=TwoWay}" Height="34" /></Grid>
+                                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10"><TextBox Text="{Binding NgxAppId, Mode=TwoWay}" PlaceholderText="NGX app id (hex)" /><TextBox Grid.Column="1" Text="{Binding NgxProjectId, Mode=TwoWay}" PlaceholderText="NGX project id (GUID)" /></Grid>
+                                            <ComboBox Classes="GlassComboBox" ItemsSource="{Binding AdapterOptions}" SelectedIndex="{Binding SelectedAdapterIndex, Mode=TwoWay}" Height="34" />
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Indicator" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding Indicator, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Kernel cache" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding CubinCache, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="D3D debug layer" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding DebugLayer, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Exclusion log" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ExclusionLog, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="High-precision colour" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding HighPrecisionColour, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Show desktop-inert controls" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowInert, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                            <StackPanel Spacing="8" IsVisible="{Binding ShowInert}"><TextBlock Text="These options do not affect desktop capture in this engine build." Foreground="#A3AEC0" FontSize="11" /><Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="UI correction" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding UiCorrection, Mode=TwoWay}" OnContent="" OffContent="" /></Grid><Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Depth inverted" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding DepthInverted, Mode=TwoWay}" OnContent="" OffContent="" /></Grid><TextBox Text="{Binding DepthValue, Mode=TwoWay}" PlaceholderText="Depth value" /><ComboBox Classes="GlassComboBox" ItemsSource="{Binding NvofPerfOptions}" SelectedIndex="{Binding SelectedNvofPerfIndex, Mode=TwoWay}" Height="34" /><ComboBox Classes="GlassComboBox" ItemsSource="{Binding NvofGridOptions}" SelectedIndex="{Binding SelectedNvofGridIndex, Mode=TwoWay}" Height="34" /></StackPanel>
+                                        </StackPanel>
                                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                                             <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                 <TextBlock Text="VSync" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />

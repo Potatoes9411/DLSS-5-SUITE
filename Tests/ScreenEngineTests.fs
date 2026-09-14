@@ -12,12 +12,19 @@ open DLSS_5_MANAGER.Services.ScreenEngine
 
 let private args s = toArguments "" "" s
 
-/// The value following an option, or None when the option is absent.
+/// The value an option was given, written either "--name value" or
+/// "--name=value" (the engine's parser takes both), or None.
 let private valueOf (option: string) (arguments: string list) =
-    arguments
-    |> List.pairwise
-    |> List.tryFind (fun (name, _) -> name = option)
-    |> Option.map snd
+    let joined =
+        arguments
+        |> List.tryPick (fun a -> if a.StartsWith(option + "=") then Some(a.Substring(option.Length + 1)) else None)
+    match joined with
+    | Some v -> Some v
+    | None ->
+        arguments
+        |> List.pairwise
+        |> List.tryFind (fun (name, _) -> name = option)
+        |> Option.map snd
 
 [<Fact>]
 let ``the engine always starts without its own control panel`` () =
@@ -132,3 +139,150 @@ let ``monitors are numbered primary first, then left to right, then top to botto
 [<Fact>]
 let ``SUITE looks for the engine under the name its build gives it`` () =
     Assert.EndsWith("FullScreenWrapperForDLSS5.exe", enginePath ())
+
+// ---------------------------------------------------------------------------
+// Advanced options
+// ---------------------------------------------------------------------------
+
+let private everythingChanged =
+    { defaults with
+        Window = "Some Game = Title"
+        Target = Some 1
+        Skin = SkinStrength 0.5
+        Advanced =
+            { advancedDefaults with
+                ShowPanel = true
+                NrPreset = 2
+                UiCorrection = false
+                SrPreset = 3
+                MvLevel = 2
+                NvofGrid = 4
+                NvofPerf = "fast"
+                DepthValue = 0.25
+                DepthInverted = true
+                MvScaleAuto = false
+                MvScaleX = 2.0
+                MvScaleY = -1.5
+                ResetThreshold = 0.75
+                CaptureBorder = true
+                NgxLog = 2
+                NgxAppId = "0x1234"
+                NgxProjectId = "5e9b2a44-7c31-4d0e-9f2b-8d3c1a6e7f10"
+                Indicator = true
+                CubinCache = false
+                Affinity = false
+                Topmost = true
+                ClickThrough = false
+                RedirectionBitmap = true
+                Adapter = 1
+                DebugLayer = true
+                LogLevel = 0
+                ExcludeOwnWindows = false
+                ExclusionLog = true
+                ShowInert = true } }
+
+[<Fact>]
+let ``even with every option set the command line fits the engine's 64-argument limit`` () =
+    // interior::kMaxArguments. One more and the engine refuses to start at all.
+    let a = toArguments @"C:\Users\x\AppData\Local\DLSS5Suite\ScreenEngine" @"C:\mods\dlss 5" everythingChanged
+    Assert.True(a.Length <= 64, sprintf "%d arguments" a.Length)
+
+[<Fact>]
+let ``a window title containing an equals sign stays a separate argument`` () =
+    // The engine splits "--name=value" at the first "=", so a title is never joined.
+    let a = args everythingChanged
+    Assert.Equal(Some "Some Game = Title", valueOf "--window" a)
+    Assert.DoesNotContain(a, fun x -> x.StartsWith("--window="))
+
+[<Fact>]
+let ``every advanced option reaches the engine in its own words`` () =
+    let a = args everythingChanged
+    let expect name value = Assert.Equal(Some value, valueOf name a)
+    expect "--gui" "on"
+    expect "--nr-preset" "2"
+    expect "--nr-ui-correction" "off"
+    expect "--sr-preset" "3"
+    expect "--mv-level" "2"
+    expect "--nvof-grid" "4"
+    expect "--nvof-perf" "fast"
+    expect "--depth-value" "0.25"
+    expect "--depth-inverted" "on"
+    expect "--mv-scale-x" "2"
+    expect "--mv-scale-y" "-1.5"
+    expect "--reset-threshold" "0.75"
+    expect "--capture-border" "on"
+    expect "--ngx-log" "2"
+    expect "--ngx-app-id" "0x1234"
+    expect "--ngx-project-id" "5e9b2a44-7c31-4d0e-9f2b-8d3c1a6e7f10"
+    expect "--indicator" "on"
+    expect "--cubin-cache" "off"
+    expect "--affinity" "off"
+    expect "--topmost" "on"
+    expect "--click-through" "off"
+    expect "--redirection-bitmap" "on"
+    expect "--adapter" "1"
+    expect "--debug-layer" "on"
+    expect "--log-level" "0"
+    expect "--exclude-own-windows" "off"
+    expect "--exclusion-log" "on"
+    expect "--show-inert" "on"
+
+[<Fact>]
+let ``options that can be left out are left out by default`` () =
+    let a = args defaults
+    Assert.Equal(None, valueOf "--adapter" a)
+    Assert.Equal(None, valueOf "--mv-scale-x" a)
+    Assert.Equal(None, valueOf "--mv-scale-y" a)
+    Assert.Equal(None, valueOf "--ngx-app-id" a)
+    Assert.Equal(None, valueOf "--ngx-project-id" a)
+
+[<Fact>]
+let ``values the engine would refuse are brought into range`` () =
+    let bad =
+        { defaults with
+            Advanced =
+                { advancedDefaults with
+                    SrPreset = 99
+                    MvLevel = 8
+                    NvofGrid = 3
+                    NvofPerf = "turbo"
+                    DepthValue = 1.5
+                    ResetThreshold = -1.0
+                    NgxLog = 5
+                    NgxAppId = "0"
+                    NgxProjectId = "not-a-guid"
+                    LogLevel = 9 } }
+    let a = args bad
+    Assert.Equal(Some "15", valueOf "--sr-preset" a)
+    Assert.Equal(Some "7", valueOf "--mv-level" a)
+    Assert.Equal(Some "1", valueOf "--nvof-grid" a)
+    Assert.Equal(Some "medium", valueOf "--nvof-perf" a)
+    Assert.Equal(Some "1", valueOf "--depth-value" a)
+    Assert.Equal(Some "0", valueOf "--reset-threshold" a)
+    Assert.Equal(Some "2", valueOf "--ngx-log" a)
+    Assert.Equal(None, valueOf "--ngx-app-id" a)
+    Assert.Equal(None, valueOf "--ngx-project-id" a)
+    Assert.Equal(Some "3", valueOf "--log-level" a)
+
+[<Fact>]
+let ``a settings file from before the advanced options keeps their defaults`` () =
+    // Without the overlay onto defaults these would load as false/0: click-through
+    // and capture exclusion silently off for everyone who upgrades.
+    let old = """{ "Source": "all", "Intensity": 0.5, "NeuralRendering": true }"""
+    let loaded = deserialize old
+    Assert.Equal(AllMonitors, loaded.Source)
+    Assert.Equal(0.5, loaded.Intensity)
+    Assert.Equal(advancedDefaults, loaded.Advanced)
+
+[<Fact>]
+let ``a settings file with some advanced options keeps the rest at their defaults`` () =
+    let loaded = deserialize """{ "Advanced": { "Topmost": true } }"""
+    Assert.True(loaded.Advanced.Topmost)
+    Assert.True(loaded.Advanced.ClickThrough)
+    Assert.True(loaded.Advanced.CubinCache)
+    Assert.Equal(-1, loaded.Advanced.Adapter)
+
+[<Fact>]
+let ``advanced settings survive being saved and loaded`` () =
+    let original = normalize everythingChanged
+    Assert.Equal(original, deserialize (serialize original))
