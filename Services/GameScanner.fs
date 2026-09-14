@@ -1027,7 +1027,7 @@ module GameScanner =
         if not (Directory.Exists(dir)) then Directory.CreateDirectory(dir) |> ignore
         Path.Combine(dir, "settings.json")
 
-    let private defaultSettings () =
+    let defaultSettings () =
         { IsSidebarLayout = false
           ColorAtmosphere = "Neon Emerald"
           GeometricMotif = "Orbital Spheres"

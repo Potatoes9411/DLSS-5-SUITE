@@ -106,7 +106,7 @@ module UpdateChecker =
                 core @ [ suiteRevision ]
 
     /// Positive when `a` is newer than `b`.
-    let private compareVersions (a: string) (b: string) : int =
+    let compareVersions (a: string) (b: string) : int =
         let va = parseVersion a
         let vb = parseVersion b
         let length = max va.Length vb.Length
