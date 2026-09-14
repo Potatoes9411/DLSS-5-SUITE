@@ -1985,8 +1985,9 @@ type MainViewModel() as this =
     // ---------------------------------------------------------------------
     // IN-GAME OVERLAY
     // ---------------------------------------------------------------------
-    /// Off means no install deploys the overlay. It does not touch a game that
-    /// already has one - that comes off with the mod, like everything else.
+    /// Applies to every game that has the mod, not just future installs:
+    /// turning it off takes the overlay out of each of those games, and turning
+    /// it back on puts it back - see SaveOverlaySettings.
     member this.IsOverlayEnabled
         with get () = isOverlayEnabled
         and set value =
@@ -2021,6 +2022,25 @@ type MainViewModel() as this =
                 this.SaveOverlaySettings()
 
     member private this.SaveOverlaySettings() =
+        // Push the change into every game that already has the overlay.
+        //
+        // ModInstaller.syncOverlays existed but nothing called it, so changing
+        // these settings only ever affected the next install - which is why
+        // switching the overlay off in Settings left it running in every game
+        // that already had it. The install records say which games those are,
+        // so turning it off removes the add-on from each one and turning it on
+        // puts it back with the current theme and hotkey.
+        //
+        // Off the UI thread: it touches files in every installed game folder.
+        let enabled = isOverlayEnabled
+        let theme = overlayTheme
+        let hotkey = overlayHotkey
+        let games = allGames |> Seq.map (fun c -> c.Game) |> Seq.toArray
+        System.Threading.Tasks.Task.Run(fun () ->
+            try ModInstaller.syncOverlays enabled theme hotkey games
+            with _ -> ())
+        |> ignore
+
         GameScanner.saveSettings
             { IsSidebarLayout = isSidebarLayout
               ColorAtmosphere = selectedColorAtmosphere

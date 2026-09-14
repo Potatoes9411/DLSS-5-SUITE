@@ -1280,7 +1280,9 @@ module ModInstaller =
     /// utility effects (DisplayDepth, UIMask, ...) bundled under
     /// "mod files\reshade-shaders" - and point ReShade.ini at it.
     let private ensureStandardEffectPaths (tracker: Tracker) (exeDir: string) : string * int =
-        let shadersRoot = Path.Combine(exeDir, reshadeShadersDirName)
+        let isLossless = Path.GetFileNameWithoutExtension(exeDir).Equals("Lossless Scaling", StringComparison.OrdinalIgnoreCase) || Path.GetFileNameWithoutExtension(exeDir).Equals("LosslessScaling", StringComparison.OrdinalIgnoreCase)
+        let root = if isLossless then Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lossless Scaling") else exeDir
+        let shadersRoot = Path.Combine(root, reshadeShadersDirName)
         Directory.CreateDirectory(Path.Combine(shadersRoot, "Shaders")) |> ignore
         Directory.CreateDirectory(Path.Combine(shadersRoot, "Textures")) |> ignore
 
@@ -1399,7 +1401,10 @@ module ModInstaller =
             // backup it does for every other file it puts down.
             let staging = Path.Combine(Path.GetTempPath(), "dlss5-overlay-" + Guid.NewGuid().ToString("N") + ".ini")
             File.WriteAllText(staging, contents)
-            tracker.Copy(staging, Path.Combine(exeDir, overlayConfigName))
+            let isLossless = Path.GetFileNameWithoutExtension(exeDir).Equals("Lossless Scaling", StringComparison.OrdinalIgnoreCase) || Path.GetFileNameWithoutExtension(exeDir).Equals("LosslessScaling", StringComparison.OrdinalIgnoreCase)
+            let root = if isLossless then Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lossless Scaling") else exeDir
+            Directory.CreateDirectory(root) |> ignore
+            tracker.Copy(staging, Path.Combine(root, overlayConfigName))
             try File.Delete(staging) with _ -> ()
         with _ ->
             ()
@@ -1596,6 +1601,8 @@ module ModInstaller =
         (overlay: OverlayOptions)
         (report: Progress)
         : InstallOutcome =
+        let isLosslessScaling = Path.GetFileNameWithoutExtension(exePath).Equals("LosslessScaling", StringComparison.OrdinalIgnoreCase)
+
         // Carry forward what a previous run already recorded, so re-running the
         // installer to repair a broken install stays fully reversible.
         let priorEntries =
@@ -2538,3 +2545,53 @@ module ModInstaller =
                     + sprintf "Restored %d original file(s) and removed %d added file(s)." restored removed }
         with ex ->
             { Success = false; Message = "Uninstall failed: " + ex.Message }
+
+
+    let syncOverlays (globalEnabled: bool) (theme: string) (hotkey: string) (games: seq<GameItem>) =
+        let modRoot = modFilesRoot ()
+        let source = Path.Combine(modRoot, overlayAddonName)
+        for game in games do
+            let path = manifestPath game
+            if File.Exists(path) then
+                try
+                    let options = JsonSerializerOptions()
+                    options.PropertyNameCaseInsensitive <- true
+                    let m = JsonSerializer.Deserialize<InstallManifest>(File.ReadAllText(path), options)
+                    let overlayEntry = 
+                        if isNull (box m.Files) then None 
+                        else m.Files |> Array.tryFind (fun f -> 
+                            not (String.IsNullOrWhiteSpace(f.TargetPath)) && 
+                            Path.GetFileName(f.TargetPath).Equals(overlayAddonName, StringComparison.OrdinalIgnoreCase))
+                    
+                    match overlayEntry with
+                    | Some f ->
+                        let targetAddon = f.TargetPath
+                        let exeDir = Path.GetDirectoryName(targetAddon)
+                        let targetIni = Path.Combine(exeDir, overlayConfigName)
+                        if globalEnabled then
+                            if File.Exists(source) then
+                                File.Copy(source, targetAddon, true)
+                                let (key, ctrl, shift, alt) = parseOverlayHotkey hotkey
+                                let flag (value: bool) = if value then "true" else "false"
+                                let contents =
+                                    String.Join(
+                                        "\r\n",
+                                        [ "; DLSS 5 Overlay - written by DLSS 5 SUITE."
+                                          "; The overlay rewrites this file when you change something from"
+                                          "; inside the game, so hand edits survive until the next install."
+                                          ""
+                                          "[Overlay]"
+                                          "Enabled=true"
+                                          "Theme=" + theme
+                                          sprintf "HotKey=%d" key
+                                          "HotKeyCtrl=" + flag ctrl
+                                          "HotKeyShift=" + flag shift
+                                          "HotKeyAlt=" + flag alt
+                                          "" ]
+                                    )
+                                File.WriteAllText(targetIni, contents)
+                        else
+                            if File.Exists(targetAddon) then File.Delete(targetAddon)
+                            if File.Exists(targetIni) then File.Delete(targetIni)
+                    | None -> ()
+                with _ -> ()
