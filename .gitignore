@@ -8,3 +8,7 @@ mod files/
 *.user
 payload.zip
 AvaloniaUI/
+
+# C++ engine build output
+Engine/build/
+Engine/out/

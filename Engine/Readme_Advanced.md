@@ -1,0 +1,322 @@
+# Full-Screen Wrapper for DLSS5
+
+This is an unofficial tool, not an NVIDIA product and not an official DLSS 5 implementation. It applies
+**DLSS 5 Neural Rendering** (NGX feature 18, `nvngx_dlssnr.dll`) to the live desktop.
+It captures the composited screen with Windows Graphics Capture, runs the model on its own Direct3D 12
+device and presents the result in its own borderless, topmost, click-through window that is excluded
+from capture, so the picture never feeds back into itself. Optionally DLSS Super Resolution (feature 1)
+upscales the capture to a larger target monitor first.
+
+The tool never injects into, hooks, or opens handles to any other process. It uses only the OS-level
+screen capture API and its own GPU device, and it runs entirely outside whatever it is showing you.
+
+That is a statement about what this code does, not a promise about how any particular anti-cheat will
+treat it. Anti-cheat systems are free to look at running processes, loaded modules, window and capture
+activity, and overlays drawn over a game, and any of that can be noticed. Some also object to a
+third-party overlay on principle, whatever it is doing. Check the rules of anything you run this
+alongside; the design avoids the techniques anti-cheat is built to catch, but it cannot make the tool
+invisible, and nothing here should be read as a guarantee against a ban.
+
+This is a from-scratch rewrite under the *Rules for AI-Written Code* (`AI_CODE_RULES.md`): a pure
+planning core, a seeded simulator of the effect layer, property tests with mutation testing, build-applied
+call tracing, and contracts that run in production.
+
+## This is not what DLSS 5 looks like in a game
+
+A game hands the model its own motion vectors, its own depth buffer and the sub-pixel jitter it rendered
+with, frame by frame, before anything is composited. This tool has none of that. It captures the finished
+desktop and makes substitutes: one flat depth plane, and motion guessed by matching blocks between two
+pictures that have already been drawn, resized and blended by the window manager.
+
+So the model is working from worse inputs than it was built for, on an image that has already lost the
+information it wants. What it does to the desktop is not what it does in a game, and neither is what it
+costs: the capture, the matching and the extra copies are all work a game would not be doing, and none of
+it is part of DLSS. Judge DLSS 5 by a game that implements it. This is a way to watch the model run on
+something it was never given.
+
+The control panel says the same thing at the foot of its window.
+
+## Working on one window
+
+On the panel's Model page, drag the crosshair onto a window to work on that one window instead of a
+monitor. The title under the pointer is shown beside it as you drag; letting go over the desktop goes back
+to capturing a monitor. From the command line, `--window` takes either part of a window's title, ignoring
+case, or a window handle as `0x...` — which is what the panel writes when it starts a new session.
+
+This uses Windows Graphics Capture's own per-window item, so the model sees that window's content and
+nothing else — not what is stacked in front of it — and the capture follows the window as it moves. It
+still opens nothing belonging to the other process. The overlay follows the window each frame.
+
+Every size downstream is fixed when the session is planned, so a window that changes size is followed by
+building the session again — once the size has stopped changing and stayed still for a moment, rather than
+once for every step of a drag. Moving a window needs no rebuild at all: the capture follows it, and only
+the overlay is moved.
+
+A window that is closed, minimised or hidden leaves nothing to capture, so the session lets it go rather
+than leaving the overlay sitting over where it used to be. The crosshair goes back to holding nothing and
+the next session takes the monitor the Source setting names, which is the primary one unless it says
+otherwise. Restoring the window does not take it back: drag the crosshair onto it again.
+
+## Screenshots
+
+The panel's **Capture** page writes screenshots: the picture the model was given and the picture shown
+for it, taken from the same frame, as two PNG files. **Save screenshot** is on that page and again on the
+Model page. The files go to a `Captures` folder next to the executable until the box on the Capture page
+names another folder, typed or browsed for; the folder is made when the first screenshot is taken.
+
+Each file is named for what was captured (`Desktop`, or the followed window's title reduced to its letters
+and digits), the settings that shaped the picture, and the minute, as in
+`Desktop_struc-1.00_tone-1.00_standard_9-11--13-42_original.png` and the matching `_processed.png`.
+`_skinstruc-N` is added when the mask is on and skin has a value of its own, `_nomask` when the mask is
+off, `_Intensity-N` when the intensity is under 100%, and `_Nx` when the model runs more than once a frame.
+**Always add all parameter values** adds `_automask`, the intensity and the passes whatever they are. A
+name already taken gets `_2`, `_3` and so on, the same count on both files. The files are written on a
+thread of their own, so the frame loop goes on while they are; at most three pictures wait to be written
+before the loop waits for room.
+
+The capture leaves the cursor out when the output covers the source, so the captures have no cursor
+either. **Include the mouse cursor**, off by default, draws it into both files where it was when the frame
+was taken, as Windows draws it, and scaled with the picture when the processed one is bigger than the
+original. When the capture carries the cursor already, with the View page's cursor set to On or a source
+the output does not cover, nothing more is drawn.
+
+**Settings comparison capture**, in the box beside those, takes one frame and writes the model's picture of
+it for every combination of the settings checked: a strength or the intensity from nothing up to the value
+its slider has now, in as many values as its box says; the passes from one up to the count; the three
+styles; the mask off and on. The count of pictures that makes is shown before anything is taken, since
+every setting checked multiplies it. **Capture all combinations** writes the original once, then one
+`_processed.png` per combination, every parameter in its name, into a folder of their own under the
+captures folder named for the source and the minute, as in `Desktop_multicapture_9-11--13-42`. No new
+frame is captured while it runs: each combination is run on the frame it started with, and the model is
+built again for each, which is what takes the time; the files are written in the background meanwhile.
+The bar under the button fills as it goes, and clicking the button again stops it.
+
+**Record video** on the same page records the two pictures as two MP4 files, `_original.mp4` and
+`_processed.mp4`, named the same way, until it is clicked again; the time recorded so far runs beside it.
+Each frame's two pictures are copied out of the GPU together and given the same time in both files, taken
+from the frame's own clock reading, so the two stay in step however the frame rate varies. The encoding is
+Windows' own H.264 through Media Foundation, on the CPU, and it costs frame rate: fine at 1080p, heavy at
+4K. A setting that builds the session again ends the recording, and so does quitting.
+
+## The model files
+
+`nvngx_dlssnr.dll` (neural rendering, feature 18) is NVIDIA's, is not in this repository, and is not in the
+build artifact. Put it next to `FullScreenWrapperForDLSS5.exe` or point `--ngx-path` at the folder that
+holds it. `nvngx_dlss.dll` (super resolution, feature 1) is NVIDIA's too, and is optional: without it the
+session runs without super resolution, and the panel says so beside a warning glyph.
+
+Because the NGX loader picks these files up by name from a folder anyone can write to, this tool checks
+every copy of them it finds in either folder before the loader gets there, whenever NGX is started at all and whether or not the session will use that model: Windows must accept every Authenticode signature the file carries (a driver file often carries NVIDIA's and Microsoft's), and one of the signers
+must be NVIDIA Corporation by name, with a chain that is clean when built again from Microsoft's own trusted root list and the certificates the signature carries alone, so a root anyone added to the ordinary Windows stores does not count. A root on that list which the machine does not hold yet is fetched by Windows during the check, so the check reaches the network only the first time it meets a root. A file that fails either stops the session before NGX is so much as initialised. One that passes is then asked what its version resource calls its product:
+`nvngx_dlssnr.dll` is expected to say `NVIDIA DLSSNR`, and one that says something else is used anyway, under a warning in the log and a glyph beside the model's switch on the panel, since it may be some other file of NVIDIA's under the model's name, or a later model. Each is then held open, shared for reading only,
+for as long as the session runs, so it cannot be written to, deleted or renamed afterwards — the file that
+was checked is the file that loads. A model that is not in one of those folders is not checked: super
+resolution may still run from the driver's own copy, which lives where Windows, not this tool, guards it. This does not defend against a machine that was already compromised
+before the check, and it says nothing about a model loaded from anywhere else.
+
+## What else the program loads
+
+Every other library the program takes in is pinned to where it belongs, so a file put beside the executable
+cannot stand in for one:
+
+- The libraries the executable is linked against are resolved by Windows from the system folder only (the
+  linker's dependent load flag), and every library loaded by name after that, by the program or inside the
+  libraries it uses, is taken from the system folder whenever one of that name is there (the process asks
+  for that image load policy before it does anything else).
+- `nvofapi64.dll`, the driver's optical flow library, is opened by its full path in the system folder,
+  checked for its signatures the way the models are, held open, and only then loaded, with its own imports
+  confined to the system folder.
+- NVIDIA's NGX loader looks for its runtime, `_nvngx.dll` or `nvngx.dll`, beside the executable before it
+  takes the driver's own copy. One found there, or under `--ngx-path`, is checked and held the way the
+  models are before the loader runs.
+- The one Windows library the program loads by name, `ext-ms-win-windowing-external-l1-1-0.dll`, is asked
+  for from the system folder only.
+
+## Requirements
+
+- Windows 10 2004 or newer (Windows Graphics Capture, DirectComposition), Windows 11 recommended.
+- An NVIDIA RTX GPU with driver **616.64 or newer** for neural rendering. 616.64 is the first driver
+  whose NGX loader offers DLSS 5 (feature 18) itself; on 616.56 and older the loader answers
+  `NotImplemented` to the requirements query and cannot build the feature, and this tool stops at
+  start-up with a message naming the installed and the required driver.
+- The [NVIDIA DLSS SDK](https://github.com/NVIDIA/DLSS) (`lib/Windows_x86_64/x64/nvsdk_ngx_s.lib`, `include/`, `lib/Windows_x86_64/rel/nvngx_dlss.dll`).
+- NVIDIA's DLSS 5 model, `nvngx_dlssnr.dll`, next to `FullScreenWrapperForDLSS5.exe` or in the folder given by
+  `--ngx-path`. NGX looks for feature DLLs in the application folder and the listed paths, the way
+  games ship `nvngx_dlss.dll`; the driver does not install this one and this tool does not ship it.
+  Without it the loader reports `DLSSNR.Available = 0` and this tool stops with a message saying the file
+  is missing, where it looked, and that the file has to be found elsewhere, since it cannot be shipped here.
+- Optional, for super resolution: `nvngx_dlss.dll`, in the same two folders. Games carry a copy and the
+  DLSS SDK ships one; recent drivers keep one of their own, which is what a session uses when neither
+  folder has one. Without any of them the panel greys the super resolution choice and says why.
+- Visual Studio 2022 17.8+ (MSVC 19.38), CMake 3.21+, Ninja or MSBuild, the Windows 10 SDK (dxc.exe).
+- Optional: the NVIDIA Optical Flow SDK for the hardware motion-vector backend (`-DDSCREEN_ENABLE_NVOF=ON`).
+
+There are no third-party dependencies beyond NVIDIA's SDKs and the platform (see `gate/dependencies.lock`).
+
+## Build
+
+```
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DDLSS_SDK_DIR=C:\path\to\DLSS
+cmake --build build --config Release
+```
+
+The portable core, simulator, tests and gate tools also build on Linux with GCC 13+:
+
+```
+cmake -S . -B build-linux -G Ninja && cmake --build build-linux && ctest --test-dir build-linux
+```
+
+The version number, the program's name, the copyright and the repository address are written once, in
+`src/global_common.h`. The About page, the window titles, the usage text, the NGX project identity, the
+version record in `res/app.rc` (what the file's Properties window lists on its Details page) and the CMake
+project version all read them from there, so a release is numbered by changing the three numbers at the
+top of that file.
+
+## Run
+
+Double-clicking the executable opens the control panel and the overlay, with no console window. Every
+command line option except `--help`, `--list-monitors`, `--gui` and the NGX runtime settings has a control
+on the panel, on one of three pages: **Model** for what the model reads, what its work is compared
+against and which window it is given, **View** for the capture and the window it is shown in, and
+**Advanced** for the rest. An **About** page names the version and links to this repository. A number is a
+slider to sweep it, a box to type an exact value and arrows to
+step it, with a reset beside each; a choice is a row of buttons; a path is a box to type in. Rows that
+belong together share a frame. Every row is measured from the height of the display's own text, so nothing
+crowds or clips whatever the scaling, and the window is only as tall as the deepest page it is showing.
+
+Moving anything on the first two pages takes effect at once. Changing the tuning rebuilds the model's
+feature, because the model reads it while the feature is built rather than on each frame, and the frame is
+drawn again even when the desktop has sent nothing new, so a change shows even while the panel sits on
+another monitor.
+
+Everything else applies itself too, just not by being read each frame. Which monitor or window is captured,
+where it is presented, the colour format, super resolution, where motion comes from, which adapter — a
+session cannot change any of those under itself, so changing one ends the session and builds another in the
+same process from what the panel now says, read back through the same parser the command line uses. It
+waits for the setting to settle first, so walking through three choices builds one session rather than
+three, and the panel stays where it is with its page and position.
+
+Two things are not quite so simple. The Direct3D debug layer is turned on for the whole program by Windows,
+which will not turn it off again, so turning it off is the one change that starts the program afresh. The
+model indicator and the kernel cache are read by the model as it loads, so they may want the program
+restarted rather than the session rebuilt.
+
+Closing the panel ends the session. Started from a console, the program attaches to it and logs there;
+`--console on` forces one, `--gui off` leaves the overlay to run alone.
+
+### Screenshots and recordings
+
+The overlay sits on top of the monitor it is capturing, so a capture that included it would feed the
+model its own answer and spiral. The blunt way to stop that is `SetWindowDisplayAffinity`, which Windows
+enforces below every capture path: it keeps the overlay out of this program's capture and out of Print
+Screen, OBS and every recorder along with it. That is why the tool could not be screenshotted at all.
+
+Where Windows offers it, the capture session can instead be told to leave this program's own windows out
+by name. That is scoped to the one session, so the model never sees the overlay while everything else
+sees it normally, and the tool can be demonstrated. `--exclude-own-windows on` asks for it; it is off by
+default while it is still being proved on real machines, and the log says which of the two is in force.
+
+The exclusion names a window, and a window is only left out if the picture is the window's own content.
+The overlay used to be a composition placed over its window: the window was excluded and the composition
+over it was not, so the overlay went on photographing itself while the panel beside it disappeared
+correctly. With the exclusion in force the overlay is given a swap chain of its own instead. It costs the
+per-pixel alpha a composition gives, which a picture covering the whole monitor has no use for, and it
+costs the layering the click-through used to ride on, which hit testing does not need.
+
+Getting it wrong puts the overlay back into its own capture, so three things have to hold before either
+window is uncovered. Both start hidden from all capture, because nothing may photograph the overlay
+before a session exists to be told about it. Each window handle is turned into the identifier the list
+takes and then turned back again, and is only used if it comes back as the same window. And the list is
+read off the session afterwards and searched for every window in it. Any of those failing leaves the
+windows hidden, which is what the tool did before there was another way.
+
+### The settings that do nothing here
+
+The desktop is not a game engine, and five settings have nothing to act on because of it. The **depth
+plane** is one constant value for every pixel, which tells the model nothing about what stands in front of
+what, so its value and **depth is inverted** both make no difference. **UI correction** is passed to the
+model, but the model reads it from a UI layer this tool never binds. **Optical flow grid** and **optical
+flow effort** configure NVIDIA's hardware flow engine, which the shipped build leaves out.
+
+All five are still there, on an **Inert** page that `--show-inert on` adds. Without it they are off the
+panel entirely and the window is shorter for it. The command line options behind them keep working either
+way. Motion vectors are not on that page: they are real, computed by matching blocks between frames, so
+`--mv-scale-x`, `--mv-scale-y`, `--mv-level` and `--reset-threshold` all do something — just nothing
+visible while the picture holds still.
+
+**Model passes** (`--nr-passes`, on the Model page with a warning glyph beside it) runs the model on its
+own output: pass two takes the picture pass one made, and so on, each pass a model instance with a history
+of its own, and only the last is shown. It exists to see what the model makes of its own work, not for
+use: every pass costs the whole model again and holds the picture back by as much.
+
+```
+FullScreenWrapperForDLSS5.exe                       # neural rendering on the primary monitor
+FullScreenWrapperForDLSS5.exe --monitor 1 --target 0  # capture monitor 1, upscale with DLSS and present on monitor 0
+FullScreenWrapperForDLSS5.exe --list-monitors
+FullScreenWrapperForDLSS5.exe --help
+```
+
+Hotkeys (global): `Ctrl+Alt+Shift+O` original/processed, `Ctrl+Alt+Shift+C` split view, `Ctrl+Alt+Shift+Q` quit.
+
+Every failure stops the program with a message and a non-zero exit code. There are no silent fallbacks:
+if neural rendering is requested and unavailable, the tool exits instead of running as a passthrough
+(pass `--nr off` or `--sr off` to run without a model). A contract violation aborts and writes the call
+trace ring to `FullScreenWrapperForDLSS5-trace.txt` next to the working directory. That file is written
+only when a contract fails, which is to say when the program is already stopping.
+
+Nothing else is written beside the executable unless it is asked for. `--exclusion-log on` writes what the
+capture was asked to leave out and what it answered to `FullScreenWrapperForDLSS5-exclusion.log`;
+`--log-file PATH` mirrors the console log to a file of your choosing; and `--ngx-log 1` or `2` lets NGX
+write its own logs, which it does beside the executable or in `--app-data`. None of the three happens by
+default: NGX is handed a callback that keeps nothing and told to write to no other sink, because its
+logging level alone is a floor that cannot lower what the driver has configured.
+
+## What the model does with these values
+
+The 310.8 model carries a single set of weights, under preset 1, which is what this tool asks for; any
+other number falls back to it and says so in the NGX log. Style takes 0, 1 or 2 and is clamped by the
+model itself. The strengths are unbounded floats: the model applies no limit of its own, so this tool
+imposes none either, though the values it was authored around sit between 0 and 1. Skin structure and
+local structure only do anything while auto mask is on, and UI correction reads a UI layer that
+this tool does not supply, so it is inert as wired. The model runs one-to-one and does no scaling; any
+resizing comes from the separate super resolution pass.
+
+The motion scales (`--mv-scale-x`, `--mv-scale-y`) are what the model multiplies the motion vectors by.
+Left out, each is the ratio between the model's working size and the captured one, which is what the
+synthesised vectors are measured in; given, the operator's number is used instead, and a negative one
+flips that axis. `--depth-inverted` tells the model the depth plane counts the other way, which with one
+flat plane changes little. None of these carries a range, so this tool imposes none.
+
+## How it works
+
+1. **Capture**: one `Direct3D11CaptureFramePool` per source monitor (free-threaded, polled every frame)
+   on a plain Direct3D 11 device, the only kind the capture API accepts. That device owns the canvas
+   and copies frames into it; the models see the same texture through a shared handle, and two shared
+   fences order the two devices on the GPU, so no CPU wait sits between them. The output window is
+   excluded with
+   `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`.
+2. **Synthesised inputs**: the desktop has no depth or motion vectors. A constant depth plane and motion
+   vectors from a GPU coarse-to-fine block matcher (or NVIDIA Optical Flow, or zeros) feed the models.
+   A high fraction of unmatched pixels or a long pause resets the models' temporal history.
+3. **Models**: DLSS Super Resolution bridges source and target sizes; DLSS 5 Neural Rendering runs on
+   the result through the driver's NGX core using the `DLSSNR.*` parameter names.
+4. **Present**: a DirectComposition flip-model swap chain with a frame-latency waitable object.
+
+## Layout
+
+| Directory | Contents |
+| --- | --- |
+| `src/infrastructure` | generic primitives: results, strong types, bounded containers, checked arithmetic, contracts, tracing |
+| `src/interior` | the pure core: options, monitors, planning, the per-frame step planner, NGX parameter lists |
+| `src/effects/sim` | seeded simulator of the effect layer with failure injection |
+| `src/effects/real` | Windows: D3D12, DirectComposition, Windows Graphics Capture, NGX, optical flow |
+| `src/app` | the generic session loop and the composition root |
+| `tests` | property tests and the seed fuzzer |
+| `gate` | mutation testing, dependency lock, gate scripts |
+| `shaders` | HLSL compute and blit kernels compiled by DXC at build time |
+
+## The gate
+
+`gate/gate.sh` (Linux, portable targets) and `gate/gate.ps1` (Windows, everything) run: the build with
+warnings as errors and tracing, the formatter check, the property tests under several seeds, the
+sanitizers, mutation testing, and the dependency-lock check.

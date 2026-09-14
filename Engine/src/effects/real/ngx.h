@@ -1,0 +1,144 @@
+#pragma once
+#include "effects/real/resources.h"
+#include "effects/real/trust.h"
+#include "interior/ngx_params.h"
+#include "interior/plan.h"
+
+#include <nvsdk_ngx.h>
+#include <nvsdk_ngx_helpers.h>
+
+#include <array>
+#include <memory>
+#include <optional>
+#include <string_view>
+#include <variant>
+
+namespace real {
+
+constexpr NVSDK_NGX_Feature kNeuralRenderingFeature = static_cast<NVSDK_NGX_Feature>(18);
+
+// What nvngx_dlssnr.dll calls its product in its version resource. A file that is signed by NVIDIA but
+// calls itself something else may be another of NVIDIA's files under the model's name, or a later model
+// renamed; the session says so and runs with it.
+constexpr std::wstring_view kNeuralRenderingProduct = L"NVIDIA DLSSNR";
+
+struct NgxSettings
+{
+    std::optional<interior::NgxAppId> appId;
+    interior::ProjectIdText projectId;
+    interior::DirectoryPath dataPath;
+    interior::DirectoryPath executableDirectory;
+    interior::DirectoryPath featurePath;
+    interior::NgxLogLevel logLevel;
+    bool indicator;
+    bool cubinCache;
+};
+
+// Where nvngx_dlssnr.dll sits among the folders the loader searches (the executable folder, then
+// --ngx-path), or nothing. The loader builds feature 18 from that file; the driver does not install it.
+[[nodiscard]] std::optional<interior::DirectoryPath> NeuralRenderingModelLocation(const NgxSettings& settings) noexcept;
+
+// Every file NVIDIA's loader may take from a folder of ours: each model, and the runtime under either of
+// its names, in the folder the executable sits in and under --ngx-path, each where it is there. Both are
+// folders anyone may write to, so whatever is found is checked before the loader is let at it, and a copy
+// in each folder is checked, since which of them the loader takes first is its own affair. Nothing where
+// there is no file, and no super resolution model of ours does not mean super resolution is unavailable:
+// the driver carries a copy of its own, which the driver store keeps. The order is the DLSS 5 model, the
+// super resolution model, _nvngx.dll and nvngx.dll, each beside the executable and then under --ngx-path.
+constexpr std::size_t kLoadableCount = 8;
+using LoadableFiles = std::array<std::optional<interior::FilePath>, kLoadableCount>;
+[[nodiscard]] LoadableFiles LoadableFilesOf(const NgxSettings& settings) noexcept;
+
+// The same slots once checked: each file open, shared for reading only, so the file that was checked stays
+// the file the loader has, for as long as whoever holds them lives, which is the session's environment.
+using HeldFiles = std::array<std::optional<TrustedFile>, kLoadableCount>;
+
+// The driver keeps the path pointers, so an NgxPaths lives on the heap and never moves.
+class NgxPaths final
+{
+public:
+    explicit NgxPaths(const NgxSettings& settings) noexcept;
+    [[nodiscard]] const NVSDK_NGX_FeatureCommonInfo& Common() const noexcept { return common_; }
+
+private:
+    interior::DirectoryPath executable_;
+    interior::DirectoryPath feature_;
+    std::array<const wchar_t*, 2> pointers_;
+    NVSDK_NGX_FeatureCommonInfo common_;
+};
+
+struct NgxShutdown
+{
+    void operator()(ID3D12Device* device) const noexcept;
+};
+
+struct ParameterDestroyer
+{
+    void operator()(NVSDK_NGX_Parameter* parameters) const noexcept;
+};
+
+struct FeatureReleaser
+{
+    void operator()(NVSDK_NGX_Handle* handle) const noexcept;
+};
+
+using NgxSession = std::unique_ptr<ID3D12Device, NgxShutdown>;
+using NgxParameters = std::unique_ptr<NVSDK_NGX_Parameter, ParameterDestroyer>;
+using Feature = std::unique_ptr<NVSDK_NGX_Handle, FeatureReleaser>;
+
+struct NgxRuntime
+{
+    std::shared_ptr<const NgxPaths> paths;
+    Com<ID3D12Device> device;
+    NgxSession session;
+    NgxParameters parameters;
+};
+
+struct Requirement
+{
+    NVSDK_NGX_Result result;
+    std::uint32_t supportMask;
+};
+
+struct ModelIo
+{
+    ID3D12Resource* color;
+    ID3D12Resource* depth;
+    ID3D12Resource* motionVectors;
+    ID3D12Resource* output;
+};
+
+struct SrInputs
+{
+    ModelIo io;
+    interior::Extent render;
+    bool reset;
+};
+
+using NgxSlot = std::variant<unsigned int, float, ID3D12Resource*>;
+
+struct BoundNrParameter
+{
+    interior::NrParameter name;
+    NgxSlot value;
+};
+
+using BoundNrParameters = infra::BoundedVector<BoundNrParameter, interior::NrParameterList::Capacity>;
+
+[[nodiscard]] Requirement RequirementOf(const GpuDevice& gpu, const NgxSettings& settings, NVSDK_NGX_Feature feature) noexcept;
+[[nodiscard]] infra::Result<NgxRuntime, Error> CreateNgxRuntime(const GpuDevice& gpu, const NgxSettings& settings) noexcept;
+// Whether the driver offers super resolution at all. Its model is NVIDIA's to ship, and a session that
+// cannot have it runs without it rather than stopping.
+[[nodiscard]] bool OffersSuperResolution(const NgxRuntime& runtime) noexcept;
+[[nodiscard]] std::optional<std::uint32_t> NeuralRenderingAvailability(const NgxRuntime& runtime) noexcept;
+// How many sets of weights the model says it carries, or nothing when it will not say. Nothing means the
+// panel leaves the choice out rather than offering numbers that fall back to the one preset that exists.
+[[nodiscard]] std::optional<std::uint32_t> NeuralRenderingPresetCount(const NgxRuntime& runtime) noexcept;
+[[nodiscard]] interior::QualityTable QualityTableFor(const NgxRuntime& runtime, const interior::Extent& target) noexcept;
+[[nodiscard]] infra::Result<Feature, Error> CreateSuperResolution(const NgxRuntime& runtime, ID3D12GraphicsCommandList* list, const interior::SrChoice& choice) noexcept;
+[[nodiscard]] infra::Result<Feature, Error> CreateNeuralRendering(const NgxRuntime& runtime, ID3D12GraphicsCommandList* list, const interior::NrTuning& tuning, const interior::Extent& work) noexcept;
+[[nodiscard]] infra::Status<Error> EvaluateSuperResolution(const NgxRuntime& runtime, const Feature& feature, ID3D12GraphicsCommandList* list, const SrInputs& inputs) noexcept;
+[[nodiscard]] infra::Status<Error> EvaluateNeuralRendering(const NgxRuntime& runtime, const Feature& feature, ID3D12GraphicsCommandList* list, const interior::NrTuning& tuning,
+                                                           const interior::EvaluateNr& evaluate, const ResourceTable& resources) noexcept;
+
+} // namespace real

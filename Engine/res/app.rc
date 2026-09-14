@@ -1,0 +1,47 @@
+// What the shell, the task bar and Alt+Tab show for the executable, and what the file's Properties window
+// lists on its Details page.
+#include "resource.h"
+#include "global_common.h"
+
+#include <winresrc.h>
+
+// The lowest-numbered icon in an executable is the one the shell takes for the file itself, and this is
+// the only one there is.
+IDI_APPICON ICON "Icon.ico"
+
+// The version record. Every field is written, the fixed ones and the strings both; the file version and
+// the product version are the same number, the one in global_common.h. The strings are US English in
+// Unicode, which is what the translation entry says too.
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION    DSCREEN_VERSION_MAJOR, DSCREEN_VERSION_MINOR, DSCREEN_VERSION_PATCH, 0
+PRODUCTVERSION DSCREEN_VERSION_MAJOR, DSCREEN_VERSION_MINOR, DSCREEN_VERSION_PATCH, 0
+FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+FILEFLAGS      VS_FF_DEBUG
+#else
+FILEFLAGS      0
+#endif
+FILEOS         VOS_NT_WINDOWS32
+FILETYPE       VFT_APP
+FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      DSCREEN_COMPANY_NAME
+            VALUE "FileDescription",  DSCREEN_PRODUCT_NAME
+            VALUE "FileVersion",      DSCREEN_VERSION_STRING
+            VALUE "InternalName",     DSCREEN_FILE_STEM
+            VALUE "LegalCopyright",   DSCREEN_COPYRIGHT
+            VALUE "OriginalFilename", DSCREEN_FILE_STEM ".exe"
+            VALUE "ProductName",      DSCREEN_PRODUCT_NAME
+            VALUE "ProductVersion",   DSCREEN_VERSION_STRING
+            VALUE "Comments",         "Source code, releases and issues: " DSCREEN_REPOSITORY_URL
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

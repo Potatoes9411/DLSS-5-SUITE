@@ -5,7 +5,7 @@
     <!-- The installer lives in Setup/ as its own C# project. Keep the app from
          globbing it: Avalonia compiles every .axaml under a project folder, and
          the installer's windows are not part of the app. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);Setup\**;Tests\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Setup\**;Tests\**;Engine\**</DefaultItemExcludes>
     <TargetFramework>net8.0</TargetFramework>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
@@ -60,6 +60,7 @@
     <Compile Include="Services\ShaderGlassDetector.fs" />
     <Compile Include="Services\EmulatorCatalog.fs" />
     <Compile Include="Services\ModInstaller.fs" />
+    <Compile Include="Services\ScreenEngine.fs" />
     <Compile Include="Services\AnalysisStore.fs" />
     <Compile Include="Services\UpdateChecker.fs" />
     <Compile Include="Services\SystemSpecs.fs" />

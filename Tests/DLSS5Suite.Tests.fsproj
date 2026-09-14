@@ -10,6 +10,7 @@
     <Compile Include="VersionComparisonTests.fs" />
     <Compile Include="DataMigrationTests.fs" />
     <Compile Include="SettingsRecordTests.fs" />
+    <Compile Include="ScreenEngineTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
