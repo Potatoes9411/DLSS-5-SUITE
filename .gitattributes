@@ -1,0 +1,15 @@
+# Shell scripts must keep LF endings. With core.autocrlf on Windows they would
+# otherwise be checked out with CRLF, and sh then fails on every line with
+# "$'\r': command not found".
+*.sh    text eol=lf
+
+# Everything else follows the platform default.
+*       text=auto
+
+# Binary assets are never touched.
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.dll   binary
+*.exe   binary
+*.zip   binary
