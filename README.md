@@ -29,8 +29,6 @@ The original and unchanged DLSS 5 MANAGER is available from its developer at:
 
 **GitHub:** [https://github.com/NODIX-TECH/DLSS-5-MANAGER](https://github.com/NODIX-TECH/DLSS-5-MANAGER)
 
-**GitHub:** [https://github.com/NODIX-TECH/DLSS-5-MANAGER](https://github.com/NODIX-TECH/DLSS-5-MANAGER)
-
 DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace or claim ownership of the original application or its download location.
 
 ## What this edition provides
@@ -56,13 +54,29 @@ The ShaderGlass route only uses allowlisted official upstream projects. Release 
 
 ## Installation
 
-Choose one of three versioned packages from this repository's Releases page:
+> [!IMPORTANT]
+> 🚨 **STOP! READ THIS BEFORE DOWNLOADING!** 🚨
+> *(Leia isto antes de baixar! / ¡Lee esto antes de descargar!)*
+> 
+> **🇬🇧 ENGLISH:**
+> * 🟢 **Easiest Install:** Download DLSS.5.SUITE.Web.Setup.exe (Downloads everything else for you automatically!)
+> * 🔵 **Offline Install:** Download DLSS.5.SUITE.Setup.exe (Huge file, has everything included).
+> * 🟡 **No Install Required:** Download DLSS.5.SUITE.Portable.zip and just extract it.
+> * ❌ **DO NOT DOWNLOAD** Lossless_Scaling.zip, addons.zip, or ShaderGlass_DLSS_5.zip manually. The application will fetch them for you!
+> 
+> **🇧🇷 PORTUGUÊS (PT-BR):**
+> * 🟢 **Instalação mais fácil:** Baixe o DLSS.5.SUITE.Web.Setup.exe (Ele baixa o resto para você automaticamente!)
+> * 🔵 **Instalação Offline:** Baixe o DLSS.5.SUITE.Setup.exe (Arquivo grande, já inclui tudo).
+> * 🟡 **Não requer instalação:** Baixe o DLSS.5.SUITE.Portable.zip e apenas extraia.
+> * ❌ **NÃO BAIXE** Lossless_Scaling.zip, addons.zip ou ShaderGlass_DLSS_5.zip manualmente. O aplicativo fará isso por você!
+> 
+> **🇪🇸 ESPAÑOL:**
+> * 🟢 **Instalación más fácil:** Descarga DLSS.5.SUITE.Web.Setup.exe (¡Descarga todo lo demás por ti automáticamente!)
+> * 🔵 **Instalación sin conexión:** Descarga DLSS.5.SUITE.Setup.exe (Archivo grande, incluye todo).
+> * 🟡 **Sin instalación:** Descarga DLSS.5.SUITE.Portable.zip y simplemente extráelo.
+> * ❌ **NO DESCARGUES** Lossless_Scaling.zip, addons.zip ni ShaderGlass_DLSS_5.zip manualmente. ¡La aplicación los descargará por ti!
 
-- **Full Setup** — contains the application payload and can install offline.
-- **Web Setup** — a smaller installer that downloads and verifies the Portable ZIP for the same release.
-- **Portable ZIP** — extract and run without installing.
-
-Existing installers are retained as separate historical downloads and are never silently overwritten with a different build.
+*(Existing installers are retained as separate historical downloads and are never silently overwritten with a different build.)*
 
 ## Updates
 
@@ -94,10 +108,10 @@ Large mod and NVIDIA runtime payloads are intentionally excluded from the Git re
 DLSS 5 SUITE is a free project. If you find this modified edition useful, you can support the developers through Ko-fi. Tips are split 50-50 between this fork and the original author of DLSS 5 MANAGER.
 
 - **Potatoes9411 (Potatoes-dev)**
-  - Ko-fi: [![Ko-Fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/potatoes9411)
+  - Ko-fi: [![Support this build's dev](https://img.shields.io/badge/Ko--fi-Support%20this%20build's%20dev%20(Potatoes9411)-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/potatoes9411)
   - Website: [potatoes-dev.com](https://potatoes-dev.com)
 - **NODIX TECH (Numidia Studios)**
-  - Ko-fi: [![Ko-Fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/nodix)
+  - Ko-fi: [![Support the original creator](https://img.shields.io/badge/Ko--fi-Support%20the%20original%20creator%20(NODIX%20TECH)-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/nodix)
   - Website: [numidiastudios.com](https://numidiastudios.com)
 
 ## Credits and trademarks
