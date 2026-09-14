@@ -15,8 +15,8 @@ Just a single `exe` (signed with a trusted certificate) written in C++ with zero
 </p>
 
 ## How to Download and Use
-1. Download the latest version of the `exe`. (Direct link [here](https://github.com/ThioJoe/Full-Screen-DLSS5-Wrapper/releases/latest/download/FullScreenWrapperForDLSS5.exe))
-    - Or find it under the latest [Release](https://github.com/ThioJoe/Full-Screen-DLSS5-Wrapper/releases) under "Assets"
+1. Download the latest version of the `exe`. (Direct link [here](https://github.com/Potatoes9411/Full-Screen-DLSS5-Wrapper/releases/latest/download/FullScreenWrapperForDLSS5.exe))
+    - Or find it under the latest [Release](https://github.com/Potatoes9411/Full-Screen-DLSS5-Wrapper/releases) under "Assets"
 2. Acquire `nvngx_dlssnr.dll` (available [here](https://web.archive.org/web/20260913005530/https://release-assets.githubusercontent.com/github-production-release-asset/1172082676/74962a93-ae18-48bf-a383-772583e7035e?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-09-13T01%3A42%3A57Z&rscd=attachment%3B+filename%3Dnvngx_dlssnr_310.8.0.zip&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-09-13T00%3A42%3A07Z&ske=2026-09-13T01%3A42%3A57Z&sks=b&skv=2018-11-09&sig=gti%2BBU6awa3LBMcrIxECIGL%2FnwBAcWqSc6E5BUP5Qrs%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc4OTI2NDUyOSwibmJmIjoxNzg5MjYwOTI5LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.ljXg2tJDwLH4YMacu6QaOC3ef-QsXzFbEsx3l04Czes&response-content-disposition=attachment%3B%20filename%3Dnvngx_dlssnr_310.8.0.zip&response-content-type=application%2Foctet-stream)) and put it next to the `exe`.
 3. Run the `exe` (no installation required).
 4. By default, it applies to the primary monitor, with more options in the View tab. You can also apply it to a specific selected window.
@@ -34,7 +34,7 @@ Just a single `exe` (signed with a trusted certificate) written in C++ with zero
 - It's a single `.exe` file, no installation or third party dependencies required.
     - It's also signed with a trusted certificate.
 - Designed to Minimize Anti-Cheat False-Positive Risk
-  - Does NOT inject itself into or modify any other applications. It captures the final screen output using Windows' screen-capture APIs and processes that. (See [How It Works](https://github.com/ThioJoe/Full-Screen-DLSS5-Wrapper#how-it-works) explanation below)
+  - Does NOT inject itself into or modify any other applications. It captures the final screen output using Windows' screen-capture APIs and processes that. (See [How It Works](https://github.com/Potatoes9411/Full-Screen-DLSS5-Wrapper#how-it-works) explanation below)
     - This makes it architecturally more similar to screen-capture software or an external graphics-enhancement overlay.
   - It's code signed, so any anti-cheat providers could see you are running the unmodified version of the tool, which independently verifies loaded Nvidia binary signatures.
   - Note: There's still never a guarantee. Some anti-cheats may block overlays in general. So still best to not use it in competitive games, or where third party overlays are prohibited. Check the game's rules.
@@ -95,7 +95,7 @@ On a simple level, it:
     - This window is "click through", so it is effectively invisible to the cursor. This means you can click, hover, and interact with everything beneath just as you normally would.
     - If you have it set to affect only a specific window, it only covers that window. If set to apply to the whole screen, the window covers the entire screen. 
 
-For a much more detailed and technical explanation, see the [Advanced Readme](https://github.com/ThioJoe/Full-Screen-DLSS5-Wrapper/blob/main/Readme_Advanced.md) file  (`Readme_Advanced.md`).
+For a much more detailed and technical explanation, see the [Advanced Readme](https://github.com/Potatoes9411/Full-Screen-DLSS5-Wrapper/blob/main/Readme_Advanced.md) file  (`Readme_Advanced.md`).
 
 ## Optional: Launch via Commandline
 - The tool can be launched by simply double clicking the `exe` to launch the GUI, or via the command line.
