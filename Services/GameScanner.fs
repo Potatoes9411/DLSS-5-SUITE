@@ -21,7 +21,7 @@ module GameScanner =
 
     let private getPostersCacheDir () =
         let localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-        let dir = Path.Combine(localAppData, "DLSS5Manager", "Cache", "Posters")
+        let dir = Path.Combine(localAppData, "DLSS5Suite", "Cache", "Posters")
         if not (Directory.Exists(dir)) then Directory.CreateDirectory(dir) |> ignore
         dir
 
@@ -885,7 +885,7 @@ module GameScanner =
     // =========================================================================
     let private getCacheFilePath () =
         let localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-        let dir = Path.Combine(localAppData, "DLSS5Manager")
+        let dir = Path.Combine(localAppData, "DLSS5Suite")
         if not (Directory.Exists(dir)) then Directory.CreateDirectory(dir) |> ignore
         Path.Combine(dir, "library_cache_v3.json")
 
@@ -923,7 +923,7 @@ module GameScanner =
     /// them out.
     let private getEmulatorCachePath () =
         let localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-        let dir = Path.Combine(localAppData, "DLSS5Manager")
+        let dir = Path.Combine(localAppData, "DLSS5Suite")
         if not (Directory.Exists(dir)) then Directory.CreateDirectory(dir) |> ignore
         Path.Combine(dir, "emulators_cache.json")
 
@@ -954,7 +954,7 @@ module GameScanner =
     /// One short line on disk - nothing to parse, nothing to grow.
     let private getCacheStampPath () =
         let localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-        let dir = Path.Combine(localAppData, "DLSS5Manager")
+        let dir = Path.Combine(localAppData, "DLSS5Suite")
         if not (Directory.Exists(dir)) then Directory.CreateDirectory(dir) |> ignore
         Path.Combine(dir, "cache_version.txt")
 
@@ -1023,7 +1023,7 @@ module GameScanner =
 
     let private getSettingsFilePath () =
         let localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-        let dir = Path.Combine(localAppData, "DLSS5Manager")
+        let dir = Path.Combine(localAppData, "DLSS5Suite")
         if not (Directory.Exists(dir)) then Directory.CreateDirectory(dir) |> ignore
         Path.Combine(dir, "settings.json")
 

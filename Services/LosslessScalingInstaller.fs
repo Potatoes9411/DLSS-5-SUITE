@@ -1,4 +1,4 @@
-namespace DLSS_5_MANAGER.Services
+﻿namespace DLSS_5_MANAGER.Services
 
 open System
 open System.Diagnostics
@@ -120,7 +120,7 @@ module LosslessScalingInstaller =
         if Process.GetProcessesByName("LosslessScaling").Length > 0 then failwith "Close Lossless Scaling before setup"
         let directory = Path.GetDirectoryName(installation.Executable)
         let steamCommon = Path.GetDirectoryName(directory)
-        let stateRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Manager", "Compatibility", "LosslessScaling")
+        let stateRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite", "Compatibility", "LosslessScaling")
         let cache = Path.Combine(stateRoot, ".downloads")
         Directory.CreateDirectory(cache) |> ignore
 

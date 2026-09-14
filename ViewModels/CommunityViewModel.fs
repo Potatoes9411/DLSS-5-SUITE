@@ -1,4 +1,4 @@
-namespace DLSS_5_MANAGER.ViewModels
+﻿namespace DLSS_5_MANAGER.ViewModels
 
 open System
 open System.Collections.ObjectModel
@@ -29,7 +29,7 @@ module CommunityShared =
             (let dir =
                 Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "DLSS5Manager",
+                    "DLSS5Suite",
                     "Cache",
                     "Community"
                 )

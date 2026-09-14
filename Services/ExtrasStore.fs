@@ -1,4 +1,4 @@
-namespace DLSS_5_MANAGER.Services
+﻿namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -40,7 +40,7 @@ module ExtrasStore =
 
     let private storePath () =
         let dir =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Manager")
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite")
 
         Directory.CreateDirectory(dir) |> ignore
         Path.Combine(dir, "extras.json")

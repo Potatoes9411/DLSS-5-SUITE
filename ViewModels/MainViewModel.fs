@@ -3283,7 +3283,7 @@ type MainViewModel() as this =
                 let dir =
                     System.IO.Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "DLSS5Manager",
+                        "DLSS5Suite",
                         "Cache",
                         "Posters"
                     )
