@@ -25,15 +25,19 @@ from pathlib import Path
 _pending: queue.Queue = queue.Queue()
 
 
+def active() -> bool:
+    """SUITE is the control panel: NeuralScreen's own menu stays shut."""
+    return bool(os.environ.get("NS_SUITE_INBOX"))
+
+
 def start() -> None:
     inbox = os.environ.get("NS_SUITE_INBOX")
     if not inbox:
         return
     folder = Path(inbox)
     folder.mkdir(parents=True, exist_ok=True)
-    # Requests left over from a previous run are about a pipeline that is gone.
-    for stale in folder.glob("*.json"):
-        stale.unlink(missing_ok=True)
+    # SUITE empties the folder before it starts NeuralScreen, so anything here
+    # was sent for this run - the window to capture, NR off - and is kept.
     threading.Thread(target=_poll, args=(folder,), name="suite-bridge", daemon=True).start()
     print(f"[suite] taking requests from {folder}")
 

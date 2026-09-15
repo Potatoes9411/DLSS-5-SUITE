@@ -204,6 +204,11 @@ module NeuralScreen =
                 stopping <- false
                 try
                     writeConfig settings captureFolder
+                    // Old requests belong to a run that is gone; new ones (the
+                    // window, NR off) are kept by the bridge once it starts.
+                    (try
+                        for old in Directory.GetFiles(inboxDir ()) do File.Delete old
+                     with _ -> ())
                     let psi = ProcessStartInfo(pythonPath ())
                     psi.UseShellExecute <- false
                     psi.CreateNoWindow <- true

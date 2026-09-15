@@ -294,7 +294,8 @@
                             <TextBlock Text="Needs an NVIDIA RTX GPU and a driver with DLSS 5 support. Hotkeys while running: Ctrl+Alt+Shift+O original/processed, Ctrl+Alt+Shift+C split view, Ctrl+Alt+Shift+Q stop. Engine: Full-Screen Wrapper for DLSS5."
                                        TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
                             </StackPanel>
-                            <TextBlock IsVisible="{Binding IsNeuralScreen}" TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" Text="NeuralScreen runs in the background; every change here applies to the picture straight away. Needs an RTX 30, 40 or 50 series card and a current NVIDIA driver." />
+                            <TextBlock IsVisible="{Binding IsNeuralScreen}" TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" Text="NeuralScreen runs in the background; every change here applies to the picture straight away. Needs an RTX 30, 40 or 50 series card and a current NVIDIA driver. Passes are a Screen Engine feature: NeuralScreen runs the model once a frame." />
+                            <TextBlock IsVisible="{Binding IsNeuralScreen}" TextWrapping="Wrap" Foreground="#FBBF24" FontSize="11" Text="One-window capture in NeuralScreen needs the screen to be driven by the NVIDIA card. On laptops whose screen runs through the integrated GPU it can only process the whole screen - use the Screen Engine tab for a single window there." />
                         </StackPanel>
                     </Border>
                 </ScrollViewer>

@@ -41,6 +41,11 @@ patch("commands.py",
       "suite_bridge.drain(")
 
 patch("commands.py",
+      '            elif cmd == "settings":\n',
+      '            elif cmd == "settings" and not suite_bridge.active():  # DLSS 5 SUITE: its window is the menu\n',
+      "suite_bridge.active()")
+
+patch("commands.py",
       '                    rec_dir = BASE_DIR / "recordings"\n',
       '                    rec_dir = Path(st.cfg.get("screenshot_dir") or (BASE_DIR / "recordings"))  # DLSS 5 SUITE\n',
       "# DLSS 5 SUITE\n")

@@ -293,6 +293,7 @@ type ScreenEngineViewModel() as this =
     member _.Intensity
         with get () = settings.Intensity
         and set value =
+            let value = Math.Clamp((if Double.IsFinite value then value else 1.0), 0.0, 1.0)
             if value <> settings.Intensity then
                 this.Change { settings with Intensity = value }
                 this.RaisePropertyChanged("Intensity")
