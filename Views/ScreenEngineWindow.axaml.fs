@@ -53,6 +53,9 @@ type ScreenEngineWindow() as this =
 
     member this.OnCrosshairCaptureLost(sender: obj, e: PointerCaptureLostEventArgs) = isPicking <- false
 
+    member this.OnMethodScreenEngineClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.SelectMethod false)
+    member this.OnMethodNeuralScreenClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.SelectMethod true)
+
     member this.OnClearWindowClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.ClearWindow())
 
     // ----- engine commands -----

@@ -956,7 +956,7 @@
                                             </StackPanel>
                                         </Grid>
                                         <TextBlock Text="Capture, DLSS 5 settings, the window crosshair, screenshots, recording and sweeps open in their own window." TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
-                                        <TextBlock Text="RTX 50 series only: the Screen Engine uses NVIDIA's signed DLSS 5 model, which only runs on RTX 50 series GPUs." TextWrapping="Wrap" Foreground="#FBBF24" FontSize="11.5" FontWeight="SemiBold" />
+                                        <TextBlock Text="Two methods: the Screen Engine (RTX 50 series only) and NeuralScreen (RTX 30/40 series, also on 50). SUITE picks the one your card can run." TextWrapping="Wrap" Foreground="#FBBF24" FontSize="11.5" FontWeight="SemiBold" />
                                     </StackPanel>
                                 </Border>
 

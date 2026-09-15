@@ -50,6 +50,15 @@ VERSION_PROPS="-p:Version=$VERSION -p:FileVersion=$NUMERIC -p:AssemblyVersion=$N
 # The app locks its own output while running.
 powershell -NoProfile -Command "Get-Process -Name 'DLSS 5 SUITE' -ErrorAction SilentlyContinue | ForEach-Object { \$_.CloseMainWindow() | Out-Null }; Start-Sleep -Milliseconds 2500; Get-Process -Name 'DLSS 5 SUITE' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue" >/dev/null 2>&1 || true
 
+# NeuralScreen (RTX 30/40 DLSS 5) ships in mod files/neuralscreen, controlled by
+# SUITE through its bridge. Applying it is a no-op when already there.
+if [ -f "$APP/mod files/neuralscreen/runtime/python.exe" ]; then
+    echo "--- NeuralScreen SUITE bridge ---"
+    "$APP/mod files/neuralscreen/runtime/python.exe" "$APP/tools/neuralscreen-bridge/apply_bridge.py" "$APP/mod files/neuralscreen"
+else
+    echo "warning: mod files/neuralscreen is missing - the NeuralScreen method will be unavailable" >&2
+fi
+
 echo "--- publishing application ---"
 rm -rf "$APP/publish"
 dotnet publish "$APP/DLSS 5 SUITE.fsproj" -c Release -r win-x64 --self-contained true $VERSION_PROPS -o "$APP/publish"

@@ -295,3 +295,26 @@ let ``a settings file with some advanced options keeps the rest at their default
 let ``advanced settings survive being saved and loaded`` () =
     let original = normalize everythingChanged
     Assert.Equal(original, deserialize (serialize original))
+
+// ---------------------------------------------------------------------------
+// Which DLSS 5 method a card gets
+// ---------------------------------------------------------------------------
+
+[<Fact>]
+let ``cards are sorted into the method they can run`` () =
+    Assert.Equal(NeuralScreen.Rtx50, NeuralScreen.tierOf "NVIDIA GeForce RTX 5070 Ti Laptop GPU")
+    Assert.Equal(NeuralScreen.Rtx50, NeuralScreen.tierOf "NVIDIA GeForce RTX 5090")
+    Assert.Equal(NeuralScreen.RtxOlder 40, NeuralScreen.tierOf "NVIDIA GeForce RTX 4060")
+    Assert.Equal(NeuralScreen.RtxOlder 30, NeuralScreen.tierOf "NVIDIA GeForce RTX 3080 Ti")
+    Assert.Equal(NeuralScreen.Rtx20, NeuralScreen.tierOf "NVIDIA GeForce RTX 2070 SUPER")
+    Assert.Equal(NeuralScreen.NoRtx, NeuralScreen.tierOf "NVIDIA GeForce GTX 1660")
+    Assert.Equal(NeuralScreen.NoRtx, NeuralScreen.tierOf "AMD Radeon RX 7900 XT")
+    Assert.Equal(NeuralScreen.NoRtx, NeuralScreen.tierOf "Intel(R) UHD Graphics")
+    Assert.Equal(NeuralScreen.RtxOlder 30, NeuralScreen.tierOf "NVIDIA RTX A4000")
+    Assert.Equal(NeuralScreen.RtxOlder 40, NeuralScreen.tierOf "NVIDIA RTX 4000 Ada Generation")
+
+[<Fact>]
+let ``NeuralScreen values stay inside its own ranges`` () =
+    Assert.Equal(1.5, NeuralScreen.clampParam "local_structure" 20.0)
+    Assert.Equal(1.0, NeuralScreen.clampParam "intensity" 3.0)
+    Assert.Equal(-1.0, NeuralScreen.skinOf FollowStructure)

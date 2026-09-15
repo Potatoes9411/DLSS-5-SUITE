@@ -16,6 +16,21 @@ type ScreenEngineViewModel() as this =
     inherit ViewModelBase()
 
     let host = new Host()
+    let nsHost = new NeuralScreen.Host()
+    let gpuName, gpuTier = NeuralScreen.detect ()
+
+    // Which program runs DLSS 5 over the screen. The Screen Engine needs an
+    // RTX 50 card; NeuralScreen covers RTX 30/40 (and 50, as a second choice).
+    let canScreenEngine = (gpuTier = NeuralScreen.Rtx50) && isAvailable ()
+    let canNeuralScreen =
+        (match gpuTier with NeuralScreen.Rtx50 | NeuralScreen.RtxOlder _ -> true | _ -> false)
+        && NeuralScreen.isAvailable ()
+    let methodPath () = Path.Combine(NeuralScreen.dataDir (), "method.txt")
+    let mutable useNeuralScreen =
+        let saved = (try File.ReadAllText(methodPath ()).Trim() with _ -> "")
+        if saved = "neuralscreen" && canNeuralScreen then true
+        elif saved = "engine" && canScreenEngine then false
+        else not canScreenEngine && canNeuralScreen
     let mutable settings = load ()
     let mutable monitors: MonitorEntry list = []
     let mutable windows: WindowEntry list = []
@@ -49,30 +64,74 @@ type ScreenEngineViewModel() as this =
         // The engine is a separate process and would otherwise keep running
         // after SUITE closes, including the Environment.Exit before an update,
         // where its locked executable would break the install.
-        AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> host.Stop())
+        AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> host.Stop(); nsHost.Stop())
         monitors <- listMonitors ()
         windows <- listVisibleWindows ()
 
         applyTimer.Tick.Add(fun _ ->
             applyTimer.Stop()
-            if host.IsRunning then this.Start())
+            if this.IsRunning then this.Start())
 
-        host.StateChanged.Add(fun message ->
+        let onState (message: string) =
             Dispatcher.UIThread.Post(fun () ->
                 status <- message
                 this.RaisePropertyChanged("Status")
                 this.RaisePropertyChanged("IsRunning")
-                this.RaisePropertyChanged("CanStart")))
+                this.RaisePropertyChanged("CanStart"))
+        host.StateChanged.Add onState
+        nsHost.StateChanged.Add onState
 
-    member val IsAvailable = isAvailable ()
+    member _.IsAvailable = if useNeuralScreen then canNeuralScreen else canScreenEngine
 
-    member _.Status =
+    // ----- method: Screen Engine or NeuralScreen -----
+    member _.GpuName = if gpuName = "" then "No graphics card found" else gpuName
+    member _.CanUseScreenEngine = canScreenEngine
+    member _.CanUseNeuralScreen = canNeuralScreen
+    member _.ScreenEngineLocked = not canScreenEngine
+    member _.NeuralScreenLocked = not canNeuralScreen
+    member _.IsNeuralScreen = useNeuralScreen
+    member _.IsScreenEngine = not useNeuralScreen
+
+    member _.ScreenEngineTip =
+        if canScreenEngine then "DLSS 5 through SUITE's Screen Engine. RTX 50 series."
+        elif not (isAvailable ()) then "The Screen Engine is not included in this build."
+        else "The Screen Engine needs an RTX 50 series card. Use NeuralScreen instead."
+
+    member _.NeuralScreenTip =
+        match gpuTier with
+        | _ when canNeuralScreen -> "DLSS 5 through NeuralScreen. RTX 30/40 series, and 50 series as an alternative."
+        | NeuralScreen.Rtx20 -> "RTX 20 series cards cannot run the DLSS 5 model, with either method."
+        | NeuralScreen.NoRtx -> "DLSS 5 needs an NVIDIA RTX 30, 40 or 50 series card."
+        | _ -> "NeuralScreen is not included in this build."
+
+    member _.MethodNote =
+        match gpuTier with
+        | NeuralScreen.Rtx50 -> "RTX 50 series detected: both methods work."
+        | NeuralScreen.RtxOlder s -> sprintf "RTX %d series detected: NeuralScreen is used. The Screen Engine is RTX 50 series only." s
+        | NeuralScreen.Rtx20 -> "RTX 20 series detected: this card cannot run DLSS 5."
+        | NeuralScreen.NoRtx -> "No RTX card detected: DLSS 5 needs an RTX 30, 40 or 50 series card."
+
+    member this.SelectMethod(neuralScreen: bool) =
+        let allowed = if neuralScreen then canNeuralScreen else canScreenEngine
+        if allowed && neuralScreen <> useNeuralScreen then
+            let wasRunning = this.IsRunning
+            this.Stop()
+            useNeuralScreen <- neuralScreen
+            (try
+                Directory.CreateDirectory(NeuralScreen.dataDir ()) |> ignore
+                File.WriteAllText(methodPath (), if neuralScreen then "neuralscreen" else "engine")
+             with _ -> ())
+            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsAvailable"; "CanStart"; "Status" ] do
+                this.RaisePropertyChanged(name)
+            if wasRunning then this.Start()
+
+    member this.Status =
         if status <> "" then status
-        elif not (isAvailable ()) then "The screen engine is not included in this build."
+        elif not this.IsAvailable then (if useNeuralScreen then this.NeuralScreenTip else this.ScreenEngineTip)
         else "Stopped"
 
-    member _.IsRunning = host.IsRunning
-    member this.CanStart = this.IsAvailable && not host.IsRunning
+    member _.IsRunning = host.IsRunning || nsHost.IsRunning
+    member this.CanStart = this.IsAvailable && not this.IsRunning
     member _.HasPendingChanges = hasPendingChanges
     member _.IsRecording = isRecording
     member _.RecordButtonText = if isRecording then "Stop recording" else "Record video"
@@ -81,12 +140,34 @@ type ScreenEngineViewModel() as this =
         and set value = this.SetProperty(&isAdvancedOpen, value) |> ignore
 
     member private this.Change(updated: Settings) =
+        let previous = settings
         settings <- normalize updated
         save settings
-        this.ScheduleApply()
+        if nsHost.IsRunning then this.PushToNeuralScreen(previous, settings)
+        else this.ScheduleApply()
 
-    member private _.ScheduleApply() =
-        if host.IsRunning then
+    /// NeuralScreen takes most changes live, the way its own menu sends them;
+    /// only a different monitor needs a restart.
+    member private this.PushToNeuralScreen(before: Settings, after: Settings) =
+        if before.Source <> after.Source then this.ScheduleApply()
+        else
+            if before.Intensity <> after.Intensity then nsHost.SetParam("intensity", after.Intensity) |> ignore
+            if before.LocalTone <> after.LocalTone then nsHost.SetParam("local_tone", after.LocalTone) |> ignore
+            if before.LocalStructure <> after.LocalStructure then nsHost.SetParam("local_structure", after.LocalStructure) |> ignore
+            if before.Skin <> after.Skin then nsHost.SetParam("skin_structure", NeuralScreen.skinOf after.Skin) |> ignore
+            if before.Style <> after.Style then nsHost.SetStyle(NeuralScreen.styleOf after.Style) |> ignore
+            if before.Compare <> after.Compare then nsHost.SetSplit(NeuralScreen.splitOf after.Compare) |> ignore
+            if before.NeuralRendering <> after.NeuralRendering then nsHost.ToggleNeuralRendering() |> ignore
+            if before.Window <> after.Window then
+                let text = after.Window.Trim()
+                if text = "" then nsHost.CaptureWindow 0n |> ignore
+                elif text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) then
+                    match Int64.TryParse(text.Substring(2), Globalization.NumberStyles.HexNumber, null) with
+                    | true, handle -> nsHost.CaptureWindow(nativeint handle) |> ignore
+                    | _ -> ()
+
+    member private this.ScheduleApply() =
+        if this.IsRunning then
             applyTimer.Stop()
             applyTimer.Start()
 
@@ -600,7 +681,16 @@ type ScreenEngineViewModel() as this =
 
     member this.Start() =
         hasPendingChanges <- false
-        host.Start(settings)
+        if useNeuralScreen then
+            host.Stop()
+            nsHost.Start(settings, this.CaptureFolder, settings.NeuralRendering)
+            if settings.Window.StartsWith("0x", StringComparison.OrdinalIgnoreCase) then
+                match Int64.TryParse(settings.Window.Substring(2), Globalization.NumberStyles.HexNumber, null) with
+                | true, handle -> nsHost.CaptureWindow(nativeint handle) |> ignore
+                | _ -> ()
+        else
+            nsHost.Stop()
+            host.Start(settings)
         this.RaisePropertyChanged("HasPendingChanges")
         this.RaisePropertyChanged("IsRunning")
         this.RaisePropertyChanged("CanStart")
@@ -608,6 +698,7 @@ type ScreenEngineViewModel() as this =
     member this.Stop() =
         applyTimer.Stop()
         host.Stop()
+        nsHost.Stop()
         isRecording <- false
         hasPendingChanges <- false
         status <- "Stopped"
@@ -621,11 +712,16 @@ type ScreenEngineViewModel() as this =
     member this.Apply() = this.Start()
 
     member this.SaveScreenshot() =
-        status <- if host.RequestScreenshot() then "Screenshot requested." else "The engine is not ready for capture commands yet."
+        let sent =
+            if useNeuralScreen then
+                Directory.CreateDirectory(this.CaptureFolder) |> ignore
+                nsHost.Screenshot(this.CaptureFolder)
+            else host.RequestScreenshot()
+        status <- if sent then "Screenshot requested." else "The engine is not ready for capture commands yet."
         this.RaisePropertyChanged("Status")
 
     member this.ToggleRecording() =
-        if host.ToggleRecording() then
+        if (if useNeuralScreen then nsHost.ToggleRecording() else host.ToggleRecording()) then
             isRecording <- not isRecording
             status <- if isRecording then "Recording started." else "Recording is being finalized."
             this.RaisePropertyChanged("IsRecording")
@@ -675,4 +771,6 @@ type ScreenEngineViewModel() as this =
         this.ScheduleApply()
 
     interface IDisposable with
-        member _.Dispose() = (host :> IDisposable).Dispose()
+        member _.Dispose() =
+            (host :> IDisposable).Dispose()
+            (nsHost :> IDisposable).Dispose()
