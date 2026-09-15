@@ -25,7 +25,10 @@ type App() =
             // The Screen Engine window lives on its own, so closing the main
             // window leaves it running; the app ends with the last window.
             desktop.ShutdownMode <- Avalonia.Controls.ShutdownMode.OnLastWindowClose
-            desktop.MainWindow <- MainWindow(DataContext = vm)
+            let window = MainWindow(DataContext = vm)
+            vm.ScreenEngine.ControlsRequested.Add(fun () ->
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () -> window.ToggleScreenEngineOverlay()))
+            desktop.MainWindow <- window
         | _ -> ()
 
         base.OnFrameworkInitializationCompleted()

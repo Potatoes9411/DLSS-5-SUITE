@@ -16,6 +16,8 @@ type ScreenEngineWindow() as this =
     inherit Window()
 
     let mutable isPicking = false
+    let mutable isOverlay = false
+    let reopenSuiteRequested = Event<unit>()
 
     do AvaloniaXamlLoader.Load(this)
 
@@ -30,7 +32,23 @@ type ScreenEngineWindow() as this =
     member this.OnHeaderPointerPressed(sender: obj, e: PointerPressedEventArgs) =
         if e.GetCurrentPoint(this).Properties.IsLeftButtonPressed then this.BeginMoveDrag(e)
 
-    member this.OnCloseClicked(sender: obj, e: RoutedEventArgs) = this.Close()
+    member this.OnCloseClicked(sender: obj, e: RoutedEventArgs) = if isOverlay then this.Hide() else this.Close()
+
+    /// Raised by the "Reopen DLSS 5 SUITE window" button.
+    member _.ReopenSuiteRequested = reopenSuiteRequested.Publish
+    member _.IsOverlay = isOverlay
+
+    /// Overlay: above everything, including DLSS 5's own picture, with the
+    /// button that goes back to the app. Otherwise an ordinary window.
+    member this.SetOverlay(on: bool) =
+        isOverlay <- on
+        this.Topmost <- on
+        match this.FindControl<Control>("OverlayBar") with
+        | null -> ()
+        | bar -> bar.IsVisible <- on
+        if on && this.WindowState = WindowState.Minimized then this.WindowState <- WindowState.Normal
+
+    member this.OnReopenSuiteClicked(sender: obj, e: RoutedEventArgs) = reopenSuiteRequested.Trigger()
     member this.OnMinimizeClicked(sender: obj, e: RoutedEventArgs) = this.WindowState <- WindowState.Minimized
 
     // ----- crosshair: press, drag onto a window, let go -----

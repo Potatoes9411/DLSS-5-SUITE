@@ -89,6 +89,7 @@ module NeuralScreen =
 
     let private configPath () = Path.Combine(dataDir (), "config.json")
     let private inboxDir () = Path.Combine(dataDir (), "inbox")
+    let private outboxDir () = Path.Combine(dataDir (), "outbox")
 
     // =====================================================================
     // WHAT NEURALSCREEN IS TOLD
@@ -169,6 +170,21 @@ module NeuralScreen =
         let mutable proc: Process = null
         let mutable stopping = false
         let stateChanged = Event<string>()
+        let controlsRequested = Event<unit>()
+
+        /// What NeuralScreen tells SUITE: Num2 asks for the control window.
+        let outboxTimer =
+            new Threading.Timer(
+                (fun _ ->
+                    try
+                        let outbox = outboxDir ()
+                        if Directory.Exists outbox then
+                            for file in Directory.GetFiles(outbox, "*.json") |> Array.sort do
+                                let text = (try File.ReadAllText file with _ -> "")
+                                (try File.Delete file with _ -> ())
+                                if text.Contains("\"controls\"") then controlsRequested.Trigger()
+                    with _ -> ()),
+                null, 150, 150)
 
         let isAlive () = not (isNull proc) && (try not proc.HasExited with _ -> false)
 
@@ -196,6 +212,9 @@ module NeuralScreen =
 
         member _.IsRunning = isAlive ()
 
+        [<CLIEvent>]
+        member _.ControlsRequested = controlsRequested.Publish
+
         member this.Start(settings: ScreenEngine.Settings, captureFolder: string, neuralRendering: bool) =
             if not (isAvailable ()) then
                 stateChanged.Trigger "NeuralScreen is not included in this build."
@@ -208,6 +227,7 @@ module NeuralScreen =
                     // window, NR off) are kept by the bridge once it starts.
                     (try
                         for old in Directory.GetFiles(inboxDir ()) do File.Delete old
+                        for old in Directory.GetFiles(outboxDir ()) do File.Delete old
                      with _ -> ())
                     let psi = ProcessStartInfo(pythonPath ())
                     psi.UseShellExecute <- false
@@ -216,6 +236,7 @@ module NeuralScreen =
                     for a in [ "-u"; Path.Combine(folder (), "main.py"); "--config"; configPath () ] do
                         psi.ArgumentList.Add(a)
                     psi.Environment.["NS_SUITE_INBOX"] <- inboxDir ()
+                    psi.Environment.["NS_SUITE_OUTBOX"] <- outboxDir ()
                     let p = new Process(StartInfo = psi, EnableRaisingEvents = true)
                     p.Exited.Add(fun _ ->
                         if not stopping then
@@ -265,4 +286,6 @@ module NeuralScreen =
             send (JsonObject([ Collections.Generic.KeyValuePair("command", JsonValue.Create("record") :> JsonNode) ]))
 
         interface IDisposable with
-            member this.Dispose() = this.Stop()
+            member this.Dispose() =
+                outboxTimer.Dispose()
+                this.Stop()

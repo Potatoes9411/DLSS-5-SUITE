@@ -131,6 +131,10 @@ type ScreenEngineViewModel() as this =
         else "Stopped"
 
     member _.IsRunning = host.IsRunning || nsHost.IsRunning
+
+    /// Num2 in NeuralScreen: SUITE's control window, as an overlay.
+    [<CLIEvent>]
+    member _.ControlsRequested = nsHost.ControlsRequested
     member this.CanStart = this.IsAvailable && not this.IsRunning
     member _.HasPendingChanges = hasPendingChanges
     member _.IsRecording = isRecording

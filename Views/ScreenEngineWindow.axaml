@@ -58,6 +58,12 @@
                 <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" Padding="16,4,16,16">
                     <Border Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
                         <StackPanel Spacing="12" DataContext="{Binding ScreenEngine}">
+                            <Border x:Name="OverlayBar" IsVisible="False" Background="#2200FF88" BorderBrush="#5500FF88" BorderThickness="1" CornerRadius="12" Padding="12,8">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="DLSS 5 SUITE controls · Num2 hides them" Foreground="White" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Content="Reopen DLSS 5 SUITE window" Click="OnReopenSuiteClicked" />
+                                </Grid>
+                            </Border>
                             <StackPanel Spacing="6">
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
                                 <Panel Grid.Column="0" ToolTip.Tip="{Binding ScreenEngineTip}" ToolTip.ShowOnDisabled="True" Background="Transparent">

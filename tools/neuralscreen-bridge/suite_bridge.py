@@ -30,12 +30,49 @@ def active() -> bool:
     return bool(os.environ.get("NS_SUITE_INBOX"))
 
 
+SUITE_NAME = "DLSS 5 SUITE"
+
+
+def name(default: str = "NeuralScreen") -> str:
+    """What the program calls itself: DLSS 5 SUITE when SUITE runs it."""
+    return SUITE_NAME if active() else default
+
+
+def _brand() -> None:
+    """Every on-screen string that names the program names DLSS 5 SUITE."""
+    try:
+        import i18n
+        for strings in i18n.STRINGS.values():
+            for key, value in list(strings.items()):
+                if isinstance(value, str) and "NeuralScreen" in value:
+                    strings[key] = value.replace("NeuralScreen", SUITE_NAME)
+    except Exception as exc:
+        print(f"[suite] branding skipped: {exc}", file=sys.stderr)
+
+
+def notify(event: str) -> None:
+    """Tell SUITE something happened here - Num2 asks for its control window."""
+    outbox = os.environ.get("NS_SUITE_OUTBOX")
+    if not outbox:
+        return
+    try:
+        folder = Path(outbox)
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = f"{time.time_ns():020d}"
+        tmp = folder / f"{stamp}.tmp"
+        tmp.write_text(json.dumps({"event": event}), encoding="utf-8")
+        os.replace(tmp, folder / f"{stamp}.json")
+    except Exception as exc:
+        print(f"[suite] could not tell SUITE {event!r}: {exc}", file=sys.stderr)
+
+
 def start() -> None:
     inbox = os.environ.get("NS_SUITE_INBOX")
     if not inbox:
         return
     folder = Path(inbox)
     folder.mkdir(parents=True, exist_ok=True)
+    _brand()
     # SUITE empties the folder before it starts NeuralScreen, so anything here
     # was sent for this run - the window to capture, NR off - and is kept.
     threading.Thread(target=_poll, args=(folder,), name="suite-bridge", daemon=True).start()

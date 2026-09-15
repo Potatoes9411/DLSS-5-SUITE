@@ -1049,16 +1049,43 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.ScreenEngine.Stop()
         | _ -> ()
 
-    /// The Screen Engine has its own window; one at a time, raised if it is open.
-    member this.OnOpenScreenEngineClicked(sender: obj, e: RoutedEventArgs) =
+    member private this.ScreenEngineWindowOf() =
         match screenEngineWindow with
-        | Some window -> window.Activate()
+        | Some window -> window
         | None ->
             let window = ScreenEngineWindow(DataContext = this.DataContext)
             window.Closed.Add(fun _ -> screenEngineWindow <- None)
+            window.ReopenSuiteRequested.Add(fun () -> this.ReopenFromOverlay())
             screenEngineWindow <- Some window
-            // No owner: it stays open, and visible, whatever the main window does.
+            window
+
+    /// The Screen Engine has its own window; one at a time, raised if it is open.
+    member this.OnOpenScreenEngineClicked(sender: obj, e: RoutedEventArgs) =
+        let window = this.ScreenEngineWindowOf()
+        window.SetOverlay false
+        // No owner: it stays open, and visible, whatever the main window does.
+        window.Show()
+        window.Activate()
+
+    /// Num2 while NeuralScreen runs: the controls come up over whatever is on
+    /// screen, and Num2 again puts them away.
+    member this.ToggleScreenEngineOverlay() =
+        let window = this.ScreenEngineWindowOf()
+        if window.IsOverlay && window.IsVisible then window.Hide()
+        else
+            window.SetOverlay true
             window.Show()
+            window.Activate()
+
+    /// "Reopen DLSS 5 SUITE window": leave the overlay for the app itself.
+    member this.ReopenFromOverlay() =
+        screenEngineWindow |> Option.iter (fun window -> window.SetOverlay false; window.Hide())
+        this.Show()
+        if this.WindowState = WindowState.Minimized then this.WindowState <- WindowState.Normal
+        this.Activate()
+        match this.DataContext with
+        | :? MainViewModel as vm when not vm.IsSettingsOpen -> vm.ToggleSettings()
+        | _ -> ()
 
     member this.OnCheckLosslessScalingClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
