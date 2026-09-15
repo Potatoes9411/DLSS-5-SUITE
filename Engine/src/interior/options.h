@@ -83,6 +83,7 @@ struct Options
     CompareMode compare;
     ColorFormat format;
     bool captureBorder;
+    DirectoryPath captureFolder; // empty keeps Captures under app data or beside the executable
     DirectoryPath ngxPath;
     std::optional<NgxAppId> ngxAppId;
     ProjectIdText ngxProjectId;

@@ -1,6 +1,7 @@
 namespace DLSS_5_MANAGER.ViewModels
 
 open System
+open System.IO
 open Avalonia.Threading
 open DLSS_5_MANAGER.Services
 open DLSS_5_MANAGER.Services.ScreenEngine
@@ -17,9 +18,13 @@ type ScreenEngineViewModel() as this =
     let host = new Host()
     let mutable settings = load ()
     let mutable monitors: MonitorEntry list = []
+    let mutable windows: WindowEntry list = []
     let mutable status = ""
     let mutable hasPendingChanges = false
     let mutable isAdvancedOpen = false
+    let mutable isRecording = false
+    let mutable selectedSweepIndex = 0
+    let mutable sweepValues = 5.0
 
     let styles = [ Standard, "Standard"; Natural, "Natural"; Cinematic, "Cinematic" ]
     let superResolutions = [ SrAuto, "Automatic"; SrDlaa, "DLAA (native resolution)"; SrOff, "Off" ]
@@ -40,6 +45,7 @@ type ScreenEngineViewModel() as this =
         // where its locked executable would break the install.
         AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> host.Stop())
         monitors <- listMonitors ()
+        windows <- listVisibleWindows ()
 
         host.StateChanged.Add(fun message ->
             Dispatcher.UIThread.Post(fun () ->
@@ -58,6 +64,8 @@ type ScreenEngineViewModel() as this =
     member _.IsRunning = host.IsRunning
     member this.CanStart = this.IsAvailable && not host.IsRunning
     member _.HasPendingChanges = hasPendingChanges
+    member _.IsRecording = isRecording
+    member _.RecordButtonText = if isRecording then "Stop recording" else "Record video"
     member this.IsAdvancedOpen
         with get () = isAdvancedOpen
         and set value = this.SetProperty(&isAdvancedOpen, value) |> ignore
@@ -126,6 +134,30 @@ type ScreenEngineViewModel() as this =
             if v <> settings.Window then
                 this.Change { settings with Window = v }
                 this.RaisePropertyChanged("Window")
+
+    member this.RefreshWindows() =
+        windows <- listVisibleWindows ()
+        this.RaisePropertyChanged("WindowOptions")
+        this.RaisePropertyChanged("SelectedWindowIndex")
+
+    member _.WindowOptions =
+        [ yield "Choose a running window..."
+          yield! windows |> List.map (fun entry -> entry.Title) ]
+
+    member _.SelectedWindowIndex
+        with get () =
+            windows
+            |> List.tryFindIndex (fun entry -> sprintf "0x%X" (uint64 (entry.Handle.ToInt64())) = settings.Window)
+            |> Option.map ((+) 1)
+            |> Option.defaultValue 0
+        and set value =
+            if value > 0 && value <= windows.Length then
+                let selected = windows.[value - 1]
+                let handle = sprintf "0x%X" (uint64 (selected.Handle.ToInt64()))
+                if handle <> settings.Window then
+                    this.Change { settings with Window = handle }
+                    this.RaisePropertyChanged("Window")
+                    this.RaisePropertyChanged("SelectedWindowIndex")
 
     // ----- DLSS 5 -----
     member _.NeuralRendering
@@ -306,6 +338,16 @@ type ScreenEngineViewModel() as this =
         with get () = settings.Advanced.DebugLayer
         and set value = if value <> settings.Advanced.DebugLayer then this.ChangeAdvanced((fun a -> { a with DebugLayer = value }), "DebugLayer")
 
+    member _.CaptureFolder
+        with get () =
+            if String.IsNullOrWhiteSpace(settings.Advanced.CaptureFolder) then
+                Path.Combine(dataDir (), "Captures")
+            else settings.Advanced.CaptureFolder
+        and set (value: string) =
+            let folder = if isNull value then "" else value.Trim()
+            if folder <> settings.Advanced.CaptureFolder then
+                this.ChangeAdvanced((fun a -> { a with CaptureFolder = folder }), "CaptureFolder")
+
     member _.ExclusionLog
         with get () = settings.Advanced.ExclusionLog
         and set value = if value <> settings.Advanced.ExclusionLog then this.ChangeAdvanced((fun a -> { a with ExclusionLog = value }), "ExclusionLog")
@@ -420,20 +462,59 @@ type ScreenEngineViewModel() as this =
 
     member this.Stop() =
         host.Stop()
+        isRecording <- false
         hasPendingChanges <- false
         status <- "Stopped"
         this.RaisePropertyChanged("Status")
         this.RaisePropertyChanged("HasPendingChanges")
         this.RaisePropertyChanged("IsRunning")
         this.RaisePropertyChanged("CanStart")
+        this.RaisePropertyChanged("IsRecording")
+        this.RaisePropertyChanged("RecordButtonText")
 
     member this.Apply() = this.Start()
+
+    member this.SaveScreenshot() =
+        status <- if host.RequestScreenshot() then "Screenshot requested." else "The engine is not ready for capture commands yet."
+        this.RaisePropertyChanged("Status")
+
+    member this.ToggleRecording() =
+        if host.ToggleRecording() then
+            isRecording <- not isRecording
+            status <- if isRecording then "Recording started." else "Recording is being finalized."
+            this.RaisePropertyChanged("IsRecording")
+            this.RaisePropertyChanged("RecordButtonText")
+        else
+            status <- "The engine is not ready for capture commands yet."
+        this.RaisePropertyChanged("Status")
+
+    member _.SweepOptions = [ "Intensity"; "Local structure"; "Local tone"; "Skin structure"; "Style"; "Auto mask"; "Passes" ]
+
+    member _.SelectedSweepIndex
+        with get () = selectedSweepIndex
+        and set value =
+            if value >= 0 && value <= 6 && value <> selectedSweepIndex then
+                selectedSweepIndex <- value
+                this.RaisePropertyChanged("SelectedSweepIndex")
+
+    member _.SweepValues
+        with get () = sweepValues
+        and set (value: float) =
+            let rounded = Math.Clamp(Math.Round(value), 2.0, 50.0)
+            if rounded <> sweepValues then
+                sweepValues <- rounded
+                this.RaisePropertyChanged("SweepValues")
+
+    member this.StartComparisonSweep() =
+        let values = if selectedSweepIndex = 4 then 3 elif selectedSweepIndex = 5 then 2 else int sweepValues
+        status <- if host.StartComparison(selectedSweepIndex, values) then "Comparison sweep started." else "The engine is not ready for capture commands yet."
+        this.RaisePropertyChanged("Status")
 
     member this.ResetToDefaults() =
         settings <- defaults
         save settings
         for name in
-            [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "NeuralRendering"
+            [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "SelectedWindowIndex"; "CaptureFolder"; "NeuralRendering"
               "Intensity"; "IntensityText"; "LocalStructure"; "LocalStructureText"; "LocalTone"; "LocalToneText"
               "Passes"; "PassesText"; "AutoMask"; "SelectedStyleIndex"; "SelectedSuperResolutionIndex"
               "SelectedCompareIndex"; "VSync"; "ShowPanel"; "NrPreset"; "SrPreset"; "MvLevel"

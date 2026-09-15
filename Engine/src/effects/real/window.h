@@ -25,11 +25,17 @@ struct WindowEvents
     bool quit;
     bool toggleOriginal;
     bool toggleSplit;
+    bool screenshot;
+    bool record;
+    std::uint64_t comparisonSweep;
 };
 
 constexpr int kHotkeyToggleOriginal = 1;
 constexpr int kHotkeyToggleSplit = 2;
 constexpr int kHotkeyQuit = 3;
+constexpr UINT kSuiteScreenshotMessage = WM_APP + 0x451;
+constexpr UINT kSuiteRecordMessage = WM_APP + 0x452;
+constexpr UINT kSuiteComparisonMessage = WM_APP + 0x453;
 
 // Registers a window class, treating "already registered" as success. Shared with the control panel.
 [[nodiscard]] infra::Status<Error> RegisterWindowClass(const WNDCLASSEXW& description) noexcept;

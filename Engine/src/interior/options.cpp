@@ -50,6 +50,7 @@ enum class OptionId : std::uint8_t {
     Compare,
     Format,
     CaptureBorder,
+    CaptureFolder,
     NgxPath,
     NgxAppId,
     NgxProjectId,
@@ -102,7 +103,7 @@ struct OptionSpec
     ValueKind kind;
 };
 
-constexpr std::array<OptionSpec, 51> kSpecs{ {
+constexpr std::array<OptionSpec, 52> kSpecs{ {
     { L"help", OptionId::Help, ValueKind::Flag },
     { L"list-monitors", OptionId::ListMonitors, ValueKind::Flag },
     { L"monitor", OptionId::Monitor, ValueKind::MonitorSel },
@@ -134,6 +135,7 @@ constexpr std::array<OptionSpec, 51> kSpecs{ {
     { L"compare", OptionId::Compare, ValueKind::Compare },
     { L"format", OptionId::Format, ValueKind::Format },
     { L"capture-border", OptionId::CaptureBorder, ValueKind::Bool },
+    { L"capture-folder", OptionId::CaptureFolder, ValueKind::Path },
     { L"ngx-path", OptionId::NgxPath, ValueKind::Path },
     { L"ngx-app-id", OptionId::NgxAppId, ValueKind::Hex },
     { L"ngx-project-id", OptionId::NgxProjectId, ValueKind::Text },
@@ -381,6 +383,7 @@ Options DefaultOptions() noexcept
         ColorFormat::Rgba8,
         false,
         DirectoryPath{},
+        DirectoryPath{},
         std::nullopt,
         *kDefaultProjectId,
         NgxLogLevel::Off,
@@ -525,6 +528,7 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                 ValueOr(list, OptionId::Compare, d.compare),
                 ValueOr(list, OptionId::Format, d.format),
                 ValueOr(list, OptionId::CaptureBorder, d.captureBorder),
+                ValueOr(list, OptionId::CaptureFolder, d.captureFolder),
                 ValueOr(list, OptionId::NgxPath, d.ngxPath),
                 appId,
                 projectId,

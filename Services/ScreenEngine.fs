@@ -4,6 +4,8 @@ open System
 open System.Diagnostics
 open System.Globalization
 open System.IO
+open System.Runtime.InteropServices
+open System.Text
 open System.Text.Json
 
 /// DLSS 5 on the whole screen, run by SUITE's own engine.
@@ -20,6 +22,29 @@ open System.Text.Json
 /// plain translation - see toArguments - with the rules the engine enforces
 /// mirrored here, so SUITE never hands it a value it would refuse.
 module ScreenEngine =
+
+    module private SuiteControl =
+        [<Literal>]
+        let private OutputWindowClass = "FullScreenWrapperForDLSS5OutputWindow"
+
+        [<Literal>]
+        let ScreenshotMessage = 0x8451u
+
+        [<Literal>]
+        let RecordMessage = 0x8452u
+
+        [<Literal>]
+        let ComparisonMessage = 0x8453u
+
+        [<DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)>]
+        extern nativeint FindWindowW(string className, string windowName)
+
+        [<DllImport("user32.dll", SetLastError = true)>]
+        extern bool PostMessageW(nativeint window, uint32 message, unativeint wParam, nativeint lParam)
+
+        let post message payload =
+            let window = FindWindowW(OutputWindowClass, null)
+            window <> 0n && PostMessageW(window, message, 0un, nativeint payload)
 
     // =====================================================================
     // SETTINGS
@@ -66,8 +91,8 @@ module ScreenEngine =
     /// adapter, MvScaleAuto for the motion scales, "" for the NGX ids.
     [<CLIMutable>]
     type AdvancedSettings =
-        { /// Runs the engine's own control panel (--gui on) alongside SUITE:
-          /// snapshots, recording, sweeps and the window-picking crosshair.
+        { /// Runs the engine's own control panel (--gui on) alongside SUITE.
+          /// SUITE also exposes capture actions and visible-window selection directly.
           ShowPanel: bool
           NrPreset: int
           UiCorrection: bool
@@ -89,6 +114,7 @@ module ScreenEngine =
           /// 0 to 1.
           ResetThreshold: float
           CaptureBorder: bool
+          CaptureFolder: string
           /// 0 off, 1 on, 2 verbose.
           NgxLog: int
           /// Hex, non-zero; "" uses the project id instead.
@@ -128,6 +154,7 @@ module ScreenEngine =
           MvScaleY = 1.0
           ResetThreshold = 0.5
           CaptureBorder = false
+          CaptureFolder = ""
           NgxLog = 0
           NgxAppId = ""
           NgxProjectId = ""
@@ -221,6 +248,7 @@ module ScreenEngine =
         let text (value: string) = if isNull value then "" else value.Trim()
         let appId = text a.NgxAppId
         let projectId = text a.NgxProjectId
+        let captureFolder = text a.CaptureFolder
 
         { a with
             NrPreset = max 0 a.NrPreset
@@ -238,6 +266,7 @@ module ScreenEngine =
             NgxLog = Math.Clamp(a.NgxLog, 0, 2)
             NgxAppId = (if isValidAppId appId then appId else "")
             NgxProjectId = (if isValidProjectId projectId then projectId else "")
+            CaptureFolder = captureFolder
             Adapter = max -1 a.Adapter
             LogLevel = Math.Clamp(a.LogLevel, 0, 3) }
 
@@ -371,6 +400,8 @@ module ScreenEngine =
                   | CursorOff -> "off"
               )
           yield opt "capture-border" (onOff a.CaptureBorder)
+          if a.CaptureFolder <> "" then
+              yield! [ "--capture-folder"; a.CaptureFolder ]
           yield opt "vsync" (onOff s.VSync)
           yield
               opt "compare" (
@@ -436,6 +467,10 @@ module ScreenEngine =
           Height: int
           IsPrimary: bool }
 
+    type WindowEntry =
+        { Handle: nativeint
+          Title: string }
+
     /// The order the engine numbers monitors in (interior::Ordered): primary
     /// first, then left edge, then top edge. --monitor N and --target N are
     /// indexes into this order, so SUITE must use the same one.
@@ -460,12 +495,28 @@ module ScreenEngine =
             val mutable dwFlags: uint32
 
         type MonitorEnumProc = delegate of nativeint * nativeint * nativeint * nativeint -> bool
+        type WindowEnumProc = delegate of nativeint * nativeint -> bool
 
         [<DllImport("user32.dll")>]
         extern bool EnumDisplayMonitors(nativeint hdc, nativeint clip, MonitorEnumProc callback, nativeint data)
 
         [<DllImport("user32.dll")>]
         extern bool GetMonitorInfoW(nativeint monitor, MONITORINFO& info)
+
+        [<DllImport("user32.dll")>]
+        extern bool EnumWindows(WindowEnumProc callback, nativeint data)
+
+        [<DllImport("user32.dll")>]
+        extern bool IsWindowVisible(nativeint window)
+
+        [<DllImport("user32.dll", CharSet = CharSet.Unicode)>]
+        extern int GetWindowTextLengthW(nativeint window)
+
+        [<DllImport("user32.dll", CharSet = CharSet.Unicode)>]
+        extern int GetWindowTextW(nativeint window, StringBuilder text, int maxCount)
+
+        [<DllImport("user32.dll")>]
+        extern uint32 GetWindowThreadProcessId(nativeint window, uint32& processId)
 
     /// Every connected monitor, in the engine's order. Empty if Windows will
     /// not say.
@@ -493,6 +544,39 @@ module ScreenEngine =
             ()
 
         engineOrder (List.ofSeq found)
+
+    /// Visible top-level windows that can be captured. The handle is passed to
+    /// the engine instead of the title so duplicate titles remain unambiguous.
+    let listVisibleWindows () =
+        let found = Collections.Generic.List<WindowEntry>()
+        let ownProcessId = uint32 Environment.ProcessId
+
+        let callback =
+            Native.WindowEnumProc(fun window _ ->
+                try
+                    let length = Native.GetWindowTextLengthW(window)
+                    let mutable processId = 0u
+                    Native.GetWindowThreadProcessId(window, &processId) |> ignore
+                    if Native.IsWindowVisible(window) && length > 0 && processId <> ownProcessId then
+                        let title = StringBuilder(length + 1)
+                        if Native.GetWindowTextW(window, title, title.Capacity) > 0 then
+                            let value = title.ToString().Trim()
+                            if value <> "" && not (value.StartsWith("Full-Screen Wrapper for DLSS5", StringComparison.OrdinalIgnoreCase)) then
+                                found.Add { Handle = window; Title = value }
+                with _ ->
+                    ()
+                true)
+
+        try
+            Native.EnumWindows(callback, 0n) |> ignore
+            GC.KeepAlive(callback)
+        with _ ->
+            ()
+
+        found
+        |> Seq.distinctBy (fun entry -> entry.Handle)
+        |> Seq.sortBy (fun entry -> entry.Title.ToUpperInvariant())
+        |> List.ofSeq
 
     // =====================================================================
     // PERSISTENCE
@@ -646,6 +730,18 @@ module ScreenEngine =
         member _.StateChanged = stateChanged.Publish
 
         member _.IsRunning = isAlive ()
+
+        member _.RequestScreenshot() =
+            isAlive () && SuiteControl.post SuiteControl.ScreenshotMessage 0L
+
+        member _.ToggleRecording() =
+            isAlive () && SuiteControl.post SuiteControl.RecordMessage 0L
+
+        member _.StartComparison(parameter: int, values: int) =
+            let safeParameter = Math.Clamp(parameter, 0, 6)
+            let safeValues = Math.Clamp(values, 2, 50)
+            let payload = int64 safeValues <<< (safeParameter * 6)
+            isAlive () && SuiteControl.post SuiteControl.ComparisonMessage payload
 
         member this.Start(settings: Settings) =
             if not (isAvailable ()) then

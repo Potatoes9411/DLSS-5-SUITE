@@ -1051,6 +1051,46 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.ScreenEngine.ResetToDefaults()
         | _ -> ()
 
+    member this.OnScreenEngineScreenshotClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.SaveScreenshot()
+        | _ -> ()
+
+    member this.OnScreenEngineRecordClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.ToggleRecording()
+        | _ -> ()
+
+    member this.OnScreenEngineSweepClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.StartComparisonSweep()
+        | _ -> ()
+
+    member this.OnScreenEngineRefreshWindowsClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.RefreshWindows()
+        | _ -> ()
+
+    member this.OnScreenEngineCaptureFolderClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let options = FolderPickerOpenOptions(Title = "Choose the Screen Engine capture folder", AllowMultiple = false)
+            let! folders = this.StorageProvider.OpenFolderPickerAsync(options) |> Async.AwaitTask
+            if folders.Count > 0 then
+                match this.DataContext with
+                | :? MainViewModel as vm -> vm.ScreenEngine.CaptureFolder <- folders.[0].Path.LocalPath
+                | _ -> ()
+        }
+        |> Async.StartImmediate
+
+    member this.OnScreenEngineOpenCaptureFolderClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm ->
+            try
+                Directory.CreateDirectory(vm.ScreenEngine.CaptureFolder) |> ignore
+                Process.Start(ProcessStartInfo(vm.ScreenEngine.CaptureFolder, UseShellExecute = true)) |> ignore
+            with _ -> ()
+        | _ -> ()
+
     member this.OnCheckLosslessScalingClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> vm.CheckLosslessScaling()

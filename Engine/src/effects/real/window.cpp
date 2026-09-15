@@ -580,16 +580,19 @@ Result<WindowEvents, Error> PumpEvents(const OutputWindow&) noexcept
             static constexpr auto Dispatched = [] [[nodiscard]] (const Pump& p, const MSG& msg) noexcept -> Pump {
                 static constexpr auto Merged = [] [[nodiscard]] (const WindowEvents& a, const WindowEvents& b) noexcept -> WindowEvents {
                     static constexpr auto Either = [] [[nodiscard]] (bool a, bool b) noexcept -> bool { return a || b; };
-                    return WindowEvents{ Either(a.quit, b.quit), Either(a.toggleOriginal, b.toggleOriginal), Either(a.toggleSplit, b.toggleSplit) };
+                    return WindowEvents{ Either(a.quit, b.quit), Either(a.toggleOriginal, b.toggleOriginal), Either(a.toggleSplit, b.toggleSplit), Either(a.screenshot, b.screenshot),
+                                         Either(a.record, b.record), a.comparisonSweep | b.comparisonSweep };
                 };
 
                 static constexpr auto EventsOf = [] [[nodiscard]] (const MSG& msg) noexcept -> WindowEvents {
                     static constexpr auto EventsOfHotkey = [] [[nodiscard]] (WPARAM id) noexcept -> WindowEvents {
-                        return WindowEvents{ id == static_cast<WPARAM>(kHotkeyQuit), id == static_cast<WPARAM>(kHotkeyToggleOriginal), id == static_cast<WPARAM>(kHotkeyToggleSplit) };
+                        return WindowEvents{ id == static_cast<WPARAM>(kHotkeyQuit), id == static_cast<WPARAM>(kHotkeyToggleOriginal), id == static_cast<WPARAM>(kHotkeyToggleSplit), false, false,
+                                             0 };
                     };
                     if (msg.message == WM_HOTKEY)
                         return EventsOfHotkey(msg.wParam);
-                    return WindowEvents{ msg.message == WM_QUIT, false, false };
+                    return WindowEvents{ msg.message == WM_QUIT, false, false, msg.message == kSuiteScreenshotMessage, msg.message == kSuiteRecordMessage,
+                                         msg.message == kSuiteComparisonMessage ? static_cast<std::uint64_t>(msg.lParam) : 0 };
                 };
                 ::TranslateMessage(&msg);
                 ::DispatchMessageW(&msg);
@@ -606,7 +609,8 @@ Result<WindowEvents, Error> PumpEvents(const OutputWindow&) noexcept
         return Peeked(p, msg, received);
     };
     const Pump pumped =
-        std::ranges::fold_left(std::views::iota(std::uint32_t{ 0 }, kMaxMessagesPerPump), Pump{ WindowEvents{ false, false, false }, false }, [](const Pump& p, std::uint32_t) { return PumpOne(p); });
+        std::ranges::fold_left(std::views::iota(std::uint32_t{ 0 }, kMaxMessagesPerPump), Pump{ WindowEvents{ false, false, false, false, false, 0 }, false },
+                               [](const Pump& p, std::uint32_t) { return PumpOne(p); });
     return pumped.events;
 }
 

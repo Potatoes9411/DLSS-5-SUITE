@@ -43,6 +43,7 @@ struct EnvironmentSettings
     bool asksToBeLeftOut;                            // the capture is asked to leave our own windows out of it by name
     bool outsideTheSource;                           // the overlay covers something other than what is being captured
     interior::ScreenRect source;                     // where what is captured is on the screen, which is where a picture's top-left pixel is
+    interior::DirectoryPath captureFolder;           // where SUITE-issued screenshots, recordings and sweeps are written
 };
 
 class RealEnvironment final

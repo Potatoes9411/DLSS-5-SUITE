@@ -165,6 +165,7 @@ let private everythingChanged =
                 MvScaleY = -1.5
                 ResetThreshold = 0.75
                 CaptureBorder = true
+                CaptureFolder = @"C:\Captures With Spaces"
                 NgxLog = 2
                 NgxAppId = "0x1234"
                 NgxProjectId = "5e9b2a44-7c31-4d0e-9f2b-8d3c1a6e7f10"
@@ -211,6 +212,7 @@ let ``every advanced option reaches the engine in its own words`` () =
     expect "--mv-scale-y" "-1.5"
     expect "--reset-threshold" "0.75"
     expect "--capture-border" "on"
+    expect "--capture-folder" @"C:\Captures With Spaces"
     expect "--ngx-log" "2"
     expect "--ngx-app-id" "0x1234"
     expect "--ngx-project-id" "5e9b2a44-7c31-4d0e-9f2b-8d3c1a6e7f10"

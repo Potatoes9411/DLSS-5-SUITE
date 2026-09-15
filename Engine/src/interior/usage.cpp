@@ -23,6 +23,7 @@ std::string_view UsageText() noexcept
            "  --target N                 Present on monitor N instead of the source monitor (enables upscaling)\n"
            "  --cursor auto|on|off       Include the cursor in the capture (auto: only when --target differs)\n"
            "  --capture-border on|off    Let Windows draw its capture border (default off)\n"
+           "  --capture-folder DIR       Save screenshots, recordings and comparison sweeps here\n"
            "  --vsync on|off             Present synchronised to the display (default off)\n"
            "  --compare off|split|original\n"
            "                             Comparison view: split screen or the untouched capture\n"

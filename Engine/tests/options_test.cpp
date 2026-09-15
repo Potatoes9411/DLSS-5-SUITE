@@ -142,6 +142,13 @@ constexpr std::array<std::wstring_view, 12> kVocabulary{ L"--monitor", L"all",  
     return !DefaultOptions().exclusionLog && asked.has_value() && asked->exclusionLog;
 }
 
+[[nodiscard]] bool CaptureFolderRoundTrips(infra::RngState&) noexcept
+{
+    const std::array<std::wstring_view, 2> args{ L"--capture-folder", L"C:\\Captures With Spaces" };
+    const auto parsed = ParseOptions(args);
+    return parsed.has_value() && parsed->captureFolder.Get() == L"C:\\Captures With Spaces";
+}
+
 [[nodiscard]] bool ShowInertRoundTrips(infra::RngState& rng) noexcept
 {
     const bool wanted = proptest::DrawBool(rng);
@@ -219,7 +226,7 @@ constexpr std::array<std::pair<std::wstring_view, bool>, 8> kSpellings{
 [[nodiscard]] bool DefaultCaptureMatchesTheDocumentation(const Options& d) noexcept
 {
     return d.source.kind == MonitorSelectionKind::Primary && !d.target.has_value() && d.cursor == CursorMode::Auto && !d.vsync && d.compare == CompareMode::Off && d.format == ColorFormat::Rgba8 &&
-           !d.captureBorder && d.ngxLogLevel == NgxLogLevel::Off && !d.ngxAppId.has_value() && d.ngxPath.IsEmpty() && d.appDataPath.IsEmpty();
+           !d.captureBorder && d.captureFolder.IsEmpty() && d.ngxLogLevel == NgxLogLevel::Off && !d.ngxAppId.has_value() && d.ngxPath.IsEmpty() && d.appDataPath.IsEmpty();
 }
 
 [[nodiscard]] bool DefaultWindowMatchesTheDocumentation(const Options& d) noexcept
@@ -266,6 +273,7 @@ std::uint32_t OptionsSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("--depth-inverted round-trips", seed, 20, DepthInversionRoundTrips));
     failures += Failures(proptest::ForAll("--show-inert round-trips", seed, 20, ShowInertRoundTrips));
     failures += Failures(proptest::ForAll("the exclusion log is off unless asked for", seed, 1, TheExclusionLogIsOffUnlessAsked));
+    failures += Failures(proptest::ForAll("--capture-folder round-trips", seed, 1, CaptureFolderRoundTrips));
     failures += Failures(proptest::ForAll("--target with --monitor all is rejected", seed, 1, TargetWithAllIsRejected));
     failures += Failures(proptest::ForAll("last occurrence wins", seed, 20, LastOccurrenceWins));
     failures += Failures(proptest::ForAll("missing value is reported", seed, 1, MissingValueIsReported));

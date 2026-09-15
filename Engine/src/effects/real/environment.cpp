@@ -182,6 +182,7 @@ struct Surroundings
 {
     const OutputWindow& window;
     const ControlPanel* panel;
+    const EnvironmentSettings& settings;
 };
 
 struct Prepared
@@ -194,6 +195,52 @@ struct Prepared
     std::optional<PanelReading> reading;
     bool panelClosed;
 };
+
+constexpr std::uint64_t kSweepFieldBits = 6;
+constexpr std::uint64_t kSweepFieldMask = (1ULL << kSweepFieldBits) - 1ULL;
+
+[[nodiscard]] interior::SweepAxis SweepAxisAt(std::uint64_t packed, std::size_t index) noexcept
+{
+    const std::uint32_t values = static_cast<std::uint32_t>((packed >> (index * kSweepFieldBits)) & kSweepFieldMask);
+    return interior::SweepAxis{ values != 0, values };
+}
+
+[[nodiscard]] interior::SweepSpec SweepOf(std::uint64_t packed) noexcept
+{
+    return infra::Generated<interior::SweepAxis, interior::kSweepParameterCount>([packed](std::size_t index) { return SweepAxisAt(packed, index); });
+}
+
+[[nodiscard]] bool HasSuiteCaptureRequest(const WindowEvents& events) noexcept
+{
+    return events.screenshot || events.record || events.comparisonSweep != 0;
+}
+
+[[nodiscard]] ComparisonRequest SuiteComparisonOf(const WindowEvents& events) noexcept
+{
+    return ComparisonRequest{ .start = events.comparisonSweep != 0, .axes = SweepOf(events.comparisonSweep) };
+}
+
+[[nodiscard]] CaptureRequest SuiteCaptureOf(const WindowEvents& events, const interior::DirectoryPath& folder) noexcept
+{
+    return CaptureRequest{
+        .screenshot = events.screenshot, .record = events.record, .folder = folder, .everything = false, .cursor = false, .comparison = SuiteComparisonOf(events)
+    };
+}
+
+[[nodiscard]] PanelReading SuiteReadingOf(const WindowEvents& events, const EnvironmentSettings& settings, const interior::FrameState& state) noexcept
+{
+    return PanelReading{ state.controls, settings.surface, state.display, state.split, SuiteCaptureOf(events, settings.captureFolder) };
+}
+
+[[nodiscard]] PanelReading WithSuiteCapture(PanelReading reading, const WindowEvents& events) noexcept
+{
+    const CaptureRequest suite = SuiteCaptureOf(events, reading.capture.folder);
+    reading.capture.screenshot = reading.capture.screenshot || suite.screenshot; // WAIVER(R2): a panel reading is merged once with this frame's SUITE request.
+    reading.capture.record = reading.capture.record || suite.record;             // WAIVER(R2): a panel reading is merged once with this frame's SUITE request.
+    if (suite.comparison.start)
+        reading.capture.comparison = suite.comparison; // WAIVER(R2): the explicit SUITE sweep replaces the panel sweep for this one request.
+    return reading;
+}
 
 [[nodiscard]] FrameContext WithFence(const FrameContext& f, interior::FenceValue fence) noexcept
 {
@@ -469,7 +516,7 @@ Result<FrameStart, Error> RealEnvironment::BeginFrame(const interior::FrameState
                     return AcquireFrames(gpu.capture, number);
                 };
 
-                static constexpr auto ReadingOf = [] [[nodiscard]] (const ControlPanel* panel, const WindowEvents& events, const std::optional<interior::Fraction>& drag,
+                static constexpr auto ReadingOf = [] [[nodiscard]] (const Surroundings& surroundings, const WindowEvents& events, const std::optional<interior::Fraction>& drag,
                                                                     const interior::FrameState& state) noexcept -> std::optional<PanelReading> {
                     static constexpr auto SteerPanel = [](const ControlPanel& panel, const WindowEvents& events, const std::optional<interior::Fraction>& drag,
                                                           const interior::FrameState& state) noexcept -> void {
@@ -484,15 +531,15 @@ Result<FrameStart, Error> RealEnvironment::BeginFrame(const interior::FrameState
                         if (drag.has_value())
                             ApplySplit(panel, *drag);
                     };
-                    if (panel == nullptr)
-                        return std::nullopt;
-                    SteerPanel(*panel, events, drag, state);
-                    return ReadControlPanel(*panel, state.controls);
+                    if (surroundings.panel == nullptr)
+                        return HasSuiteCaptureRequest(events) ? std::optional<PanelReading>{ SuiteReadingOf(events, surroundings.settings, state) } : std::nullopt;
+                    SteerPanel(*surroundings.panel, events, drag, state);
+                    return WithSuiteCapture(ReadControlPanel(*surroundings.panel, state.controls), events);
                 };
 
                 static constexpr auto PanelWasClosed = [] [[nodiscard]] (const ControlPanel* panel) noexcept -> bool { return panel != nullptr && IsPanelClosed(*panel); };
                 const std::optional<interior::Fraction> drag = SplitRequest(s.window);
-                const std::optional<PanelReading> reading = ReadingOf(s.panel, events, drag, state);
+                const std::optional<PanelReading> reading = ReadingOf(s, events, drag, state);
                 return AcquiredUnlessHeld(gpu, state.number, held).and_then([&](bool fresh) {
                     return Now().and_then([&](interior::Instant now) {
                         return CurrentBackBuffer(gpu.presenter).transform([&](interior::BackBufferIndex index) {
@@ -542,7 +589,7 @@ Result<FrameStart, Error> RealEnvironment::BeginFrame(const interior::FrameState
             return Prepare(gpu, s, events, finestPixels, state, slot, held).transform([&](const Prepared& p) { return Begun{ ContextOf(state, slot, fence), InputOf(events, p), p.reading }; });
         });
     };
-    return Begin(gpu_, Surroundings{ window_, panel_ }, finestPixels_, frame_.fence, state, comparison_.has_value()).and_then([this](const Begun& begun) { return Began(begun); });
+    return Begin(gpu_, Surroundings{ window_, panel_, applied_ }, finestPixels_, frame_.fence, state, comparison_.has_value()).and_then([this](const Begun& begun) { return Began(begun); });
 }
 
 Result<FrameStart, Error> RealEnvironment::Accept(const Begun& begun) noexcept
@@ -627,7 +674,7 @@ Status<Error> RealEnvironment::Resurfaced(const interior::SurfaceSettings& surfa
     if (surface == applied_.surface)
         return {};
     // WAIVER(R2): what has been applied, replaced whole.
-    applied_ = EnvironmentSettings{ surface, applied_.captureCursor, applied_.followed, applied_.asksToBeLeftOut, applied_.outsideTheSource, applied_.source };
+    applied_ = EnvironmentSettings{ surface, applied_.captureCursor, applied_.followed, applied_.asksToBeLeftOut, applied_.outsideTheSource, applied_.source, applied_.captureFolder };
     return ApplySurface(gpu_, window_, applied_);
 }
 

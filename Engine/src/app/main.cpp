@@ -228,6 +228,11 @@ using Caption = real::ChoiceText;
     return b.options.appDataPath.IsEmpty() ? b.executableDirectory : b.options.appDataPath;
 }
 
+[[nodiscard]] interior::DirectoryPath CaptureFolderOf(const Base& b) noexcept
+{
+    return b.options.captureFolder.IsEmpty() ? interior::DefaultCaptureFolder(CaptureRootOf(b)) : b.options.captureFolder;
+}
+
 [[nodiscard]] Result<real::RealEnvironment, Error> Environment(const Console& console, const Base& b, Devices d, const SessionPlan& plan, const real::ControlPanel* panel) noexcept
 {
     static constexpr auto CreatedWindow = [] [[nodiscard]] (const Console& console, const Base& b) noexcept -> Result<real::OutputWindow, Error> {
@@ -256,7 +261,8 @@ using Caption = real::ChoiceText;
                                           .followed = FollowedWindow(b),
                                           .asksToBeLeftOut = AsksToBeLeftOut(o, b.geometry),
                                           .outsideTheSource = !OverlapsSource(o, b.geometry),
-                                          .source = b.geometry.sourceRect };
+                                          .source = b.geometry.sourceRect,
+                                          .captureFolder = CaptureFolderOf(b) };
     };
     return CreatedWindow(console, b).and_then([&](real::OutputWindow window) {
         return real::CreateEnvironment(std::move(d.held), std::move(d.device), std::move(d.runtime), plan, b.geometry, std::move(window), panel, SettingsOf(b, plan), b.options, console);
@@ -682,7 +688,7 @@ struct Ended
                                         .superResolution = OffersSuperResolution(d),
                                         .opticalFlow = kHasOpticalFlow,
                                         .modelAsNamed = ModelAsNamed(d),
-                                        .captureFolder = interior::DefaultCaptureFolder(CaptureRootOf(b)),
+                                        .captureFolder = CaptureFolderOf(b),
                                         .window = FollowedWindow(b) };
         };
 

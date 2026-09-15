@@ -975,6 +975,11 @@
                                         <StackPanel Spacing="4">
                                             <TextBlock Text="One window instead (title, optional)" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
                                             <TextBox Text="{Binding Window, Mode=TwoWay}" PlaceholderText="Leave empty to capture the monitor" Height="34" />
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <ComboBox Grid.Column="0" Classes="GlassComboBox" ItemsSource="{Binding WindowOptions}"
+                                                          SelectedIndex="{Binding SelectedWindowIndex, Mode=TwoWay}" Height="34" />
+                                                <Button Grid.Column="1" Content="Refresh windows" Click="OnScreenEngineRefreshWindowsClicked" />
+                                            </Grid>
                                         </StackPanel>
 
                                         <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
@@ -1020,6 +1025,28 @@
                                                     <ToggleSwitch IsChecked="{Binding AutoMask, Mode=TwoWay}" OnContent="" OffContent="" />
                                                 </StackPanel>
                                             </Grid>
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="CAPTURE TOOLS" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Button Content="Save screenshot" Click="OnScreenEngineScreenshotClicked" IsEnabled="{Binding IsRunning}" />
+                                                <Button Content="{Binding RecordButtonText}" Click="OnScreenEngineRecordClicked" IsEnabled="{Binding IsRunning}" />
+                                            </StackPanel>
+                                            <Grid ColumnDefinitions="*,100,Auto" ColumnSpacing="8">
+                                                <ComboBox Grid.Column="0" Classes="GlassComboBox" ItemsSource="{Binding SweepOptions}" SelectedIndex="{Binding SelectedSweepIndex, Mode=TwoWay}" Height="34" />
+                                                <NumericUpDown Grid.Column="1" Minimum="2" Maximum="50" Value="{Binding SweepValues, Mode=TwoWay}" Height="34" />
+                                                <Button Grid.Column="2" Content="Run comparison sweep" Click="OnScreenEngineSweepClicked" IsEnabled="{Binding IsRunning}" />
+                                            </Grid>
+                                            <TextBlock Text="Capture folder" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                                <TextBox Grid.Column="0" Text="{Binding CaptureFolder, Mode=TwoWay}" Height="34" />
+                                                <Button Grid.Column="1" Content="Browse" Click="OnScreenEngineCaptureFolderClicked" />
+                                                <Button Grid.Column="2" Content="Open" Click="OnScreenEngineOpenCaptureFolderClicked" />
+                                            </Grid>
+                                            <TextBlock Text="Screenshots, recordings and sweep comparisons are saved here." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
                                         </StackPanel>
 
                                         <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
