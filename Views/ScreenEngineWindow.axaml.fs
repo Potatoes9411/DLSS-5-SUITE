@@ -31,6 +31,7 @@ type ScreenEngineWindow() as this =
         if e.GetCurrentPoint(this).Properties.IsLeftButtonPressed then this.BeginMoveDrag(e)
 
     member this.OnCloseClicked(sender: obj, e: RoutedEventArgs) = this.Close()
+    member this.OnMinimizeClicked(sender: obj, e: RoutedEventArgs) = this.WindowState <- WindowState.Minimized
 
     // ----- crosshair: press, drag onto a window, let go -----
     member this.OnCrosshairPressed(sender: obj, e: PointerPressedEventArgs) =

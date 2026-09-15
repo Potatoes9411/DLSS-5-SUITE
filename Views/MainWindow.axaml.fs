@@ -1057,7 +1057,8 @@ type MainWindow() as this =
             let window = ScreenEngineWindow(DataContext = this.DataContext)
             window.Closed.Add(fun _ -> screenEngineWindow <- None)
             screenEngineWindow <- Some window
-            window.Show(this)
+            // No owner: it stays open, and visible, whatever the main window does.
+            window.Show()
 
     member this.OnCheckLosslessScalingClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with

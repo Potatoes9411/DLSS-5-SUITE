@@ -6,7 +6,8 @@
         Icon="/Assets/logo.ico"
         Title="Screen Engine - DLSS 5 SUITE"
         Width="640" Height="780" MinWidth="520" MinHeight="480"
-        WindowStartupLocation="CenterOwner"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
         TransparencyLevelHint="Transparent"
         Background="Transparent"
         WindowDecorations="None">
@@ -43,9 +44,14 @@
                             <TextBlock Text="SCREEN ENGINE" FontSize="12" FontWeight="Bold" Foreground="White" LetterSpacing="0.6" />
                             <TextBlock Text="DLSS 5 on any screen" FontSize="11" Foreground="#94A3B8" />
                         </StackPanel>
-                        <Button Grid.Column="2" Classes="GlassWindowControlBtn Close" Click="OnCloseClicked" ToolTip.Tip="Close" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button Classes="GlassWindowControlBtn" Click="OnMinimizeClicked" ToolTip.Tip="Minimize">
+                            <PathIcon Data="M 19,13 H 5 V 11 H 19 V 13 Z" Width="10" Height="10" Foreground="#A1A1AA" VerticalAlignment="Center" />
+                        </Button>
+                        <Button Classes="GlassWindowControlBtn Close" Click="OnCloseClicked" ToolTip.Tip="Close">
                             <PathIcon Data="M 19,6.41 L 17.59,5 L 12,10.59 L 6.41,5 L 5,6.41 L 10.59,12 L 5,17.59 L 6.41,19 L 12,13.41 L 17.59,19 L 19,17.59 L 13.41,12 Z" Width="10" Height="10" Foreground="#FF6961" VerticalAlignment="Center" />
                         </Button>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -59,7 +65,6 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                     <Button Classes="PrimaryActionBtn" Content="Start" Click="OnScreenEngineStartClicked" IsVisible="{Binding CanStart}" />
-                                    <Button Content="Apply changes" Click="OnScreenEngineApplyClicked" IsVisible="{Binding HasPendingChanges}" />
                                     <Button Content="Stop" Click="OnScreenEngineStopClicked" IsVisible="{Binding IsRunning}" />
                                 </StackPanel>
                             </Grid>
@@ -116,26 +121,26 @@
                             </Grid>
 
                             <StackPanel Spacing="10" IsVisible="{Binding NeuralRendering}">
-                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="Intensity" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                     <Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Intensity, Mode=TwoWay}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="2" Text="{Binding IntensityText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                    <TextBox Grid.Column="2" Text="{Binding IntensityText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" />
                                 </Grid>
-                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="Local structure" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
-                                    <Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding LocalStructure, Mode=TwoWay}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="2" Text="{Binding LocalStructureText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding LocalStructureSlider, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="2" Text="{Binding LocalStructureText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" />
                                 </Grid>
-                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="Local tone" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
-                                    <Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding LocalTone, Mode=TwoWay}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="2" Text="{Binding LocalToneText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding LocalToneSlider, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="2" Text="{Binding LocalToneText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" />
                                 </Grid>
-                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="Passes" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                     <Slider Grid.Column="1" Minimum="1" Maximum="4" TickFrequency="1" IsSnapToTickEnabled="True"
-                                            Value="{Binding Passes, Mode=TwoWay}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="2" Text="{Binding PassesText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                            Value="{Binding PassesSlider, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="2" Text="{Binding PassesText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" />
                                 </Grid>
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
@@ -200,15 +205,15 @@
                             <ToggleButton Content="Advanced engine options" IsChecked="{Binding IsAdvancedOpen, Mode=TwoWay}" />
                             <StackPanel Spacing="10" IsVisible="{Binding IsAdvancedOpen}">
                                 <TextBlock Text="MODEL" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
-                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="NR preset" Foreground="#CBD5E1" VerticalAlignment="Center" />
-                                    <Slider Grid.Column="1" Minimum="0" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding NrPreset, Mode=TwoWay}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding NrPreset}" Foreground="White" HorizontalAlignment="Right" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding NrPresetSlider, Mode=TwoWay}" />
+                                    <TextBox Grid.Column="2" Text="{Binding NrPresetText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" />
                                 </Grid>
-                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="SR preset" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                     <Slider Grid.Column="1" Minimum="0" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding SrPreset, Mode=TwoWay}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding SrPreset}" Foreground="White" HorizontalAlignment="Right" />
+                                    <TextBox Grid.Column="2" Text="{Binding SrPresetText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" />
                                 </Grid>
                                 <TextBlock Text="MOTION" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
@@ -216,15 +221,15 @@
                                     <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding CursorOptions}" SelectedIndex="{Binding SelectedCursorIndex, Mode=TwoWay}" Height="34" />
                                 </Grid>
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Skin follows structure" Foreground="#CBD5E1" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding SkinFollowsStructure, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
-                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10" IsVisible="{Binding !SkinFollowsStructure}"><TextBlock Grid.Column="0" Text="Skin strength" Foreground="#CBD5E1" VerticalAlignment="Center" /><Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding SkinStrength, Mode=TwoWay}" /><TextBlock Grid.Column="2" Text="{Binding SkinStrength}" Foreground="White" HorizontalAlignment="Right" /></Grid>
-                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10" IsVisible="{Binding !SkinFollowsStructure}"><TextBlock Grid.Column="0" Text="Skin strength" Foreground="#CBD5E1" VerticalAlignment="Center" /><Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding SkinStrengthSlider, Mode=TwoWay}" /><TextBox Grid.Column="2" Text="{Binding SkinStrengthText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" /></Grid>
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="MV level" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                     <Slider Grid.Column="1" Minimum="0" Maximum="7" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding MvLevel, Mode=TwoWay}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding MvLevel}" Foreground="White" HorizontalAlignment="Right" />
+                                    <TextBox Grid.Column="2" Text="{Binding MvLevelText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" />
                                 </Grid>
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Set motion-vector scale manually" Foreground="#CBD5E1" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding UseManualMvScale, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding UseManualMvScale}"><TextBox Text="{Binding MvScaleX, Mode=TwoWay}" PlaceholderText="MV scale X" /><TextBox Grid.Column="1" Text="{Binding MvScaleY, Mode=TwoWay}" PlaceholderText="MV scale Y" /></Grid>
-                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10"><TextBlock Grid.Column="0" Text="Reset threshold" Foreground="#CBD5E1" VerticalAlignment="Center" /><Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding ResetThreshold, Mode=TwoWay}" /><TextBlock Grid.Column="2" Text="{Binding ResetThreshold}" Foreground="White" HorizontalAlignment="Right" /></Grid>
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10"><TextBlock Grid.Column="0" Text="Reset threshold" Foreground="#CBD5E1" VerticalAlignment="Center" /><Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding ResetThreshold, Mode=TwoWay}" /><TextBox Grid.Column="2" Text="{Binding ResetThresholdText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" /></Grid>
                                 <TextBlock Text="CAPTURE AND WINDOW" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Capture border" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding CaptureBorder, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Keep output out of capture" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding Affinity, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>

@@ -27,6 +27,11 @@ type ScreenEngineViewModel() as this =
     let mutable sweepValues = 5.0
     let mutable pickerText = "Drag the crosshair onto a window"
 
+    // Changes apply by themselves. A running engine only reads its options at
+    // start, so each change restarts it - but only once the settings have been
+    // still for a moment, so dragging a slider restarts it once, not per tick.
+    let applyTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds(600.0))
+
     let styles = [ Standard, "Standard"; Natural, "Natural"; Cinematic, "Cinematic" ]
     let superResolutions = [ SrAuto, "Automatic"; SrDlaa, "DLAA (native resolution)"; SrOff, "Off" ]
     let compares = [ CompareOff, "Off"; CompareSplit, "Split view"; CompareOriginal, "Original only" ]
@@ -47,6 +52,10 @@ type ScreenEngineViewModel() as this =
         AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> host.Stop())
         monitors <- listMonitors ()
         windows <- listVisibleWindows ()
+
+        applyTimer.Tick.Add(fun _ ->
+            applyTimer.Stop()
+            if host.IsRunning then this.Start())
 
         host.StateChanged.Add(fun message ->
             Dispatcher.UIThread.Post(fun () ->
@@ -74,9 +83,12 @@ type ScreenEngineViewModel() as this =
     member private this.Change(updated: Settings) =
         settings <- normalize updated
         save settings
-        if host.IsRunning && not hasPendingChanges then
-            hasPendingChanges <- true
-            this.RaisePropertyChanged("HasPendingChanges")
+        this.ScheduleApply()
+
+    member private _.ScheduleApply() =
+        if host.IsRunning then
+            applyTimer.Stop()
+            applyTimer.Start()
 
     // ----- source and output -----
     member this.RefreshMonitors() =
@@ -205,7 +217,6 @@ type ScreenEngineViewModel() as this =
                 this.RaisePropertyChanged("Intensity")
                 this.RaisePropertyChanged("IntensityText")
 
-    member _.IntensityText = sprintf "%.0f%%" (settings.Intensity * 100.0)
 
     member _.LocalStructure
         with get () = settings.LocalStructure
@@ -214,8 +225,8 @@ type ScreenEngineViewModel() as this =
                 this.Change { settings with LocalStructure = value }
                 this.RaisePropertyChanged("LocalStructure")
                 this.RaisePropertyChanged("LocalStructureText")
+                this.RaisePropertyChanged("LocalStructureSlider")
 
-    member _.LocalStructureText = settings.LocalStructure.ToString("0.00")
 
     member _.LocalTone
         with get () = settings.LocalTone
@@ -224,8 +235,8 @@ type ScreenEngineViewModel() as this =
                 this.Change { settings with LocalTone = value }
                 this.RaisePropertyChanged("LocalTone")
                 this.RaisePropertyChanged("LocalToneText")
+                this.RaisePropertyChanged("LocalToneSlider")
 
-    member _.LocalToneText = settings.LocalTone.ToString("0.00")
 
     member _.Passes
         with get () = float settings.Passes
@@ -235,8 +246,8 @@ type ScreenEngineViewModel() as this =
                 this.Change { settings with Passes = passes }
                 this.RaisePropertyChanged("Passes")
                 this.RaisePropertyChanged("PassesText")
+                this.RaisePropertyChanged("PassesSlider")
 
-    member _.PassesText = string settings.Passes
 
     member _.AutoMask
         with get () = settings.AutoMask
@@ -299,23 +310,23 @@ type ScreenEngineViewModel() as this =
         with get () = float settings.Advanced.NrPreset
         and set (value: float) =
             let v = int (Math.Round value)
-            if v <> settings.Advanced.NrPreset then this.ChangeAdvanced((fun a -> { a with NrPreset = v }), "NrPreset")
+            if v <> settings.Advanced.NrPreset then this.ChangeAdvanced((fun a -> { a with NrPreset = v }), "NrPreset"); this.RaisePropertyChanged("NrPresetSlider"); this.RaisePropertyChanged("NrPresetText")
 
     member _.SrPreset
         with get () = float settings.Advanced.SrPreset
         and set (value: float) =
             let v = int (Math.Round value)
-            if v <> settings.Advanced.SrPreset then this.ChangeAdvanced((fun a -> { a with SrPreset = v }), "SrPreset")
+            if v <> settings.Advanced.SrPreset then this.ChangeAdvanced((fun a -> { a with SrPreset = v }), "SrPreset"); this.RaisePropertyChanged("SrPresetText")
 
     member _.MvLevel
         with get () = float settings.Advanced.MvLevel
         and set (value: float) =
             let v = int (Math.Round value)
-            if v <> settings.Advanced.MvLevel then this.ChangeAdvanced((fun a -> { a with MvLevel = v }), "MvLevel")
+            if v <> settings.Advanced.MvLevel then this.ChangeAdvanced((fun a -> { a with MvLevel = v }), "MvLevel"); this.RaisePropertyChanged("MvLevelText")
 
     member _.ResetThreshold
         with get () = settings.Advanced.ResetThreshold
-        and set value = if value <> settings.Advanced.ResetThreshold then this.ChangeAdvanced((fun a -> { a with ResetThreshold = value }), "ResetThreshold")
+        and set value = if value <> settings.Advanced.ResetThreshold then this.ChangeAdvanced((fun a -> { a with ResetThreshold = value }), "ResetThreshold"); this.RaisePropertyChanged("ResetThresholdText")
 
     member _.MvScaleAuto
         with get () = settings.Advanced.MvScaleAuto
@@ -457,6 +468,8 @@ type ScreenEngineViewModel() as this =
                 this.Change { settings with Skin = skin }
                 this.RaisePropertyChanged("SkinFollowsStructure")
                 this.RaisePropertyChanged("SkinStrength")
+                this.RaisePropertyChanged("SkinStrengthSlider")
+                this.RaisePropertyChanged("SkinStrengthText")
 
     member _.SkinStrength
         with get () = match settings.Skin with FollowStructure -> 1.0 | SkinStrength v -> v
@@ -464,6 +477,8 @@ type ScreenEngineViewModel() as this =
             if not this.SkinFollowsStructure && settings.Skin <> SkinStrength value then
                 this.Change { settings with Skin = SkinStrength value }
                 this.RaisePropertyChanged("SkinStrength")
+                this.RaisePropertyChanged("SkinStrengthSlider")
+                this.RaisePropertyChanged("SkinStrengthText")
 
     member _.MotionOptions = [ "Built-in"; "None" ]
     member _.SelectedMotionIndex
@@ -491,6 +506,98 @@ type ScreenEngineViewModel() as this =
                 this.RaisePropertyChanged("HighPrecisionColour")
 
     // ----- running it -----
+
+    // ----- typed values -----
+    // Every slider has a box beside it that takes any value. Where the engine
+    // caps a setting the value is still clamped to that cap; where it does not
+    // (structure, tone, skin, passes, NR preset) the box can go past the
+    // slider's end and the slider just sits at its end.
+    static member private Parse(text: string) =
+        let cleaned = if isNull text then "" else text.Trim().TrimEnd('%').Trim().Replace(',', '.')
+        match Double.TryParse(cleaned, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture) with
+        | true, v when Double.IsFinite v -> Some v
+        | _ -> None
+
+    static member private Show(value: float) = value.ToString("0.###", Globalization.CultureInfo.InvariantCulture)
+
+    /// A slider view of a wider value: shown clamped, and only a real move is
+    /// written back, so a typed value past the end is not pulled in by the slider.
+    static member private Within(value: float, low: float, high: float) = Math.Clamp(value, low, high)
+
+    member this.IntensityText
+        with get () = sprintf "%.0f%%" (settings.Intensity * 100.0)
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.Intensity <- Math.Clamp(v / 100.0, 0.0, 1.0))
+            this.RaisePropertyChanged("IntensityText")
+
+    member this.LocalStructureText
+        with get () = ScreenEngineViewModel.Show settings.LocalStructure
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.LocalStructure <- v)
+            this.RaisePropertyChanged("LocalStructureText")
+
+    member this.LocalStructureSlider
+        with get () = ScreenEngineViewModel.Within(settings.LocalStructure, 0.0, 5.0)
+        and set (v: float) = if abs (v - this.LocalStructureSlider) > 1e-6 then this.LocalStructure <- v
+
+    member this.LocalToneText
+        with get () = ScreenEngineViewModel.Show settings.LocalTone
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.LocalTone <- v)
+            this.RaisePropertyChanged("LocalToneText")
+
+    member this.LocalToneSlider
+        with get () = ScreenEngineViewModel.Within(settings.LocalTone, 0.0, 5.0)
+        and set (v: float) = if abs (v - this.LocalToneSlider) > 1e-6 then this.LocalTone <- v
+
+    member this.PassesText
+        with get () = string settings.Passes
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.Passes <- max 1.0 v)
+            this.RaisePropertyChanged("PassesText")
+
+    member this.PassesSlider
+        with get () = ScreenEngineViewModel.Within(float settings.Passes, 1.0, 4.0)
+        and set (v: float) = if abs (v - this.PassesSlider) > 1e-6 then this.Passes <- v
+
+    member this.NrPresetText
+        with get () = string settings.Advanced.NrPreset
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.NrPreset <- max 0.0 v)
+            this.RaisePropertyChanged("NrPresetText")
+
+    member this.NrPresetSlider
+        with get () = ScreenEngineViewModel.Within(float settings.Advanced.NrPreset, 0.0, 15.0)
+        and set (v: float) = if abs (v - this.NrPresetSlider) > 1e-6 then this.NrPreset <- v
+
+    member this.SrPresetText
+        with get () = string settings.Advanced.SrPreset
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.SrPreset <- Math.Clamp(v, 0.0, 15.0))
+            this.RaisePropertyChanged("SrPresetText")
+
+    member this.MvLevelText
+        with get () = string settings.Advanced.MvLevel
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.MvLevel <- Math.Clamp(v, 0.0, 7.0))
+            this.RaisePropertyChanged("MvLevelText")
+
+    member this.ResetThresholdText
+        with get () = ScreenEngineViewModel.Show settings.Advanced.ResetThreshold
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.ResetThreshold <- Math.Clamp(v, 0.0, 1.0))
+            this.RaisePropertyChanged("ResetThresholdText")
+
+    member this.SkinStrengthText
+        with get () = ScreenEngineViewModel.Show this.SkinStrength
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.SkinStrength <- v)
+            this.RaisePropertyChanged("SkinStrengthText")
+
+    member this.SkinStrengthSlider
+        with get () = ScreenEngineViewModel.Within(this.SkinStrength, 0.0, 5.0)
+        and set (v: float) = if abs (v - this.SkinStrengthSlider) > 1e-6 then this.SkinStrength <- v
+
     member this.Start() =
         hasPendingChanges <- false
         host.Start(settings)
@@ -499,6 +606,7 @@ type ScreenEngineViewModel() as this =
         this.RaisePropertyChanged("CanStart")
 
     member this.Stop() =
+        applyTimer.Stop()
         host.Stop()
         isRecording <- false
         hasPendingChanges <- false
@@ -554,7 +662,7 @@ type ScreenEngineViewModel() as this =
         for name in
             [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "SelectedWindowIndex"; "CaptureFolder"; "ModelFolder"; "NeuralRendering"
               "Intensity"; "IntensityText"; "LocalStructure"; "LocalStructureText"; "LocalTone"; "LocalToneText"
-              "Passes"; "PassesText"; "AutoMask"; "SelectedStyleIndex"; "SelectedSuperResolutionIndex"
+              "Passes"; "PassesText"; "PassesSlider"; "LocalStructureSlider"; "LocalToneSlider"; "NrPresetSlider"; "NrPresetText"; "SrPresetText"; "MvLevelText"; "ResetThresholdText"; "SkinStrengthSlider"; "SkinStrengthText"; "AutoMask"; "SelectedStyleIndex"; "SelectedSuperResolutionIndex"
               "SelectedCompareIndex"; "VSync"; "ShowPanel"; "NrPreset"; "SrPreset"; "MvLevel"
               "ResetThreshold"; "MvScaleAuto"; "UseManualMvScale"; "MvScaleX"; "MvScaleY"
               "CaptureBorder"; "Affinity"; "Topmost"; "ClickThrough"; "ExcludeOwnWindows"
@@ -564,9 +672,7 @@ type ScreenEngineViewModel() as this =
               "SelectedAdapterIndex"; "NgxAppId"; "NgxProjectId"; "SkinFollowsStructure"
               "SkinStrength"; "SelectedMotionIndex"; "SelectedCursorIndex"; "HighPrecisionColour" ] do
             this.RaisePropertyChanged(name)
-        if host.IsRunning then
-            hasPendingChanges <- true
-            this.RaisePropertyChanged("HasPendingChanges")
+        this.ScheduleApply()
 
     interface IDisposable with
         member _.Dispose() = (host :> IDisposable).Dispose()

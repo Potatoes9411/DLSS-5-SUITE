@@ -22,6 +22,9 @@ type App() =
                 if updateIndex.IsSome && updateIndex.Value + 1 < args.Length then
                     vm.ShowUpdateSuccessMessage <- true
                     vm.UpdateSuccessVersion <- args.[updateIndex.Value + 1]
+            // The Screen Engine window lives on its own, so closing the main
+            // window leaves it running; the app ends with the last window.
+            desktop.ShutdownMode <- Avalonia.Controls.ShutdownMode.OnLastWindowClose
             desktop.MainWindow <- MainWindow(DataContext = vm)
         | _ -> ()
 
