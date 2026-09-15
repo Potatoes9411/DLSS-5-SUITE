@@ -206,7 +206,7 @@ let ``a window title containing an equals sign stays a separate argument`` () =
 let ``every advanced option reaches the engine in its own words`` () =
     let a = args everythingChanged
     let expect name value = Assert.Equal(Some value, valueOf name a)
-    expect "--gui" "on"
+    expect "--gui" "off" // never on: SUITE is the control panel
     expect "--nr-preset" "2"
     expect "--nr-ui-correction" "off"
     expect "--sr-preset" "3"

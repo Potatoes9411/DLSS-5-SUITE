@@ -323,7 +323,8 @@ module ScreenEngine =
         let a = s.Advanced
         let opt (name: string) (value: string) = "--" + name + "=" + value
 
-        [ yield opt "gui" (onOff a.ShowPanel)
+        // SUITE is the only control panel; the engine's own would be a third window.
+        [ yield opt "gui" "off"
           yield opt "console" "off"
 
           // Paths and titles stay two arguments: they may contain "=".

@@ -197,13 +197,6 @@
                             </Grid>
 
                             <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="Engine control panel" FontSize="12" Foreground="#CBD5E1" />
-                                    <TextBlock Text="Also opens the engine's own control panel while it runs." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
-                                </StackPanel>
-                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowPanel, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
-                            </Grid>
                             <ToggleButton Content="Advanced engine options" IsChecked="{Binding IsAdvancedOpen, Mode=TwoWay}" />
                             <StackPanel Spacing="10" IsVisible="{Binding IsAdvancedOpen}">
                                 <TextBlock Text="MODEL" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
