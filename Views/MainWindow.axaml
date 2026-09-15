@@ -956,6 +956,7 @@
                                             </StackPanel>
                                         </Grid>
                                         <TextBlock Text="Capture, DLSS 5 settings, the window crosshair, screenshots, recording and sweeps open in their own window." TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
+                                        <TextBlock Text="RTX 50 series only: the Screen Engine uses NVIDIA's signed DLSS 5 model, which only runs on RTX 50 series GPUs." TextWrapping="Wrap" Foreground="#FBBF24" FontSize="11.5" FontWeight="SemiBold" />
                                     </StackPanel>
                                 </Border>
 
