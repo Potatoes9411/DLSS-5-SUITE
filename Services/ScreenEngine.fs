@@ -459,8 +459,13 @@ module ScreenEngine =
         Path.Combine(AppContext.BaseDirectory, "engine", EngineFileName)
 
     /// The folder holding the nvngx_dlssnr.dll SUITE already bundles.
+    /// The NVIDIA-signed copy ships in "dlss 5 signed" and is preferred: the
+    /// driver's NGX loader refuses the modified build in "dlss 5", which stays
+    /// for the game mods.
     let neuralRuntimeDir () =
-        Path.Combine(ModInstaller.modFilesRoot (), "dlss 5")
+        let signed = Path.Combine(ModInstaller.modFilesRoot (), "dlss 5 signed")
+        if File.Exists(Path.Combine(signed, "nvngx_dlssnr.dll")) then signed
+        else Path.Combine(ModInstaller.modFilesRoot (), "dlss 5")
 
     let isAvailable () = File.Exists(enginePath ())
 
