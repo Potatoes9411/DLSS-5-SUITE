@@ -25,6 +25,7 @@ type ScreenEngineViewModel() as this =
     let mutable isRecording = false
     let mutable selectedSweepIndex = 0
     let mutable sweepValues = 5.0
+    let mutable pickerText = "Drag the crosshair onto a window"
 
     let styles = [ Standard, "Standard"; Natural, "Natural"; Cinematic, "Cinematic" ]
     let superResolutions = [ SrAuto, "Automatic"; SrDlaa, "DLAA (native resolution)"; SrOff, "Off" ]
@@ -138,6 +139,35 @@ type ScreenEngineViewModel() as this =
     member this.RefreshWindows() =
         windows <- listVisibleWindows ()
         this.RaisePropertyChanged("WindowOptions")
+        this.RaisePropertyChanged("SelectedWindowIndex")
+
+    /// What the crosshair is over while it is dragged, then what it picked.
+    member _.PickerText = pickerText
+
+    /// Called while the crosshair is dragged; the window is only taken when
+    /// the button comes up, so passing over windows on the way changes nothing.
+    member this.TrackWindowUnderCursor(take: bool) =
+        let found = windowAtCursor ()
+        pickerText <-
+            match found, take with
+            | Some entry, true -> "Capturing: " + entry.Title
+            | Some entry, false -> "Release over: " + entry.Title
+            | None, true -> "Nothing picked. Drag the crosshair onto another app's window."
+            | None, false -> "Drag onto a window..."
+        this.RaisePropertyChanged("PickerText")
+        match found with
+        | Some entry when take ->
+            windows <- listVisibleWindows ()
+            this.RaisePropertyChanged("WindowOptions")
+            this.Window <- sprintf "0x%X" (uint64 (entry.Handle.ToInt64()))
+            this.RaisePropertyChanged("SelectedWindowIndex")
+        | _ -> ()
+
+    /// Back to capturing the monitor.
+    member this.ClearWindow() =
+        this.Window <- ""
+        pickerText <- "Capturing the monitor"
+        this.RaisePropertyChanged("PickerText")
         this.RaisePropertyChanged("SelectedWindowIndex")
 
     member _.WindowOptions =

@@ -17,8 +17,8 @@
     <AssemblyTitle>DLSS 5 SUITE</AssemblyTitle>
     <Company>Potatoes-dev</Company>
     <Authors>Potatoes9411</Authors>
-    <Description>DLSS 5 SUITE — a modified version of DLSS 5 MANAGER (built by NODIX TECH, published by Numidia Studios). Built by Potatoes9411, published by Potatoes-dev.</Description>
-    <Copyright>© 2026 Potatoes-dev. Based on DLSS 5 MANAGER, © 2026 Numidia Studios. All rights reserved.</Copyright>
+    <Description>DLSS 5 SUITE ï¿½ a modified version of DLSS 5 MANAGER (built by NODIX TECH, published by Numidia Studios). Built by Potatoes9411, published by Potatoes-dev.</Description>
+    <Copyright>ï¿½ 2026 Potatoes-dev. Based on DLSS 5 MANAGER, ï¿½ 2026 Numidia Studios. All rights reserved.</Copyright>
 
     <!-- ================================================================= -->
     <!-- RUNTIME FOOTPRINT                                                  -->
@@ -70,6 +70,7 @@
     <Compile Include="ViewModels\CommunityViewModel.fs" />
     <Compile Include="ViewModels\ScreenEngineViewModel.fs" />
     <Compile Include="ViewModels\MainViewModel.fs" />
+    <Compile Include="Views\ScreenEngineWindow.axaml.fs" />
     <Compile Include="Views\MainWindow.axaml.fs" />
     <Compile Include="ViewLocator.fs" />
     <Compile Include="App.axaml.fs" />

@@ -1,0 +1,263 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DLSS_5_MANAGER.ViewModels"
+        x:Class="DLSS_5_MANAGER.Views.ScreenEngineWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/logo.ico"
+        Title="Screen Engine - DLSS 5 SUITE"
+        Width="640" Height="780" MinWidth="520" MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        WindowDecorations="None">
+
+    <Border CornerRadius="24" ClipToBounds="True" Background="Transparent">
+        <Panel>
+            <!-- The app's own backdrop, bound to the same theme so it matches. -->
+            <Panel ClipToBounds="True" IsHitTestVisible="False">
+                <Border Background="{Binding BgBaseBrush}" />
+                <Image Source="{Binding NebulaSource}" Stretch="UniformToFill" Opacity="0.82" />
+                <Image Source="/Assets/bg_stars_1.png" Stretch="UniformToFill" Opacity="0.6" />
+                <Image Source="{Binding NvidiaMarkSource}" Stretch="Uniform" Width="460"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.22" />
+                <Border Background="{Binding BgVignetteBrush}" />
+                <Border Background="#18000000" />
+            </Panel>
+            <Border CornerRadius="24" BorderThickness="1" IsHitTestVisible="False">
+                <Border.BorderBrush>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                        <GradientStop Color="#2CFFFFFF" Offset="0.0" />
+                        <GradientStop Color="#08FFFFFF" Offset="0.5" />
+                        <GradientStop Color="#1CFFFFFF" Offset="1.0" />
+                    </LinearGradientBrush>
+                </Border.BorderBrush>
+            </Border>
+
+            <Grid RowDefinitions="Auto,*">
+                <!-- Title bar: drag to move -->
+                <Border Grid.Row="0" Background="Transparent" Padding="20,14,14,6" PointerPressed="OnHeaderPointerPressed">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <Image Grid.Column="0" Source="/Assets/logo_bar.png" Height="26" Stretch="Uniform"
+                               RenderOptions.BitmapInterpolationMode="HighQuality" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock Text="SCREEN ENGINE" FontSize="12" FontWeight="Bold" Foreground="White" LetterSpacing="0.6" />
+                            <TextBlock Text="DLSS 5 on any screen" FontSize="11" Foreground="#94A3B8" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Classes="GlassWindowControlBtn Close" Click="OnCloseClicked" ToolTip.Tip="Close" VerticalAlignment="Center">
+                            <PathIcon Data="M 19,6.41 L 17.59,5 L 12,10.59 L 6.41,5 L 5,6.41 L 10.59,12 L 5,17.59 L 6.41,19 L 12,13.41 L 17.59,19 L 19,17.59 L 13.41,12 Z" Width="10" Height="10" Foreground="#FF6961" VerticalAlignment="Center" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" Padding="16,4,16,16">
+                    <Border Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                        <StackPanel Spacing="12" DataContext="{Binding ScreenEngine}">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+                                    <TextBlock Text="Full-screen DLSS 5 Neural Rendering" FontSize="13.5" FontWeight="SemiBold" Foreground="White" />
+                                    <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="#CBD5E1" FontSize="12" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <Button Classes="PrimaryActionBtn" Content="Start" Click="OnScreenEngineStartClicked" IsVisible="{Binding CanStart}" />
+                                    <Button Content="Apply changes" Click="OnScreenEngineApplyClicked" IsVisible="{Binding HasPendingChanges}" />
+                                    <Button Content="Stop" Click="OnScreenEngineStopClicked" IsVisible="{Binding IsRunning}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <TextBlock Text="Capture" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                    <ComboBox Classes="GlassComboBox" ItemsSource="{Binding SourceOptions}"
+                                              SelectedIndex="{Binding SelectedSourceIndex, Mode=TwoWay}"
+                                              HorizontalAlignment="Stretch" Height="34" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Show on" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                    <ComboBox Classes="GlassComboBox" ItemsSource="{Binding TargetOptions}"
+                                              SelectedIndex="{Binding SelectedTargetIndex, Mode=TwoWay}"
+                                              IsEnabled="{Binding CanPickTarget}"
+                                              HorizontalAlignment="Stretch" Height="34" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Capture one window" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                    <Border Grid.Column="0" Width="46" Height="46" CornerRadius="12" Cursor="Cross"
+                                            Background="#5C121619" BorderBrush="#5500FF88" BorderThickness="1"
+                                            ToolTip.Tip="Hold and drag onto the window to capture"
+                                            PointerPressed="OnCrosshairPressed" PointerMoved="OnCrosshairMoved"
+                                            PointerReleased="OnCrosshairReleased" PointerCaptureLost="OnCrosshairCaptureLost">
+                                        <PathIcon Width="24" Height="24" Foreground="#4ADE80"
+                                                  Data="F1 M11,1 H13 V6 H11 Z M11,18 H13 V23 H11 Z M1,11 H6 V13 H1 Z M18,11 H23 V13 H18 Z M12,6.5 A5.5,5.5 0 1 0 12,17.5 A5.5,5.5 0 1 0 12,6.5 Z M12,8.5 A3.5,3.5 0 1 1 12,15.5 A3.5,3.5 0 1 1 12,8.5 Z" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding PickerText}" FontSize="12.5" Foreground="White" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Window, StringFormat='Handle / title: {0}', TargetNullValue=''}" FontSize="11" Foreground="#A3AEC0" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Content="Use monitor" Click="OnClearWindowClicked" VerticalAlignment="Center" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <ComboBox Grid.Column="0" Classes="GlassComboBox" ItemsSource="{Binding WindowOptions}"
+                                              SelectedIndex="{Binding SelectedWindowIndex, Mode=TwoWay}" HorizontalAlignment="Stretch" Height="34" />
+                                    <Button Grid.Column="1" Content="Refresh" Click="OnScreenEngineRefreshWindowsClicked" />
+                                </Grid>
+                                <TextBox Text="{Binding Window, Mode=TwoWay}" PlaceholderText="Or type a window title" Height="34" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="11">
+                                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Neural Rendering" FontSize="13" FontWeight="SemiBold" Foreground="White" />
+                                    <TextBlock Text="Off leaves only super resolution, when a second monitor is the output." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding NeuralRendering, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                            </Grid>
+
+                            <StackPanel Spacing="10" IsVisible="{Binding NeuralRendering}">
+                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="Intensity" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding Intensity, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding IntensityText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="Local structure" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding LocalStructure, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding LocalStructureText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="Local tone" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding LocalTone, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding LocalToneText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="Passes" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="1" Maximum="4" TickFrequency="1" IsSnapToTickEnabled="True"
+                                            Value="{Binding Passes, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding PassesText}" FontSize="12" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Style" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" Width="110" />
+                                        <ComboBox Classes="GlassComboBox" ItemsSource="{Binding StyleOptions}"
+                                                  SelectedIndex="{Binding SelectedStyleIndex, Mode=TwoWay}" MinWidth="150" Height="34" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock Text="Auto mask" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                        <ToggleSwitch IsChecked="{Binding AutoMask, Mode=TwoWay}" OnContent="" OffContent="" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+
+                            <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="CAPTURE TOOLS" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save screenshot" Click="OnScreenEngineScreenshotClicked" IsEnabled="{Binding IsRunning}" />
+                                    <Button Content="{Binding RecordButtonText}" Click="OnScreenEngineRecordClicked" IsEnabled="{Binding IsRunning}" />
+                                </StackPanel>
+                                <Grid ColumnDefinitions="*,100,Auto" ColumnSpacing="8">
+                                    <ComboBox Grid.Column="0" Classes="GlassComboBox" ItemsSource="{Binding SweepOptions}" SelectedIndex="{Binding SelectedSweepIndex, Mode=TwoWay}" Height="34" />
+                                    <NumericUpDown Grid.Column="1" Minimum="2" Maximum="50" Value="{Binding SweepValues, Mode=TwoWay}" Height="34" />
+                                    <Button Grid.Column="2" Content="Run comparison sweep" Click="OnScreenEngineSweepClicked" IsEnabled="{Binding IsRunning}" />
+                                </Grid>
+                                <TextBlock Text="Capture folder" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                    <TextBox Grid.Column="0" Text="{Binding CaptureFolder, Mode=TwoWay}" Height="34" />
+                                    <Button Grid.Column="1" Content="Browse" Click="OnScreenEngineCaptureFolderClicked" />
+                                    <Button Grid.Column="2" Content="Open" Click="OnScreenEngineOpenCaptureFolderClicked" />
+                                </Grid>
+                                <TextBlock Text="Screenshots, recordings and sweep comparisons are saved here." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <TextBlock Text="Super resolution" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                    <ComboBox Classes="GlassComboBox" ItemsSource="{Binding SuperResolutionOptions}"
+                                              SelectedIndex="{Binding SelectedSuperResolutionIndex, Mode=TwoWay}"
+                                              HorizontalAlignment="Stretch" Height="34" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Compare with the original" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                    <ComboBox Classes="GlassComboBox" ItemsSource="{Binding CompareOptions}"
+                                              SelectedIndex="{Binding SelectedCompareIndex, Mode=TwoWay}"
+                                              HorizontalAlignment="Stretch" Height="34" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Engine control panel" FontSize="12" Foreground="#CBD5E1" />
+                                    <TextBlock Text="Also opens the engine's own control panel while it runs." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowPanel, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                            </Grid>
+                            <ToggleButton Content="Advanced engine options" IsChecked="{Binding IsAdvancedOpen, Mode=TwoWay}" />
+                            <StackPanel Spacing="10" IsVisible="{Binding IsAdvancedOpen}">
+                                <TextBlock Text="MODEL" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="NR preset" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding NrPreset, Mode=TwoWay}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding NrPreset}" Foreground="White" HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="SR preset" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="15" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding SrPreset, Mode=TwoWay}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding SrPreset}" Foreground="White" HorizontalAlignment="Right" />
+                                </Grid>
+                                <TextBlock Text="MOTION" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                    <ComboBox Grid.Column="0" Classes="GlassComboBox" ItemsSource="{Binding MotionOptions}" SelectedIndex="{Binding SelectedMotionIndex, Mode=TwoWay}" Height="34" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding CursorOptions}" SelectedIndex="{Binding SelectedCursorIndex, Mode=TwoWay}" Height="34" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Skin follows structure" Foreground="#CBD5E1" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding SkinFollowsStructure, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10" IsVisible="{Binding !SkinFollowsStructure}"><TextBlock Grid.Column="0" Text="Skin strength" Foreground="#CBD5E1" VerticalAlignment="Center" /><Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding SkinStrength, Mode=TwoWay}" /><TextBlock Grid.Column="2" Text="{Binding SkinStrength}" Foreground="White" HorizontalAlignment="Right" /></Grid>
+                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="MV level" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="7" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding MvLevel, Mode=TwoWay}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding MvLevel}" Foreground="White" HorizontalAlignment="Right" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Set motion-vector scale manually" Foreground="#CBD5E1" VerticalAlignment="Center" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding UseManualMvScale, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding UseManualMvScale}"><TextBox Text="{Binding MvScaleX, Mode=TwoWay}" PlaceholderText="MV scale X" /><TextBox Grid.Column="1" Text="{Binding MvScaleY, Mode=TwoWay}" PlaceholderText="MV scale Y" /></Grid>
+                                <Grid ColumnDefinitions="110,*,50" ColumnSpacing="10"><TextBlock Grid.Column="0" Text="Reset threshold" Foreground="#CBD5E1" VerticalAlignment="Center" /><Slider Grid.Column="1" Minimum="0" Maximum="1" Value="{Binding ResetThreshold, Mode=TwoWay}" /><TextBlock Grid.Column="2" Text="{Binding ResetThreshold}" Foreground="White" HorizontalAlignment="Right" /></Grid>
+                                <TextBlock Text="CAPTURE AND WINDOW" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Capture border" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding CaptureBorder, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Keep output out of capture" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding Affinity, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Always on top" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding Topmost, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Click through output" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ClickThrough, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Use redirection bitmap capture" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding RedirectionBitmap, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Exclude engine windows" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ExcludeOwnWindows, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <TextBlock Text="NGX AND DIAGNOSTICS" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10"><ComboBox Grid.Column="0" Classes="GlassComboBox" ItemsSource="{Binding NgxLogOptions}" SelectedIndex="{Binding SelectedNgxLogIndex, Mode=TwoWay}" Height="34" /><ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding LogLevelOptions}" SelectedIndex="{Binding SelectedLogLevelIndex, Mode=TwoWay}" Height="34" /></Grid>
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="10"><TextBox Text="{Binding NgxAppId, Mode=TwoWay}" PlaceholderText="NGX app id (hex)" /><TextBox Grid.Column="1" Text="{Binding NgxProjectId, Mode=TwoWay}" PlaceholderText="NGX project id (GUID)" /></Grid>
+                                <ComboBox Classes="GlassComboBox" ItemsSource="{Binding AdapterOptions}" SelectedIndex="{Binding SelectedAdapterIndex, Mode=TwoWay}" Height="34" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Indicator" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding Indicator, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Kernel cache" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding CubinCache, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="D3D debug layer" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding DebugLayer, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Exclusion log" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ExclusionLog, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="High-precision colour" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding HighPrecisionColour, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Show desktop-inert controls" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowInert, Mode=TwoWay}" OnContent="" OffContent="" /></Grid>
+                                <StackPanel Spacing="8" IsVisible="{Binding ShowInert}"><TextBlock Text="These options do not affect desktop capture in this engine build." Foreground="#A3AEC0" FontSize="11" /><Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="UI correction" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding UiCorrection, Mode=TwoWay}" OnContent="" OffContent="" /></Grid><Grid ColumnDefinitions="*,Auto" ColumnSpacing="10"><TextBlock Text="Depth inverted" Foreground="#CBD5E1" /><ToggleSwitch Grid.Column="1" IsChecked="{Binding DepthInverted, Mode=TwoWay}" OnContent="" OffContent="" /></Grid><TextBox Text="{Binding DepthValue, Mode=TwoWay}" PlaceholderText="Depth value" /><ComboBox Classes="GlassComboBox" ItemsSource="{Binding NvofPerfOptions}" SelectedIndex="{Binding SelectedNvofPerfIndex, Mode=TwoWay}" Height="34" /><ComboBox Classes="GlassComboBox" ItemsSource="{Binding NvofGridOptions}" SelectedIndex="{Binding SelectedNvofGridIndex, Mode=TwoWay}" Height="34" /></StackPanel>
+                            </StackPanel>
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <TextBlock Text="VSync" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <ToggleSwitch IsChecked="{Binding VSync, Mode=TwoWay}" OnContent="" OffContent="" />
+                                </StackPanel>
+                                <Button Grid.Column="2" Content="Reset to defaults" Click="OnScreenEngineResetClicked" />
+                            </Grid>
+
+                            <TextBlock Text="Needs an NVIDIA RTX GPU and a driver with DLSS 5 support. Hotkeys while running: Ctrl+Alt+Shift+O original/processed, Ctrl+Alt+Shift+C split view, Ctrl+Alt+Shift+Q stop. Engine: Full-Screen Wrapper for DLSS5."
+                                       TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </Grid>
+        </Panel>
+    </Border>
+</Window>

@@ -24,6 +24,9 @@ type MainWindow() as this =
     let mutable currentTargetCard: GameCardViewModel option = None
     let mutable isDraggingCard = false
 
+    /// The Screen Engine pop-out, while it is open.
+    let mutable screenEngineWindow: ScreenEngineWindow option = None
+
     // --- Kinetic smooth-scroll state --------------------------------------
     // The wheel sets a target offset; a 60 fps timer eases the real offset
     // towards it, so the grid glides instead of jumping line by line.
@@ -1046,50 +1049,15 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.ScreenEngine.Stop()
         | _ -> ()
 
-    member this.OnScreenEngineResetClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm -> vm.ScreenEngine.ResetToDefaults()
-        | _ -> ()
-
-    member this.OnScreenEngineScreenshotClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm -> vm.ScreenEngine.SaveScreenshot()
-        | _ -> ()
-
-    member this.OnScreenEngineRecordClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm -> vm.ScreenEngine.ToggleRecording()
-        | _ -> ()
-
-    member this.OnScreenEngineSweepClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm -> vm.ScreenEngine.StartComparisonSweep()
-        | _ -> ()
-
-    member this.OnScreenEngineRefreshWindowsClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm -> vm.ScreenEngine.RefreshWindows()
-        | _ -> ()
-
-    member this.OnScreenEngineCaptureFolderClicked(sender: obj, e: RoutedEventArgs) =
-        async {
-            let options = FolderPickerOpenOptions(Title = "Choose the Screen Engine capture folder", AllowMultiple = false)
-            let! folders = this.StorageProvider.OpenFolderPickerAsync(options) |> Async.AwaitTask
-            if folders.Count > 0 then
-                match this.DataContext with
-                | :? MainViewModel as vm -> vm.ScreenEngine.CaptureFolder <- folders.[0].Path.LocalPath
-                | _ -> ()
-        }
-        |> Async.StartImmediate
-
-    member this.OnScreenEngineOpenCaptureFolderClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm ->
-            try
-                Directory.CreateDirectory(vm.ScreenEngine.CaptureFolder) |> ignore
-                Process.Start(ProcessStartInfo(vm.ScreenEngine.CaptureFolder, UseShellExecute = true)) |> ignore
-            with _ -> ()
-        | _ -> ()
+    /// The Screen Engine has its own window; one at a time, raised if it is open.
+    member this.OnOpenScreenEngineClicked(sender: obj, e: RoutedEventArgs) =
+        match screenEngineWindow with
+        | Some window -> window.Activate()
+        | None ->
+            let window = ScreenEngineWindow(DataContext = this.DataContext)
+            window.Closed.Add(fun _ -> screenEngineWindow <- None)
+            screenEngineWindow <- Some window
+            window.Show(this)
 
     member this.OnCheckLosslessScalingClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with

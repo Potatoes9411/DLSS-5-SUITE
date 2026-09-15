@@ -518,6 +518,20 @@ module ScreenEngine =
         [<DllImport("user32.dll")>]
         extern uint32 GetWindowThreadProcessId(nativeint window, uint32& processId)
 
+        [<Struct; StructLayout(LayoutKind.Sequential)>]
+        type POINT =
+            val mutable x: int
+            val mutable y: int
+
+        [<DllImport("user32.dll")>]
+        extern bool GetCursorPos(POINT& point)
+
+        [<DllImport("user32.dll")>]
+        extern nativeint WindowFromPoint(POINT point)
+
+        [<DllImport("user32.dll")>]
+        extern nativeint GetAncestor(nativeint window, uint32 flags)
+
     /// Every connected monitor, in the engine's order. Empty if Windows will
     /// not say.
     let listMonitors () =
@@ -577,6 +591,27 @@ module ScreenEngine =
         |> Seq.distinctBy (fun entry -> entry.Handle)
         |> Seq.sortBy (fun entry -> entry.Title.ToUpperInvariant())
         |> List.ofSeq
+
+    /// The top-level window under the mouse pointer, for the crosshair picker.
+    /// None over SUITE itself, over the engine's windows or over nothing titled.
+    let windowAtCursor () =
+        try
+            let mutable point = Native.POINT()
+            if not (Native.GetCursorPos(&point)) then None
+            else
+                let window = Native.GetAncestor(Native.WindowFromPoint(point), 2u) // GA_ROOT
+                let mutable processId = 0u
+                Native.GetWindowThreadProcessId(window, &processId) |> ignore
+                let length = if window = 0n then 0 else Native.GetWindowTextLengthW(window)
+                if window = 0n || processId = uint32 Environment.ProcessId || length = 0 then None
+                else
+                    let title = StringBuilder(length + 1)
+                    Native.GetWindowTextW(window, title, title.Capacity) |> ignore
+                    let value = title.ToString().Trim()
+                    if value = "" || value.StartsWith("Full-Screen Wrapper for DLSS5", StringComparison.OrdinalIgnoreCase) then None
+                    else Some { Handle = window; Title = value }
+        with _ ->
+            None
 
     // =====================================================================
     // PERSISTENCE
