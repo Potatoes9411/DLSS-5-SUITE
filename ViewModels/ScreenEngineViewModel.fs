@@ -378,6 +378,14 @@ type ScreenEngineViewModel() as this =
             if folder <> settings.Advanced.CaptureFolder then
                 this.ChangeAdvanced((fun a -> { a with CaptureFolder = folder }), "CaptureFolder")
 
+    /// The folder the DLSS 5 model DLL is loaded from; "" is the bundled one.
+    member _.ModelFolder
+        with get () = settings.Advanced.ModelFolder
+        and set (value: string) =
+            let folder = if isNull value then "" else value.Trim()
+            if folder <> settings.Advanced.ModelFolder then
+                this.ChangeAdvanced((fun a -> { a with ModelFolder = folder }), "ModelFolder")
+
     member _.ExclusionLog
         with get () = settings.Advanced.ExclusionLog
         and set value = if value <> settings.Advanced.ExclusionLog then this.ChangeAdvanced((fun a -> { a with ExclusionLog = value }), "ExclusionLog")
@@ -544,7 +552,7 @@ type ScreenEngineViewModel() as this =
         settings <- defaults
         save settings
         for name in
-            [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "SelectedWindowIndex"; "CaptureFolder"; "NeuralRendering"
+            [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "SelectedWindowIndex"; "CaptureFolder"; "ModelFolder"; "NeuralRendering"
               "Intensity"; "IntensityText"; "LocalStructure"; "LocalStructureText"; "LocalTone"; "LocalToneText"
               "Passes"; "PassesText"; "AutoMask"; "SelectedStyleIndex"; "SelectedSuperResolutionIndex"
               "SelectedCompareIndex"; "VSync"; "ShowPanel"; "NrPreset"; "SrPreset"; "MvLevel"

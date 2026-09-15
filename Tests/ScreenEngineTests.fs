@@ -32,6 +32,13 @@ let ``the engine always starts without its own control panel`` () =
     Assert.Equal(Some "off", valueOf "--gui" a)
 
 [<Fact>]
+let ``the bundled model folder is used unless another one is chosen`` () =
+    let bundled = toArguments "" @"C:\SUITE\mod files\dlss 5" defaults
+    Assert.Equal(Some @"C:\SUITE\mod files\dlss 5", valueOf "--ngx-path" bundled)
+    let chosen = toArguments "" @"C:\SUITE\mod files\dlss 5" { defaults with Advanced = { advancedDefaults with ModelFolder = @"D:\Signed Model" } }
+    Assert.Equal(Some @"D:\Signed Model", valueOf "--ngx-path" chosen)
+
+[<Fact>]
 let ``decimals are written with a dot whatever the system locale`` () =
     // In a comma-decimal locale "1.5" would otherwise become "1,5", which the
     // engine rejects as an invalid number.

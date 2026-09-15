@@ -115,6 +115,8 @@ module ScreenEngine =
           ResetThreshold: float
           CaptureBorder: bool
           CaptureFolder: string
+          /// Folder holding the nvngx_dlssnr.dll to load; "" uses the one SUITE bundles.
+          ModelFolder: string
           /// 0 off, 1 on, 2 verbose.
           NgxLog: int
           /// Hex, non-zero; "" uses the project id instead.
@@ -155,6 +157,7 @@ module ScreenEngine =
           ResetThreshold = 0.5
           CaptureBorder = false
           CaptureFolder = ""
+          ModelFolder = ""
           NgxLog = 0
           NgxAppId = ""
           NgxProjectId = ""
@@ -249,6 +252,7 @@ module ScreenEngine =
         let appId = text a.NgxAppId
         let projectId = text a.NgxProjectId
         let captureFolder = text a.CaptureFolder
+        let modelFolder = text a.ModelFolder
 
         { a with
             NrPreset = max 0 a.NrPreset
@@ -267,6 +271,7 @@ module ScreenEngine =
             NgxAppId = (if isValidAppId appId then appId else "")
             NgxProjectId = (if isValidProjectId projectId then projectId else "")
             CaptureFolder = captureFolder
+            ModelFolder = modelFolder
             Adapter = max -1 a.Adapter
             LogLevel = Math.Clamp(a.LogLevel, 0, 3) }
 
@@ -322,8 +327,9 @@ module ScreenEngine =
           yield opt "console" "off"
 
           // Paths and titles stay two arguments: they may contain "=".
-          if not (String.IsNullOrEmpty(neuralRuntimeDir)) then
-              yield! [ "--ngx-path"; neuralRuntimeDir ]
+          let modelDir = if a.ModelFolder <> "" then a.ModelFolder else neuralRuntimeDir
+          if not (String.IsNullOrEmpty(modelDir)) then
+              yield! [ "--ngx-path"; modelDir ]
 
           if not (String.IsNullOrEmpty(engineDataDir)) then
               yield! [ "--app-data"; engineDataDir ]

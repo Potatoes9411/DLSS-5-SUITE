@@ -73,6 +73,18 @@ type ScreenEngineWindow() as this =
         }
         |> Async.StartImmediate
 
+    member this.OnScreenEngineModelFolderClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let options = FolderPickerOpenOptions(Title = "Choose the folder holding nvngx_dlssnr.dll", AllowMultiple = false)
+            let! folders = this.StorageProvider.OpenFolderPickerAsync(options) |> Async.AwaitTask
+            if folders.Count > 0 then
+                this.WithEngine(fun engine -> engine.ModelFolder <- folders.[0].Path.LocalPath)
+        }
+        |> Async.StartImmediate
+
+    member this.OnScreenEngineBundledModelClicked(sender: obj, e: RoutedEventArgs) =
+        this.WithEngine(fun engine -> engine.ModelFolder <- "")
+
     member this.OnScreenEngineOpenCaptureFolderClicked(sender: obj, e: RoutedEventArgs) =
         this.WithEngine(fun engine ->
             try

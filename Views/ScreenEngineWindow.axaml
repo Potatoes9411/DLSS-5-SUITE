@@ -170,6 +170,13 @@
                                     <Button Grid.Column="2" Content="Open" Click="OnScreenEngineOpenCaptureFolderClicked" />
                                 </Grid>
                                 <TextBlock Text="Screenshots, recordings and sweep comparisons are saved here." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                <TextBlock Text="DLSS 5 model folder (nvngx_dlssnr.dll)" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                    <TextBox Grid.Column="0" Text="{Binding ModelFolder, Mode=TwoWay}" PlaceholderText="Bundled: mod files\dlss 5" Height="34" />
+                                    <Button Grid.Column="1" Content="Browse" Click="OnScreenEngineModelFolderClicked" />
+                                    <Button Grid.Column="2" Content="Use bundled" Click="OnScreenEngineBundledModelClicked" />
+                                </Grid>
+                                <TextBlock Text="Empty loads the DLL SUITE bundles. Pick another folder to try a different nvngx_dlssnr.dll; the bundled file is never changed." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
