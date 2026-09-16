@@ -93,6 +93,15 @@
                             </Grid>
                             <TextBlock Text="{Binding MethodNote}" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding GpuName}" FontSize="10.5" Foreground="#64748B" />
+                            <Border IsVisible="{Binding NeuralScreenNeedsInstall}" Background="#22FBBF24" BorderBrush="#55FBBF24" BorderThickness="1" CornerRadius="12" Padding="12,10">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="NeuralScreen is a separate download (about 435 MB), because only RTX 30/40 cards need it." Foreground="#FDE68A" FontSize="11.5" TextWrapping="Wrap" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Content="Get the add-on" Click="OnGetNeuralScreenClicked" />
+                                        <Button Content="Install from zip..." Click="OnInstallNeuralScreenClicked" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
                             </StackPanel>
 
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">

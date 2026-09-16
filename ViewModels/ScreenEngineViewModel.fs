@@ -2,6 +2,7 @@ namespace DLSS_5_MANAGER.ViewModels
 
 open System
 open System.IO
+open System.IO.Compression
 open Avalonia.Threading
 open DLSS_5_MANAGER.Services
 open DLSS_5_MANAGER.Services.ScreenEngine
@@ -22,9 +23,8 @@ type ScreenEngineViewModel() as this =
     // Which program runs DLSS 5 over the screen. The Screen Engine needs an
     // RTX 50 card; NeuralScreen covers RTX 30/40 (and 50, as a second choice).
     let canScreenEngine = (gpuTier = NeuralScreen.Rtx50) && isAvailable ()
-    let canNeuralScreen =
-        (match gpuTier with NeuralScreen.Rtx50 | NeuralScreen.RtxOlder _ -> true | _ -> false)
-        && NeuralScreen.isAvailable ()
+    let cardRunsNeuralScreen = (match gpuTier with NeuralScreen.Rtx50 | NeuralScreen.RtxOlder _ -> true | _ -> false)
+    let mutable canNeuralScreen = cardRunsNeuralScreen && NeuralScreen.isAvailable ()
     let methodPath () = Path.Combine(NeuralScreen.dataDir (), "method.txt")
     let mutable useNeuralScreen =
         let saved = (try File.ReadAllText(methodPath ()).Trim() with _ -> "")
@@ -111,12 +111,36 @@ type ScreenEngineViewModel() as this =
         | _ when canNeuralScreen -> "DLSS 5 through NeuralScreen. RTX 30/40 series, and 50 series as an alternative."
         | NeuralScreen.Rtx20 -> "RTX 20 series cards cannot run the DLSS 5 model, with either method."
         | NeuralScreen.NoRtx -> "DLSS 5 needs an NVIDIA RTX 30, 40 or 50 series card."
-        | _ -> "NeuralScreen is not included in this build."
+        | _ -> "NeuralScreen is a separate download. Install the add-on to use it."
+
+    /// The card can run it, but the add-on is not installed: it is a separate
+    /// download because of its size and its own NVIDIA runtimes.
+    member _.NeuralScreenNeedsInstall = cardRunsNeuralScreen && not canNeuralScreen
+
+    member _.NeuralScreenInstallFolder = NeuralScreen.folder ()
+
+    /// Unpacks "DLSS 5 SUITE NeuralScreen Add-on.zip" into mod files.
+    member this.InstallNeuralScreenAddon(zipPath: string) =
+        try
+            let target = Path.GetDirectoryName(NeuralScreen.folder ())
+            Directory.CreateDirectory(target) |> ignore
+            status <- "Installing the NeuralScreen add-on..."
+            this.RaisePropertyChanged("Status")
+            ZipFile.ExtractToDirectory(zipPath, target, true)
+            canNeuralScreen <- cardRunsNeuralScreen && NeuralScreen.isAvailable ()
+            status <-
+                if canNeuralScreen then "NeuralScreen add-on installed."
+                else "That archive does not hold the NeuralScreen add-on."
+        with ex ->
+            status <- "The NeuralScreen add-on could not be installed: " + ex.Message
+        for name in [ "Status"; "CanUseNeuralScreen"; "NeuralScreenLocked"; "NeuralScreenNeedsInstall"; "NeuralScreenTip"; "MethodNote"; "IsAvailable"; "CanStart" ] do
+            this.RaisePropertyChanged(name)
 
     member _.MethodNote =
         match gpuTier with
         | NeuralScreen.Rtx50 -> "RTX 50 series detected: both methods work."
-        | NeuralScreen.RtxOlder s -> sprintf "RTX %d series detected: NeuralScreen is used. The Screen Engine is RTX 50 series only." s
+        | NeuralScreen.RtxOlder s when canNeuralScreen -> sprintf "RTX %d series detected: NeuralScreen is used. The Screen Engine is RTX 50 series only." s
+        | NeuralScreen.RtxOlder s -> sprintf "RTX %d series detected: DLSS 5 needs the NeuralScreen add-on, a separate download." s
         | NeuralScreen.Rtx20 -> "RTX 20 series detected: this card cannot run DLSS 5."
         | NeuralScreen.NoRtx -> "No RTX card detected: DLSS 5 needs an RTX 30, 40 or 50 series card."
 

@@ -121,6 +121,21 @@ type ScreenEngineWindow() as this =
     member this.OnMethodScreenEngineClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.SelectMethod false)
     member this.OnMethodNeuralScreenClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.SelectMethod true)
 
+    member this.OnInstallNeuralScreenClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let zip = FilePickerFileType("NeuralScreen add-on", Patterns = [| "*.zip" |])
+            let options = FilePickerOpenOptions(Title = "Choose the downloaded NeuralScreen add-on zip", AllowMultiple = false, FileTypeFilter = [| zip |])
+            let! files = this.StorageProvider.OpenFilePickerAsync(options) |> Async.AwaitTask
+            if files.Count > 0 then
+                this.WithEngine(fun engine -> engine.InstallNeuralScreenAddon files.[0].Path.LocalPath)
+        }
+        |> Async.StartImmediate
+
+    member this.OnGetNeuralScreenClicked(sender: obj, e: RoutedEventArgs) =
+        try
+            Process.Start(ProcessStartInfo("https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest", UseShellExecute = true)) |> ignore
+        with _ -> ()
+
     member this.OnClearWindowClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.ClearWindow())
 
     // ----- engine commands -----

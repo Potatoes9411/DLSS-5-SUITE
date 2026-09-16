@@ -33,6 +33,17 @@ This release integrates the Full-Screen DLSS 5 Screen Engine and finishes its ap
 - Expands Settings search so Screen Engine controls can be found by their actual names.
 - Accepts the bundled neural-rendering compatibility model by one exact pinned SHA-256 while retaining NVIDIA Authenticode verification for every other runtime DLL.
 
+## Downloads
+
+| File | What it is |
+|---|---|
+| `DLSS 5 SUITE Setup v1.2.2-suite.1.exe` | The full installer. Everything except the NeuralScreen add-on. |
+| `DLSS 5 SUITE Web Setup v1.2.2-suite.1.exe` | The small installer; it fetches the payload while it runs. |
+| `DLSS 5 SUITE Portable v1.2.2-suite.1.zip` | No installer: unpack and run. |
+| `DLSS 5 SUITE NeuralScreen Add-on v1.2.2-suite.1.zip` | Only for RTX 30/40 cards, or an RTX 50 that wants the second method. Install it from the Screen Engine window's **Install from zip...** button. |
+
+NeuralScreen is a separate download because it is large, carries NVIDIA runtimes of its own, and only RTX 30/40 cards need it. SUITE shows the method as locked until it is installed.
+
 ## Compatibility-model trust policy
 
 The bundled `nvngx_dlssnr.dll` compatibility model is accepted only when its SHA-256 is:

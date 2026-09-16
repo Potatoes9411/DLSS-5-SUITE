@@ -46,6 +46,7 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - The Screen Engine and NeuralScreen share one themed window, opened from Settings: capture source, a click-or-drag window crosshair, Neural Rendering strength, style, passes, screenshots, recording, comparison sweeps and a capture folder. Changes apply on their own while a session runs.
 - Num2 brings those controls up over whatever is on screen while NeuralScreen runs, with a button back to the main window. NeuralScreen's own menu never opens.
 - Game installs receive a motion-vector provider and the technique order DLSS 5 needs, so the add-on overlay reports real motion vectors.
+- NeuralScreen ships as its own download. Install its zip from the Screen Engine window; SUITE keeps the method locked until then.
 - Integrated controls for a full monitor or selected window, with a running-window picker, direct screenshots, recording, comparison sweeps where supported, a selectable capture folder, output, model, motion, cursor, skin, diagnostics and advanced controls.
 - DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
 

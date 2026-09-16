@@ -36,9 +36,10 @@ NUMERIC="$BASE.$REV"
 echo "file version: $NUMERIC"
 
 FULL_TARGET="$DIST/DLSS 5 SUITE Setup v$VERSION.exe"
+NEURALSCREEN_TARGET="$DIST/DLSS 5 SUITE NeuralScreen Add-on v$VERSION.zip"
 WEB_TARGET="$DIST/DLSS 5 SUITE Web Setup v$VERSION.exe"
 PORTABLE_TARGET="$DIST/DLSS 5 SUITE Portable v$VERSION.zip"
-for TARGET in "$FULL_TARGET" "$WEB_TARGET" "$PORTABLE_TARGET"; do
+for TARGET in "$FULL_TARGET" "$WEB_TARGET" "$PORTABLE_TARGET" "$NEURALSCREEN_TARGET"; do
     if [ -e "$TARGET" ]; then
         echo "release artifact already exists; refusing to overwrite: $TARGET" >&2
         exit 1
@@ -79,6 +80,17 @@ else
     cp "$APP/Engine/LICENSE" "$APP/publish/engine/LICENSE.txt"
 fi
 
+# NeuralScreen is its own download: it is 435 MB, only RTX 30/40 cards need it,
+# and it carries NVIDIA runtimes of its own. The setup ships without it and
+# SUITE installs the zip on request, into the same "mod files/neuralscreen".
+mkdir -p "$DIST"
+if [ -d "$APP/publish/mod files/neuralscreen" ]; then
+    echo "--- packaging NeuralScreen add-on ---"
+    powershell -NoProfile -Command "Compress-Archive -Path '$APP/publish/mod files/neuralscreen' -DestinationPath '$NEURALSCREEN_TARGET' -CompressionLevel Optimal"
+    rm -rf "$APP/publish/mod files/neuralscreen"
+    echo "built: $NEURALSCREEN_TARGET"
+fi
+
 if [ "$1" = "--app-only" ]; then
     echo "done: $APP/publish"
     exit 0
@@ -117,4 +129,5 @@ echo ""
 echo "built: $FULL_TARGET"
 echo "built: $WEB_TARGET"
 echo "built: $PORTABLE_TARGET"
+echo "built: $NEURALSCREEN_TARGET"
 ls -1sh "$DIST" | sed 's/^/  /'
