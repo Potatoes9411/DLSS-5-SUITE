@@ -1249,6 +1249,43 @@
                                                             <Setter Property="Opacity" Value="1" />
                                                         </Style>
 
+                                                        <!-- Play: shown on hover, and kept on show while the game
+                                                             is starting or running so the way to stop it never hides -->
+                                                        <Style Selector="Panel.PlayControl">
+                                                            <Setter Property="Opacity" Value="0" />
+                                                        </Style>
+                                                        <Style Selector="StackPanel.GameCardItem:pointerover Panel.PlayControl, Panel.PlayControl.Active">
+                                                            <Setter Property="Opacity" Value="1" />
+                                                        </Style>
+                                                        <Style Selector="Button.PlayButton">
+                                                            <Setter Property="Width" Value="40" />
+                                                            <Setter Property="Height" Value="40" />
+                                                            <Setter Property="CornerRadius" Value="20" />
+                                                            <Setter Property="Padding" Value="0" />
+                                                            <Setter Property="BorderThickness" Value="1" />
+                                                            <Setter Property="BorderBrush" Value="#40FFFFFF" />
+                                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                                            <Setter Property="FontSize" Value="15" />
+                                                            <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                                            <Setter Property="VerticalContentAlignment" Value="Center" />
+                                                            <Setter Property="Cursor" Value="Hand" />
+                                                        </Style>
+                                                        <Style Selector="Button.PlayButton:pointerover /template/ ContentPresenter">
+                                                            <Setter Property="Background" Value="{Binding PlayBrush}" />
+                                                            <Setter Property="BorderBrush" Value="#90FFFFFF" />
+                                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                                        </Style>
+                                                        <Style Selector="Button.LaunchChoice">
+                                                            <Setter Property="Padding" Value="10,5" />
+                                                            <Setter Property="FontSize" Value="11" />
+                                                            <Setter Property="CornerRadius" Value="10" />
+                                                            <Setter Property="Background" Value="#26FFFFFF" />
+                                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                                            <Setter Property="HorizontalAlignment" Value="Stretch" />
+                                                            <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                                            <Setter Property="Cursor" Value="Hand" />
+                                                        </Style>
+
                                                         <!-- Inner Artwork Expansion -->
                                                         <Style Selector="Border.InnerGameCard">
                                                             <Setter Property="Width" Value="198" />
@@ -1436,6 +1473,39 @@
                                                                         </StackPanel>
                                                                     </Border>
                                                                 </Border>
+
+                                                                <!-- Play / cancel / stop, Steam style -->
+                                                                <Panel Classes="PlayControl" Classes.Active="{Binding IsLaunchActive}" ZIndex="12">
+                                                                    <Panel.Transitions>
+                                                                        <Transitions>
+                                                                            <DoubleTransition Property="Opacity" Duration="0:0:0.18" />
+                                                                        </Transitions>
+                                                                    </Panel.Transitions>
+
+                                                                    <Button Classes="PlayButton" Background="{Binding PlayBrush}" Content="{Binding PlayGlyph}"
+                                                                            ToolTip.Tip="{Binding PlayTooltip}" Click="OnPlayClicked"
+                                                                            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,10,10" />
+
+                                                                    <!-- First launch of a Steam title: how should it start? -->
+                                                                    <Border IsVisible="{Binding IsChoosingLaunch}" Background="#E6050C08" CornerRadius="14"
+                                                                            BorderBrush="#30FFFFFF" BorderThickness="1" Padding="12"
+                                                                            HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="12,0">
+                                                                        <StackPanel Spacing="8">
+                                                                            <TextBlock Text="Start this game with" FontSize="11" FontWeight="SemiBold" Foreground="#FFFFFF" HorizontalAlignment="Center" />
+                                                                            <Button Classes="LaunchChoice" Content="Steam" Click="OnLaunchViaSteamClicked"
+                                                                                    ToolTip.Tip="Steam overlay, cloud saves and playtime" />
+                                                                            <Button Classes="LaunchChoice" Content="The game's .exe" Click="OnLaunchViaExeClicked"
+                                                                                    ToolTip.Tip="Runs the executable directly, without Steam" />
+                                                                            <TextBlock Text="Remembered. Change it in Manage." FontSize="9.5" Foreground="#A3AEC0" HorizontalAlignment="Center" />
+                                                                        </StackPanel>
+                                                                    </Border>
+
+                                                                    <!-- Why a launch did not work -->
+                                                                    <Border IsVisible="{Binding HasLaunchMessage}" Background="#E0450A0A" CornerRadius="10" Padding="8,5"
+                                                                            HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="10,40,10,0" IsHitTestVisible="False">
+                                                                        <TextBlock Text="{Binding LaunchMessage}" FontSize="10" Foreground="#FECACA" TextWrapping="Wrap" />
+                                                                    </Border>
+                                                                </Panel>
                                                             </Panel>
                                                         </Border>
                                                     </Border>
@@ -2090,6 +2160,31 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Launching: how this game starts from its card, and with what -->
+                        <Border IsVisible="{Binding IsGameTarget}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <StackPanel Grid.Column="0" Spacing="3">
+                                        <TextBlock Text="LAUNCH" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                        <TextBlock Text="{Binding ManageLaunchRouteText}" FontSize="12" Foreground="#E2E8F0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageResetLaunchRouteClicked" Cursor="Hand"
+                                                IsVisible="{Binding ManageCanLaunchViaSteam}"
+                                                Content="Ask again" ToolTip.Tip="The next play asks whether to start through Steam or the .exe" />
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageOpenGameFolderClicked" Cursor="Hand"
+                                                Content="Open game folder" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="LAUNCH OPTIONS" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                    <TextBox Text="{Binding ManageLaunchArguments, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                             PlaceholderText="e.g. -dx12 -fullscreen" FontSize="12"
+                                             ToolTip.Tip="Passed to the game every time it starts from SUITE" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Install route: OptiScaler is recommended; the ReShade routes are exclusive with it -->
                         <Border IsVisible="{Binding IsGameTarget}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
                             <StackPanel Spacing="10">
@@ -2174,9 +2269,9 @@
                                             <Panel>
                                                 <Button Classes="SegmentedTab" Classes.Active="{Binding IsOptiNeural}" Click="OnSetOptiNeural"
                                                         IsEnabled="{Binding IsManageReady}" Padding="6,6" FontSize="11.5"
-                                                        Content="Upstream" Cursor="Hand"
+                                                        Content="DLSS-NR" Cursor="Hand"
                                                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                                                        ToolTip.Tip="neural-upstream - a different OptiScaler build, hooked exactly like DirectX 12" />
+                                                        ToolTip.Tip="OptiScaler with DLSS Neural Rendering. Works on DirectX 12, Vulkan and DirectX 11 (through OptiScaler's D3D12 bridge). The game must already use DLSS, FSR or XeSS." />
                                                 <Border Classes="ActiveRouteDot" IsVisible="{Binding IsOptiNeuralInstalled}" />
                                             </Panel>
                                         </UniformGrid>

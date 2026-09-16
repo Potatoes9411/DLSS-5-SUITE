@@ -53,6 +53,7 @@
     <Compile Include="Services\GameAnalyzer.fs" />
     <Compile Include="Services\IconExtractor.fs" />
     <Compile Include="Services\GameScanner.fs" />
+    <Compile Include="Services\GameLauncher.fs" />
     <Compile Include="Services\LosslessScalingDetector.fs" />
     <Compile Include="Services\VerifiedDownload.fs" />
     <Compile Include="Services\LosslessScalingInstaller.fs" />

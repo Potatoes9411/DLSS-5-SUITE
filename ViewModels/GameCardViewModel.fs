@@ -4,6 +4,7 @@ open System
 open System.IO
 open System.Text.RegularExpressions
 open Avalonia.Media.Imaging
+open Avalonia.Threading
 open DLSS_5_MANAGER.Models
 open DLSS_5_MANAGER.Services
 
@@ -18,6 +19,17 @@ type GameCardViewModel(game: GameItem) =
     let mutable isVerticalCover = false
     let mutable isDragging = false
     let mutable isDragTarget = false
+
+    // ---- launching ----
+    // 0 idle, 1 starting, 2 running. Watched once a second while not idle;
+    // nothing is polled for a card nobody has pressed play on.
+    let mutable launchState = 0
+    let mutable launchMessage = ""
+    let mutable isChoosingLaunch = false
+    let mutable startedAt = DateTime.MinValue
+    let mutable seenProcess = false
+    let launchWatch = DispatcherTimer(Interval = TimeSpan.FromSeconds(1.0))
+    let mutable watchAttached = false
 
     let cleanDisplayTitle (raw: string) =
         let cleaned = Regex.Replace(raw, @"\[.*?\]|\(.*?\)", "").Trim()
@@ -197,6 +209,147 @@ type GameCardViewModel(game: GameItem) =
         and set value =
             if this.SetProperty(&isDragTarget, value) then
                 this.RaisePropertyChanged("IsDragTarget")
+
+    // =====================================================================
+    // PLAY / CANCEL / STOP
+    // =====================================================================
+    member private this.RaiseLaunch() =
+        for name in
+            [ "IsLaunchIdle"; "IsLaunchStarting"; "IsLaunchRunning"; "IsLaunchActive"; "PlayGlyph"; "PlayBrush"
+              "PlayTooltip"; "LaunchMessage"; "HasLaunchMessage"; "IsChoosingLaunch" ] do
+            this.RaisePropertyChanged(name)
+
+    member private this.SetLaunchState(state: int, message: string) =
+        launchState <- state
+        launchMessage <- message
+        if not watchAttached then
+            watchAttached <- true
+            launchWatch.Tick.Add(fun _ -> this.WatchTick())
+        if state = 0 then launchWatch.Stop()
+        elif not launchWatch.IsEnabled then launchWatch.Start()
+        this.RaiseLaunch()
+
+    member _.IsLaunchIdle = launchState = 0
+    member _.IsLaunchStarting = launchState = 1
+    member _.IsLaunchRunning = launchState = 2
+    /// Keeps the button on show after the pointer leaves, so a starting or
+    /// running game never hides the way to stop it.
+    member _.IsLaunchActive = launchState <> 0 || isChoosingLaunch
+
+    /// Play, a square while it is starting (press to cancel), a cross to stop.
+    member _.PlayGlyph =
+        match launchState with
+        | 1 -> "■"
+        | 2 -> "✕"
+        | _ -> "▶"
+
+    member _.PlayBrush =
+        match launchState with
+        | 1 -> "#475569"
+        | 2 -> "#2563EB"
+        | _ -> "#22A31B"
+
+    member _.PlayTooltip =
+        match launchState with
+        | 1 -> "Starting... click to cancel"
+        | 2 -> "Stop"
+        | _ -> "Play"
+
+    member _.LaunchMessage = launchMessage
+    member _.HasLaunchMessage = launchMessage <> ""
+    member _.IsChoosingLaunch = isChoosingLaunch
+
+    /// The command line the game is started with, remembered per game.
+    member this.LaunchArguments
+        with get () = (GameLauncher.prefsFor currentGame).Arguments
+        and set (value: string) =
+            let prefs = GameLauncher.prefsFor currentGame
+            GameLauncher.savePrefs currentGame { prefs with Arguments = (if isNull value then "" else value) } |> ignore
+            this.RaisePropertyChanged("LaunchArguments")
+
+    member _.CanLaunchViaSteam = GameLauncher.canLaunchViaSteam currentGame
+
+    member _.LaunchRouteText =
+        match GameLauncher.routeOf (GameLauncher.prefsFor currentGame) with
+        | Some GameLauncher.ViaSteam -> "Starts through Steam"
+        | Some GameLauncher.ViaExe -> "Starts the executable directly"
+        | None when GameLauncher.canLaunchViaSteam currentGame -> "Asks how to start it the first time"
+        | None -> "Starts the executable directly"
+
+    /// Forgets the Steam-or-executable answer, so the next play asks again.
+    member this.ResetLaunchRoute() =
+        let prefs = GameLauncher.prefsFor currentGame
+        GameLauncher.savePrefs currentGame { prefs with Route = "" } |> ignore
+        this.RaisePropertyChanged("LaunchRouteText")
+
+    member this.OpenGameFolder() = GameLauncher.openFolder currentGame |> ignore
+
+    member private this.Launch(route: GameLauncher.LaunchRoute) =
+        isChoosingLaunch <- false
+        match GameLauncher.start currentGame route (GameLauncher.prefsFor currentGame).Arguments with
+        | Ok() ->
+            startedAt <- DateTime.UtcNow
+            seenProcess <- false
+            this.SetLaunchState(1, "")
+        | Error message -> this.SetLaunchState(0, message)
+
+    /// The first press on a Steam title asks how to start it; the answer is kept.
+    member this.ChooseLaunch(viaSteam: bool) =
+        let route = if viaSteam then GameLauncher.ViaSteam else GameLauncher.ViaExe
+        let prefs = GameLauncher.prefsFor currentGame
+        GameLauncher.savePrefs currentGame { prefs with Route = GameLauncher.routeKey route } |> ignore
+        this.RaisePropertyChanged("LaunchRouteText")
+        this.Launch route
+
+    member this.CancelLaunchChoice() =
+        isChoosingLaunch <- false
+        this.RaiseLaunch()
+
+    member this.PressPlay() =
+        match launchState with
+        | 0 when isChoosingLaunch -> this.CancelLaunchChoice()
+        | 0 ->
+            if GameLauncher.isRunning currentGame then
+                // Already open, started from somewhere else: show it as running.
+                seenProcess <- true
+                this.SetLaunchState(2, "")
+            elif GameLauncher.needsChoice currentGame then
+                isChoosingLaunch <- true
+                launchMessage <- ""
+                this.RaiseLaunch()
+            else
+                let route =
+                    match GameLauncher.routeOf (GameLauncher.prefsFor currentGame) with
+                    | Some r -> r
+                    | None -> if GameLauncher.hasExecutable currentGame then GameLauncher.ViaExe else GameLauncher.ViaSteam
+                this.Launch route
+        | _ ->
+            // Cancelling a start and stopping a game are the same request: close
+            // whatever of it exists, politely first.
+            let wasStarting = launchState = 1
+            this.SetLaunchState(1, if wasStarting then "Cancelling..." else "Closing...")
+            async {
+                do! GameLauncher.stop currentGame |> Async.AwaitTask
+                Dispatcher.UIThread.Post(fun () -> this.SetLaunchState(0, ""))
+            }
+            |> Async.Start
+
+    member private this.WatchTick() =
+        match launchState with
+        | 1 when launchMessage = "Cancelling..." || launchMessage = "Closing..." -> ()
+        | 1 ->
+            let alive = GameLauncher.isRunning currentGame
+            if alive then seenProcess <- true
+            if alive && (GameLauncher.hasWindow currentGame || (DateTime.UtcNow - startedAt).TotalSeconds > 20.0) then
+                this.SetLaunchState(2, "")
+            elif not alive && seenProcess then
+                // Came up and went away again before it was ever shown.
+                this.SetLaunchState(0, "The game closed while it was starting.")
+            elif (DateTime.UtcNow - startedAt).TotalSeconds > 90.0 then
+                this.SetLaunchState(0, "The game did not start within 90 seconds.")
+        | 2 ->
+            if not (GameLauncher.isRunning currentGame) then this.SetLaunchState(0, "")
+        | _ -> launchWatch.Stop()
 
     member this.LauncherBadgeBackground: string =
         match currentGame.LauncherTypeName with

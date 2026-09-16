@@ -1917,6 +1917,28 @@ type MainViewModel() as this =
     member this.ManageCard = manageCard
     member this.ManageTitle = manageTitle
     member this.ManageExePath = manageExePath
+
+    // ---- launching, per game ----
+    /// The command line the game in the Manage sheet starts with.
+    member this.ManageLaunchArguments
+        with get () = match manageCard with Some card -> card.LaunchArguments | None -> ""
+        and set (value: string) =
+            manageCard |> Option.iter (fun card -> card.LaunchArguments <- value)
+            this.RaisePropertyChanged("ManageLaunchArguments")
+
+    member this.ManageLaunchRouteText =
+        match manageCard with
+        | Some card -> card.LaunchRouteText
+        | None -> ""
+
+    member this.ManageCanLaunchViaSteam =
+        match manageCard with
+        | Some card -> card.CanLaunchViaSteam
+        | None -> false
+
+    member this.RefreshManageLaunch() =
+        for name in [ "ManageLaunchArguments"; "ManageLaunchRouteText"; "ManageCanLaunchViaSteam" ] do
+            this.RaisePropertyChanged(name)
     member this.ManageFolder = manageFolder
     member this.ManageReShadeText = manageReShadeText
     member this.ManageDlssText = manageDlssText
@@ -2505,6 +2527,7 @@ type MainViewModel() as this =
         manageAnalysis <- None
         manageTitle <- card.Title
         manageExePath <- card.ExecutablePath
+        this.RefreshManageLaunch()
 
         manageFolder <-
             if String.IsNullOrWhiteSpace(card.ExecutablePath) then card.InstallDirectory

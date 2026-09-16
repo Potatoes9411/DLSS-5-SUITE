@@ -715,9 +715,50 @@ type MainWindow() as this =
         ghostVY <- 0.0
         if not (isNull (box ghostTilt)) then ghostTilt.Angle <- 0.0
 
+    // =====================================================================
+    // PLAY / CANCEL / STOP
+    // =====================================================================
+    member private this.CardOf(sender: obj) =
+        match sender with
+        | :? Control as ctrl ->
+            match ctrl.DataContext with
+            | :? GameCardViewModel as card -> Some card
+            | _ -> None
+        | _ -> None
+
+    member this.OnPlayClicked(sender: obj, e: RoutedEventArgs) =
+        // Handled here, or the card underneath takes it as a click and opens Manage.
+        e.Handled <- true
+        this.CardOf sender |> Option.iter (fun card -> card.PressPlay())
+
+    member this.OnLaunchViaSteamClicked(sender: obj, e: RoutedEventArgs) =
+        e.Handled <- true
+        this.CardOf sender |> Option.iter (fun card -> card.ChooseLaunch true)
+
+    member this.OnLaunchViaExeClicked(sender: obj, e: RoutedEventArgs) =
+        e.Handled <- true
+        this.CardOf sender |> Option.iter (fun card -> card.ChooseLaunch false)
+
+    member this.OnManageOpenGameFolderClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ManageCard |> Option.iter (fun card -> card.OpenGameFolder())
+        | _ -> ()
+
+    member this.OnManageResetLaunchRouteClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm ->
+            vm.ManageCard |> Option.iter (fun card -> card.ResetLaunchRoute())
+            vm.RefreshManageLaunch()
+        | _ -> ()
+
     member this.OnCardPointerPressed(sender: obj, e: PointerPressedEventArgs) =
+        // A press that starts on a button inside the card belongs to that button.
+        let fromButton =
+            match e.Source with
+            | :? Avalonia.Visual as v -> not (isNull (Avalonia.VisualTree.VisualExtensions.FindAncestorOfType<Button>(v, true)))
+            | _ -> false
         let point = e.GetCurrentPoint(this)
-        if point.Properties.IsLeftButtonPressed then
+        if not fromButton && point.Properties.IsLeftButtonPressed then
             match sender with
             | :? Control as ctrl ->
                 match ctrl.DataContext with

@@ -1189,6 +1189,32 @@ module ModInstaller =
     /// Picks the proxy name OptiScaler can take over without colliding with a
     /// file the game already ships - the same walk down the setup's own menu,
     /// starting from whichever slot suits the game's graphics API.
+    /// Sets one key inside one [section] of an ini, leaving every other line
+    /// as it was. OptiScaler.ini repeats keys such as "Enabled" in dozens of
+    /// sections, so a key is only ever looked for between its own header and
+    /// the next one.
+    let private setIniKeyInSection (path: string) (section: string) (key: string) (value: string) =
+        let lines = if File.Exists(path) then File.ReadAllLines(path) |> List.ofArray else []
+        let header = "[" + section + "]"
+        let isKey (line: string) =
+            let trimmed = line.TrimStart()
+            trimmed.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase)
+        let updated =
+            match lines |> List.tryFindIndex (fun l -> l.Trim().Equals(header, StringComparison.OrdinalIgnoreCase)) with
+            | None -> lines @ [ ""; header; key + "=" + value ]
+            | Some start ->
+                let afterHeader = start + 1
+                let sectionEnd =
+                    lines
+                    |> List.skip afterHeader
+                    |> List.tryFindIndex (fun l -> l.TrimStart().StartsWith("["))
+                    |> Option.map (fun i -> afterHeader + i)
+                    |> Option.defaultValue lines.Length
+                match [ afterHeader .. sectionEnd - 1 ] |> List.tryFind (fun i -> isKey lines.[i]) with
+                | Some i -> lines |> List.mapi (fun j l -> if j = i then key + "=" + value else l)
+                | None -> List.truncate afterHeader lines @ [ key + "=" + value ] @ List.skip afterHeader lines
+        File.WriteAllLines(path, updated)
+
     let private pickOptiScalerSlot (dir: string) (useVulkan: bool) : string =
         let order = if useVulkan then optiScalerSlotsVulkan else optiScalerSlots
 
@@ -1340,8 +1366,17 @@ module ModInstaller =
     /// preprocessor definition and the technique order are written, because
     /// either one alone leaves the feed without vectors.
     let private ensureMotionVectorProvider (tracker: Tracker) (exeDir: string) (provider: int) =
-        let providerEffect = if provider = 3 then "Kernel@lumenite_Kernel.fx" else "QuantMotion@lumenite_QuantMotion.fx"
+        // ReShade names a technique by the name inside the .fx, not the file:
+        // "Lumenite_QuantMotion", not "QuantMotion". The short names were never
+        // enabled at all, which is what left the feed with no motion vectors.
+        let kernelEffect = "Lumenite_Kernel@lumenite_Kernel.fx"
+        let quantMotionEffect = "Lumenite_QuantMotion@lumenite_QuantMotion.fx"
+        let providerEffect = if provider = 3 then kernelEffect else quantMotionEffect
         let feedEffect = "DLSS5_Feed@DLSS5_Feed.fx"
+        let allProviderEffects =
+            [ kernelEffect; quantMotionEffect
+              // what earlier builds wrote, cleared so it does not linger
+              "Kernel@lumenite_Kernel.fx"; "QuantMotion@lumenite_QuantMotion.fx" ]
 
         /// One "key=value" line inside an ini, kept where it already is.
         let setKey (path: string) (section: string) (key: string) (value: string) =
@@ -1391,7 +1426,10 @@ module ModInstaller =
                 valueOf preset "Techniques"
                 |> fun s -> s.Split(',')
                 |> Array.map (fun x -> x.Trim())
-                |> Array.filter (fun x -> x <> "" && x <> providerEffect && x <> feedEffect)
+                // Both providers are dropped, not just the one being set: left
+                // enabled, the other still runs, and the feed - compiled for one
+                // of them - reads motion vectors nobody wrote.
+                |> Array.filter (fun x -> x <> "" && x <> feedEffect && not (List.contains x allProviderEffects))
             setKey preset "" "Techniques" (String.concat "," (Array.append [| providerEffect; feedEffect |] techniques))
             setKey preset "" "TechniqueSorting" (String.concat "," (Array.append [| providerEffect; feedEffect |] techniques))
             tracker.Record(preset, false, "")
@@ -1816,6 +1854,27 @@ module ModInstaller =
                 report (sprintf "Hooking OptiScaler as %s..." slotName) 0.42
                 tracker.Copy(optiDll, Path.Combine(exeDir, slotName))
 
+                // The DLSS-NR build ships with Neural Rendering at "auto", which
+                // OptiScaler reads as off: installed as it comes, the route put a
+                // neural build in place and never ran the model. A DirectX 11
+                // game also needs OptiScaler's D3D12 bridge chosen for its
+                // upscaler, or there is no D3D12 device for the model to run on.
+                let neuralDx11 =
+                    optiApi = OptiNeural
+                    && (match GameAnalyzer.detectGraphicsApi exePath with
+                        | "dx11" | "dx10" -> true
+                        | _ -> false)
+                if optiApi = OptiNeural then
+                    let ini = Path.Combine(exeDir, "OptiScaler.ini")
+                    if File.Exists(ini) then
+                        try
+                            report "Turning on DLSS Neural Rendering in OptiScaler..." 0.46
+                            setIniKeyInSection ini "DlssNr" "Enabled" "true"
+                            if neuralDx11 then
+                                setIniKeyInSection ini "Upscalers" "Dx11Upscaler" "dlss_12"
+                        with ex ->
+                            report ("OptiScaler.ini could not be updated: " + ex.Message) 0.46
+
                 report "Deploying DLSS 5 ray reconstruction model (165 MB)..." 0.52
                 copyIfEnabled tracker dlssnrFileName dlssnrFile (Path.Combine(exeDir, dlssnrFileName)) |> ignore
 
@@ -1854,7 +1913,8 @@ module ModInstaller =
                         " • ",
                         [ yield
                               (match optiApi with
-                               | OptiNeural -> "OptiScaler neural-upstream installed"
+                               | OptiNeural when neuralDx11 -> "OptiScaler DLSS-NR installed (DirectX 11 through the D3D12 bridge)"
+                               | OptiNeural -> "OptiScaler DLSS-NR installed"
                                | OptiVulkan -> "Vulkan + OptiScaler installed"
                                | OptiDx12 -> "DX12 + OptiScaler (recommended) installed")
                           yield sprintf "%d OptiScaler file(s) deployed" (deployed + 1)
