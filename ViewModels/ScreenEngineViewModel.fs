@@ -40,7 +40,7 @@ type ScreenEngineViewModel() as this =
     let mutable isRecording = false
     let mutable selectedSweepIndex = 0
     let mutable sweepValues = 5.0
-    let mutable pickerText = "Drag the crosshair onto a window"
+    let mutable pickerText = "Click, then Alt+Tab and click a window — or drag the crosshair onto it"
 
     // Changes apply by themselves. A running engine only reads its options at
     // start, so each change restarts it - but only once the settings have been
@@ -169,6 +169,7 @@ type ScreenEngineViewModel() as this =
             if before.LocalStructure <> after.LocalStructure then nsHost.SetParam("local_structure", after.LocalStructure) |> ignore
             if before.Skin <> after.Skin then nsHost.SetParam("skin_structure", NeuralScreen.skinOf after.Skin) |> ignore
             if before.Style <> after.Style then nsHost.SetStyle(NeuralScreen.styleOf after.Style) |> ignore
+            if before.Passes <> after.Passes then nsHost.SetPasses(after.Passes) |> ignore
             if before.Compare <> after.Compare then nsHost.SetSplit(NeuralScreen.splitOf after.Compare) |> ignore
             if before.NeuralRendering <> after.NeuralRendering then nsHost.ToggleNeuralRendering() |> ignore
             if before.Window <> after.Window then
@@ -250,6 +251,14 @@ type ScreenEngineViewModel() as this =
     /// What the crosshair is over while it is dragged, then what it picked.
     member _.PickerText = pickerText
 
+    member this.ArmWindowPicker() =
+        pickerText <- "Armed — Alt+Tab if needed, then click the window to capture"
+        this.RaisePropertyChanged("PickerText")
+
+    member this.CancelWindowPicker() =
+        pickerText <- "Selection cancelled. Click the crosshair to try again."
+        this.RaisePropertyChanged("PickerText")
+
     /// Called while the crosshair is dragged; the window is only taken when
     /// the button comes up, so passing over windows on the way changes nothing.
     member this.TrackWindowUnderCursor(take: bool) =
@@ -258,7 +267,7 @@ type ScreenEngineViewModel() as this =
             match found, take with
             | Some entry, true -> "Capturing: " + entry.Title
             | Some entry, false -> "Release over: " + entry.Title
-            | None, true -> "Nothing picked. Drag the crosshair onto another app's window."
+            | None, true -> "Nothing picked. Click the crosshair, then click another app's window."
             | None, false -> "Drag onto a window..."
         this.RaisePropertyChanged("PickerText")
         match found with

@@ -544,6 +544,9 @@ module ScreenEngine =
         [<DllImport("user32.dll")>]
         extern nativeint GetAncestor(nativeint window, uint32 flags)
 
+        [<DllImport("user32.dll")>]
+        extern int16 GetAsyncKeyState(int virtualKey)
+
     /// Every connected monitor, in the engine's order. Empty if Windows will
     /// not say.
     let listMonitors () =
@@ -624,6 +627,13 @@ module ScreenEngine =
                     else Some { Handle = window; Title = value }
         with _ ->
             None
+
+    /// True while the physical left mouse button is down, or when a click
+    /// happened since the previous check. Including Win32's low transition
+    /// bit prevents a fast click between timer ticks from being missed.
+    let isLeftMouseButtonDown () =
+        try (uint16 (Native.GetAsyncKeyState(0x01)) &&& 0x8001us) <> 0us
+        with _ -> false
 
     // =====================================================================
     // PERSISTENCE

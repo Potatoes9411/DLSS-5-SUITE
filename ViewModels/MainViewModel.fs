@@ -1397,10 +1397,11 @@ type MainViewModel() as this =
                 try
                     let report text value =
                         Dispatcher.UIThread.Post(fun () ->
-                            shaderGlassStatus <- text
-                            shaderGlassProgress <- value
-                            this.RaisePropertyChanged("ShaderGlassStatus")
-                            this.RaisePropertyChanged("ShaderGlassProgress"))
+                            if isSettingUpShaderGlass then
+                                shaderGlassStatus <- text
+                                shaderGlassProgress <- value
+                                this.RaisePropertyChanged("ShaderGlassStatus")
+                                this.RaisePropertyChanged("ShaderGlassProgress"))
                     let! path = ShaderGlassDetector.setupLatest report |> Async.AwaitTask
                     verifiedShaderGlassPath <- Some path
                     return Some path
@@ -1449,10 +1450,11 @@ type MainViewModel() as this =
                 try
                     let report text value =
                         Dispatcher.UIThread.Post(fun () ->
-                            losslessScalingStatus <- text
-                            losslessScalingProgress <- value
-                            this.RaisePropertyChanged("LosslessScalingStatus")
-                            this.RaisePropertyChanged("LosslessScalingProgress"))
+                            if isCheckingLosslessScaling then
+                                losslessScalingStatus <- text
+                                losslessScalingProgress <- value
+                                this.RaisePropertyChanged("LosslessScalingStatus")
+                                this.RaisePropertyChanged("LosslessScalingProgress"))
                     let! executable, monitors = LosslessScalingInstaller.setupLatest report |> Async.AwaitTask
                     let displayNote =
                         if monitors >= 2 then "Keep the game on display 1 and this Lossless Scaling window visible on display 2."

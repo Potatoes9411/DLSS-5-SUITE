@@ -12,11 +12,13 @@ open System.Threading.Tasks
 module ShaderGlassDetector =
 
     type Status = | Missing | Ready of string | NeedsUpdate of string
-    type ReleaseAsset = { Tag: string; Name: string; Url: string; Digest: string }
+    type ReleaseAsset = { Tag: string; Name: string; Url: string; Digest: string; Size: int64 }
 
     let private root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite", "Compatibility", "ShaderGlass")
     let private manifestPath = Path.Combine(root, "suite-component-manifest.json")
-    let private client = new HttpClient()
+    // The verified package is roughly 277 MB; HttpClient's 100-second
+    // default aborts a perfectly healthy download below ~3 MB/s.
+    let private client = new HttpClient(Timeout = TimeSpan.FromMinutes(30.0))
     do client.DefaultRequestHeaders.UserAgent.ParseAdd("DLSS5-SUITE/1.2.1")
 
     let private hash path =
@@ -40,32 +42,11 @@ module ShaderGlassDetector =
             match asset.TryGetProperty("digest") with
             | true, value when not (String.IsNullOrWhiteSpace(value.GetString())) -> value.GetString()
             | _ -> failwithf "%s did not publish a digest; download refused" repo
-        return { Tag = tag; Name = asset.GetProperty("name").GetString(); Url = asset.GetProperty("browser_download_url").GetString(); Digest = digest.Replace("sha256:", "").ToUpperInvariant() }
+        return { Tag = tag; Name = asset.GetProperty("name").GetString(); Url = asset.GetProperty("browser_download_url").GetString(); Digest = digest.Replace("sha256:", "").ToUpperInvariant(); Size = asset.GetProperty("size").GetInt64() }
     }
 
-    let private download (asset: ReleaseAsset) path (progress: string -> float -> unit) phaseStart phaseSize = task {
-        use! response = client.GetAsync(asset.Url, HttpCompletionOption.ResponseHeadersRead)
-        response.EnsureSuccessStatusCode() |> ignore
-        let total = response.Content.Headers.ContentLength |> Option.ofNullable |> Option.defaultValue 0L
-        use! source = response.Content.ReadAsStreamAsync()
-        use target = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None)
-        let buffer = Array.zeroCreate<byte> (128 * 1024)
-        let mutable received = 0L
-        let mutable reading = true
-        while reading do
-            let! count = source.ReadAsync(buffer, 0, buffer.Length)
-            if count = 0 then reading <- false
-            else
-                do! target.WriteAsync(buffer, 0, count)
-                received <- received + int64 count
-                let fraction = if total > 0L then float received / float total else 0.0
-                progress (sprintf "Downloading %s" asset.Name) (phaseStart + fraction * phaseSize)
-        target.Flush(true)
-        let actual = hash path
-        if not (String.Equals(actual, asset.Digest, StringComparison.OrdinalIgnoreCase)) then
-            File.Delete(path)
-            failwithf "SHA-256 mismatch for %s" asset.Name
-    }
+    let private download (asset: ReleaseAsset) path progress phaseStart phaseSize =
+        VerifiedDownload.download client asset.Name asset.Url asset.Digest asset.Size path progress phaseStart phaseSize
 
     let private extractSafe zipPath destination =
         let fullDestination = Path.GetFullPath(destination) + string Path.DirectorySeparatorChar
@@ -92,7 +73,8 @@ module ShaderGlassDetector =
         | NeedsUpdate _ -> "ShaderGlass exists, but its component record is missing. Run setup to verify and repair it."
         | Ready path -> sprintf "ShaderGlass compatibility is installed and update-aware.\n%s" path
 
-    let setupLatest (progress: string -> float -> unit) = task {
+    let setupLatest (progress: string -> float -> unit) =
+      VerifiedDownload.runExclusive progress (fun () -> task {
         Directory.CreateDirectory(root) |> ignore
         let cache = Path.Combine(root, ".downloads")
         Directory.CreateDirectory(cache) |> ignore
@@ -130,4 +112,4 @@ module ShaderGlassDetector =
         if Directory.Exists(staging) then Directory.Delete(staging, true)
         progress "ShaderGlass compatibility is ready" 100.0
         return exePath()
-    }
+      })

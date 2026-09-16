@@ -1,5 +1,6 @@
 namespace DLSS_5_MANAGER.Views
 
+open System
 open System.Diagnostics
 open System.IO
 open Avalonia.Controls
@@ -7,6 +8,8 @@ open Avalonia.Input
 open Avalonia.Interactivity
 open Avalonia.Markup.Xaml
 open Avalonia.Platform.Storage
+open Avalonia.Threading
+open DLSS_5_MANAGER.Services
 open DLSS_5_MANAGER.ViewModels
 
 /// The Screen Engine's own window, opened from Settings. Its DataContext is
@@ -16,10 +19,34 @@ type ScreenEngineWindow() as this =
     inherit Window()
 
     let mutable isPicking = false
+    let mutable wasDragged = false
+    let mutable pickerArmed = false
+    let mutable waitForButtonRelease = false
+    let mutable pickerTicksRemaining = 0
+    let mutable pressPosition = Avalonia.Point()
+    let pickerTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds(30.0))
     let mutable isOverlay = false
     let reopenSuiteRequested = Event<unit>()
 
-    do AvaloniaXamlLoader.Load(this)
+    do
+        AvaloniaXamlLoader.Load(this)
+        pickerTimer.Tick.Add(fun _ ->
+            if pickerArmed then
+                pickerTicksRemaining <- pickerTicksRemaining - 1
+                let down = ScreenEngine.isLeftMouseButtonDown ()
+                if waitForButtonRelease then
+                    if not down then waitForButtonRelease <- false
+                elif down then
+                    match ScreenEngine.windowAtCursor () with
+                    | Some _ ->
+                        pickerArmed <- false
+                        pickerTimer.Stop()
+                        this.WithEngine(fun engine -> engine.TrackWindowUnderCursor true)
+                    | None -> ()
+                elif pickerTicksRemaining <= 0 then
+                    pickerArmed <- false
+                    pickerTimer.Stop()
+                    this.WithEngine(fun engine -> engine.CancelWindowPicker()))
 
     member private this.Engine =
         match this.DataContext with
@@ -51,25 +78,45 @@ type ScreenEngineWindow() as this =
     member this.OnReopenSuiteClicked(sender: obj, e: RoutedEventArgs) = reopenSuiteRequested.Trigger()
     member this.OnMinimizeClicked(sender: obj, e: RoutedEventArgs) = this.WindowState <- WindowState.Minimized
 
-    // ----- crosshair: press, drag onto a window, let go -----
+    member private this.ArmClickPicker() =
+        pickerArmed <- true
+        waitForButtonRelease <- true
+        pickerTicksRemaining <- 2000 // one minute at 30 ms
+        this.WithEngine(fun engine -> engine.ArmWindowPicker())
+        pickerTimer.Start()
+
+    // ----- crosshair: click, Alt+Tab, then click; dragging still works -----
     member this.OnCrosshairPressed(sender: obj, e: PointerPressedEventArgs) =
         if e.GetCurrentPoint(this).Properties.IsLeftButtonPressed then
+            if pickerArmed then
+                pickerArmed <- false
+                pickerTimer.Stop()
+                this.WithEngine(fun engine -> engine.CancelWindowPicker())
             isPicking <- true
+            wasDragged <- false
+            pressPosition <- e.GetPosition(this)
             e.Pointer.Capture(sender :?> IInputElement)
-            this.WithEngine(fun engine -> engine.TrackWindowUnderCursor false)
             e.Handled <- true
 
     member this.OnCrosshairMoved(sender: obj, e: PointerEventArgs) =
-        if isPicking then this.WithEngine(fun engine -> engine.TrackWindowUnderCursor false)
+        if isPicking then
+            let p = e.GetPosition(this)
+            if abs (p.X - pressPosition.X) >= 5.0 || abs (p.Y - pressPosition.Y) >= 5.0 then
+                wasDragged <- true
+                this.WithEngine(fun engine -> engine.TrackWindowUnderCursor false)
 
     member this.OnCrosshairReleased(sender: obj, e: PointerReleasedEventArgs) =
         if isPicking then
             isPicking <- false
             e.Pointer.Capture(null)
-            this.WithEngine(fun engine -> engine.TrackWindowUnderCursor true)
+            if wasDragged then this.WithEngine(fun engine -> engine.TrackWindowUnderCursor true)
+            else this.ArmClickPicker()
             e.Handled <- true
 
-    member this.OnCrosshairCaptureLost(sender: obj, e: PointerCaptureLostEventArgs) = isPicking <- false
+    member this.OnCrosshairCaptureLost(sender: obj, e: PointerCaptureLostEventArgs) =
+        // Releasing capture is part of both valid paths. Do not cancel the
+        // armed picker when SUITE loses focus to Alt+Tab.
+        isPicking <- false
 
     member this.OnMethodScreenEngineClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.SelectMethod false)
     member this.OnMethodNeuralScreenClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.SelectMethod true)

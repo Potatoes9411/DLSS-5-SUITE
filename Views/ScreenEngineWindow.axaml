@@ -127,7 +127,7 @@
                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                     <Border Grid.Column="0" Width="46" Height="46" CornerRadius="12" Cursor="Cross"
                                             Background="#5C121619" BorderBrush="#5500FF88" BorderThickness="1"
-                                            ToolTip.Tip="Hold and drag onto the window to capture"
+                                            ToolTip.Tip="Click, then Alt+Tab and click a window — or drag this crosshair onto it"
                                             PointerPressed="OnCrosshairPressed" PointerMoved="OnCrosshairMoved"
                                             PointerReleased="OnCrosshairReleased" PointerCaptureLost="OnCrosshairCaptureLost">
                                         <PathIcon Width="24" Height="24" Foreground="#4ADE80"
@@ -173,7 +173,7 @@
                                     <Slider Grid.Column="1" Minimum="0" Maximum="5" Value="{Binding LocalToneSlider, Mode=TwoWay}" VerticalAlignment="Center" />
                                     <TextBox Grid.Column="2" Text="{Binding LocalToneText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" ToolTip.Tip="Type any value, then press Tab or click away" />
                                 </Grid>
-                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10" IsVisible="{Binding IsScreenEngine}">
+                                <Grid ColumnDefinitions="110,*,72" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="Passes" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                     <Slider Grid.Column="1" Minimum="1" Maximum="4" TickFrequency="1" IsSnapToTickEnabled="True"
                                             Value="{Binding PassesSlider, Mode=TwoWay}" VerticalAlignment="Center" />
@@ -300,7 +300,7 @@
                             <TextBlock Text="Needs an NVIDIA RTX GPU and a driver with DLSS 5 support. Hotkeys while running: Ctrl+Alt+Shift+O original/processed, Ctrl+Alt+Shift+C split view, Ctrl+Alt+Shift+Q stop. Engine: Full-Screen Wrapper for DLSS5."
                                        TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
                             </StackPanel>
-                            <TextBlock IsVisible="{Binding IsNeuralScreen}" TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" Text="NeuralScreen runs in the background; every change here applies to the picture straight away. Needs an RTX 30, 40 or 50 series card and a current NVIDIA driver. Passes are a Screen Engine feature: NeuralScreen runs the model once a frame." />
+                            <TextBlock IsVisible="{Binding IsNeuralScreen}" TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" Text="NeuralScreen runs in the background; every change here applies to the picture straight away. Needs an RTX 30, 40 or 50 series card and a current NVIDIA driver. Passes run the model up to four times on its own result; each extra pass costs frame rate." />
                             <TextBlock IsVisible="{Binding IsNeuralScreen}" TextWrapping="Wrap" Foreground="#FBBF24" FontSize="11" Text="One-window capture in NeuralScreen needs the screen to be driven by the NVIDIA card. On laptops whose screen runs through the integrated GPU it can only process the whole screen - use the Screen Engine tab for a single window there." />
                         </StackPanel>
                     </Border>

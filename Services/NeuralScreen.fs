@@ -156,6 +156,7 @@ module NeuralScreen =
         set "local_structure" (JsonValue.Create(clampParam "local_structure" s.LocalStructure))
         set "skin_structure" (JsonValue.Create(skinOf s.Skin))
         set "style" (JsonValue.Create(styleOf s.Style))
+        set "passes" (JsonValue.Create(Math.Clamp(s.Passes, 1, 4)))
         set "split" (JsonValue.Create(splitOf s.Compare))
         set "screenshot_dir" (JsonValue.Create(captureFolder))
         // SUITE's window is the menu; NeuralScreen's own stays shut.
@@ -278,6 +279,7 @@ module NeuralScreen =
             action [ JsonValue.Create("param"); JsonValue.Create(key); JsonValue.Create(clampParam key value) ]
 
         member _.SetStyle(style: int) = action [ JsonValue.Create("style"); JsonValue.Create(Math.Clamp(style, 0, 2)) ]
+        member _.SetPasses(passes: int) = action [ JsonValue.Create("passes"); JsonValue.Create(Math.Clamp(passes, 1, 4)) ]
         member _.SetSplit(split: float) = action [ JsonValue.Create("split"); JsonValue.Create(Math.Clamp(split, 0.0, 1.0)) ]
         member _.ToggleNeuralRendering() = action [ JsonValue.Create("nr") ]
 

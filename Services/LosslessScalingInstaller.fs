@@ -13,7 +13,7 @@ open System.Text.Json
 /// stack into an existing, licensed Steam copy of Lossless Scaling.
 module LosslessScalingInstaller =
 
-    type private Asset = { Tag: string; Name: string; Url: string; Digest: string }
+    type private Asset = { Tag: string; Name: string; Url: string; Digest: string; Size: int64 }
 
     let private client = new HttpClient(Timeout = TimeSpan.FromMinutes(30.0))
     do client.DefaultRequestHeaders.UserAgent.ParseAdd("DLSS5-SUITE/1.2.1")
@@ -44,33 +44,14 @@ module LosslessScalingInstaller =
             | true, value when not (String.IsNullOrWhiteSpace(value.GetString())) -> value.GetString().Replace("sha256:", "").ToUpperInvariant()
             | _ -> failwithf "%s did not publish a SHA-256 digest" repo
         if digest.Length <> 64 then failwith "Invalid component digest"
-        return { Tag = tag; Name = assetName; Url = url; Digest = digest }
+        return { Tag = tag; Name = assetName; Url = url; Digest = digest; Size = asset.GetProperty("size").GetInt64() }
     }
 
     let private latestAsset repo expectedName =
         latestMatchingAsset repo expectedName (fun name -> String.Equals(name, expectedName, StringComparison.Ordinal))
 
-    let private download (asset: Asset) destination progress start size = task {
-        use! response = client.GetAsync(asset.Url, HttpCompletionOption.ResponseHeadersRead)
-        response.EnsureSuccessStatusCode() |> ignore
-        let total = response.Content.Headers.ContentLength |> Option.ofNullable |> Option.defaultValue 0L
-        use! input = response.Content.ReadAsStreamAsync()
-        use output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None)
-        let buffer = Array.zeroCreate<byte> (128 * 1024)
-        let mutable received = 0L
-        let mutable reading = true
-        while reading do
-            let! count = input.ReadAsync(buffer, 0, buffer.Length)
-            if count = 0 then reading <- false
-            else
-                do! output.WriteAsync(buffer, 0, count)
-                received <- received + int64 count
-                progress (sprintf "Downloading %s" asset.Name) (start + size * (if total > 0 then float received / float total else 0.0))
-        output.Flush(true)
-        if not (String.Equals(hash destination, asset.Digest, StringComparison.OrdinalIgnoreCase)) then
-            File.Delete(destination)
-            failwithf "SHA-256 verification failed for %s" asset.Name
-    }
+    let private download (asset: Asset) destination progress start size =
+        VerifiedDownload.download client asset.Name asset.Url asset.Digest asset.Size destination progress start size
 
     let private extractSafe zipPath destination =
         let root = Path.GetFullPath(destination) + string Path.DirectorySeparatorChar
@@ -112,7 +93,8 @@ module LosslessScalingInstaller =
         return feeder
     }
 
-    let setupLatest progress = task {
+    let setupLatest progress =
+      VerifiedDownload.runExclusive progress (fun () -> task {
         let installation =
             (LosslessScalingDetector.discover()).Installations
             |> List.tryHead
@@ -151,4 +133,4 @@ module LosslessScalingInstaller =
         
         progress "Lossless Scaling compatibility is ready" 100.0
         return installation.Executable, monitors
-    }
+      })
