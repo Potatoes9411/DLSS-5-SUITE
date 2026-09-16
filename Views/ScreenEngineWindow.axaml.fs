@@ -132,9 +132,7 @@ type ScreenEngineWindow() as this =
         |> Async.StartImmediate
 
     member this.OnGetNeuralScreenClicked(sender: obj, e: RoutedEventArgs) =
-        try
-            Process.Start(ProcessStartInfo("https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest", UseShellExecute = true)) |> ignore
-        with _ -> ()
+        this.WithEngine(fun engine -> engine.DownloadNeuralScreenAddon())
 
     member this.OnClearWindowClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.ClearWindow())
 

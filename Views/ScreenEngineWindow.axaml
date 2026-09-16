@@ -95,11 +95,13 @@
                             <TextBlock Text="{Binding GpuName}" FontSize="10.5" Foreground="#64748B" />
                             <Border IsVisible="{Binding NeuralScreenNeedsInstall}" Background="#22FBBF24" BorderBrush="#55FBBF24" BorderThickness="1" CornerRadius="12" Padding="12,10">
                                 <StackPanel Spacing="8">
-                                    <TextBlock Text="NeuralScreen is a separate download (about 435 MB), because only RTX 30/40 cards need it." Foreground="#FDE68A" FontSize="11.5" TextWrapping="Wrap" />
+                                    <TextBlock Text="NeuralScreen is a separate download (about 221 MB), because only RTX 30/40 cards need it. SUITE fetches and installs it here." Foreground="#FDE68A" FontSize="11.5" TextWrapping="Wrap" />
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Content="Get the add-on" Click="OnGetNeuralScreenClicked" />
-                                        <Button Content="Install from zip..." Click="OnInstallNeuralScreenClicked" />
+                                        <Button Classes="PrimaryActionBtn" Content="Download and install" Click="OnGetNeuralScreenClicked" IsEnabled="{Binding !IsInstallingAddon}" />
+                                        <Button Content="Install from zip..." Click="OnInstallNeuralScreenClicked" IsEnabled="{Binding !IsInstallingAddon}" />
                                     </StackPanel>
+                                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding AddonProgress}" Height="6" IsVisible="{Binding IsInstallingAddon}" />
+                                    <TextBlock Text="{Binding AddonStatus}" Foreground="#FDE68A" FontSize="11" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
                             </StackPanel>
