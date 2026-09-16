@@ -1329,6 +1329,75 @@ module ModInstaller =
 
         (shadersRoot, standardEffects)
 
+    /// DLSS 5 needs motion vectors, and ReShade has none of its own: a
+    /// provider effect has to run before DLSS5_Feed and the shader has to be
+    /// compiled for that provider. Without this the add-on reports
+    /// "DLSS is getting (almost) no motion vectors" and the picture is built
+    /// from the current frame alone.
+    ///
+    /// Provider 4 is lumenite_QuantMotion, which SUITE bundles; the Need for
+    /// Speed route uses the fuller Lumenite kernel (3) instead. Both the
+    /// preprocessor definition and the technique order are written, because
+    /// either one alone leaves the feed without vectors.
+    let private ensureMotionVectorProvider (tracker: Tracker) (exeDir: string) (provider: int) =
+        let providerEffect = if provider = 3 then "Kernel@lumenite_Kernel.fx" else "QuantMotion@lumenite_QuantMotion.fx"
+        let feedEffect = "DLSS5_Feed@DLSS5_Feed.fx"
+
+        /// One "key=value" line inside an ini, kept where it already is.
+        let setKey (path: string) (section: string) (key: string) (value: string) =
+            let isKey (line: string) = line.TrimStart().StartsWith(key + "=", StringComparison.OrdinalIgnoreCase)
+            let existing = if File.Exists(path) then File.ReadAllLines(path) |> List.ofArray else []
+            let updated =
+                if existing |> List.exists isKey then
+                    existing |> List.map (fun l -> if isKey l then key + "=" + value else l)
+                elif section = "" then
+                    existing @ [ key + "=" + value ]
+                else
+                    match existing |> List.tryFindIndex (fun l -> l.Trim().Equals(section, StringComparison.OrdinalIgnoreCase)) with
+                    | Some i -> List.truncate (i + 1) existing @ [ key + "=" + value ] @ List.skip (i + 1) existing
+                    | None -> existing @ [ section; key + "=" + value ]
+            File.WriteAllLines(path, updated)
+
+        let valueOf (path: string) (key: string) =
+            if not (File.Exists(path)) then ""
+            else
+                File.ReadAllLines(path)
+                |> Array.tryPick (fun l ->
+                    let trimmed = l.TrimStart()
+                    if trimmed.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase) then Some(trimmed.Substring(key.Length + 1).Trim())
+                    else None)
+                |> Option.defaultValue ""
+
+        try
+            let ini = Path.Combine(exeDir, "ReShade.ini")
+
+            // The definition the shader compiles against. Anything else the
+            // user has defined is kept; only ours is replaced.
+            let definitions =
+                valueOf ini "PreprocessorDefinitions"
+                |> fun s -> s.Split(',')
+                |> Array.map (fun d -> d.Trim())
+                |> Array.filter (fun d -> d <> "" && not (d.StartsWith("DLSS5_MV_PROVIDER=", StringComparison.OrdinalIgnoreCase)))
+                |> Array.append [| sprintf "DLSS5_MV_PROVIDER=%d" provider |]
+                |> String.concat ","
+            setKey ini "[GENERAL]" "PreprocessorDefinitions" definitions
+
+            let preset = Path.Combine(exeDir, "ReShadePreset.ini")
+            setKey ini "[GENERAL]" "PresetPath" ".\\ReShadePreset.ini"
+
+            // The provider has to produce its vectors before the feed reads
+            // them, so it goes first in the list and neither is listed twice.
+            let techniques =
+                valueOf preset "Techniques"
+                |> fun s -> s.Split(',')
+                |> Array.map (fun x -> x.Trim())
+                |> Array.filter (fun x -> x <> "" && x <> providerEffect && x <> feedEffect)
+            setKey preset "" "Techniques" (String.concat "," (Array.append [| providerEffect; feedEffect |] techniques))
+            setKey preset "" "TechniqueSorting" (String.concat "," (Array.append [| providerEffect; feedEffect |] techniques))
+            tracker.Record(preset, false, "")
+        with _ ->
+            ()
+
     /// Copies a payload file only when the user has left it switched on.
     /// A file switched off is simply not deployed - it is not an error, and
     /// nothing else about the install changes.
@@ -2155,16 +2224,21 @@ module ModInstaller =
                     copyIfEnabled tracker feedAddonName feedAddonFile (Path.Combine(exeDir, feedAddonName)) |> ignore
                     0
 
-            // For recognised Need for Speed titles the Lumenite kernel
-            // requires motion-vector provider 3.  Write the config once so
-            // the feed add-on picks it up on first launch.
+            // Motion vectors. The Need for Speed route carries the fuller
+            // Lumenite kernel (provider 3); every other game gets the bundled
+            // QuantMotion (4). Without one of them DLSS 5 runs on the current
+            // frame alone, which is what "no motion vectors" in the add-on's
+            // overlay means.
+            let isNeedForSpeed = NeedForSpeedProfiles.tryRecommendedRoute game.Title |> Option.isSome
+            let mvProvider = if isNeedForSpeed then 3 else 4
             let feedCfgPath = Path.Combine(exeDir, "dlss5-feed.cfg")
-            if not (File.Exists(feedCfgPath))
-               && NeedForSpeedProfiles.tryRecommendedRoute game.Title |> Option.isSome then
+            if not (File.Exists(feedCfgPath)) then
                 try
-                    File.WriteAllText(feedCfgPath, "DLSS5_MV_PROVIDER=3\n")
+                    File.WriteAllText(feedCfgPath, sprintf "DLSS5_MV_PROVIDER=%d\n" mvProvider)
                     tracker.Record(feedCfgPath, false, "")
                 with _ -> ()
+
+            ensureMotionVectorProvider tracker exeDir mvProvider
 
             // -------------------------------------------------------------
             // 3-4. NVIDIA Streamline + DLSS runtime
