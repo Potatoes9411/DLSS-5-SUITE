@@ -1,5 +1,6 @@
 #pragma once
 #include "effects/real/com.h"
+#include "infrastructure/bounded_vector.h"
 #include "interior/monitors.h"
 
 #include <optional>
@@ -20,6 +21,12 @@ struct OutputWindow
     interior::ScreenRect rect;
 };
 
+// One change SUITE asked for while the session runs: which setting, and what to set it to. They arrive as
+// window messages like the capture requests do, and several can land in one frame, so they are kept in the
+// order they came in rather than merged.
+constexpr std::size_t kMaxTuneRequests = 32;
+using TuneRequests = infra::BoundedVector<std::uint64_t, kMaxTuneRequests>;
+
 struct WindowEvents
 {
     bool quit;
@@ -28,6 +35,7 @@ struct WindowEvents
     bool screenshot;
     bool record;
     std::uint64_t comparisonSweep;
+    TuneRequests tunes;
 };
 
 constexpr int kHotkeyToggleOriginal = 1;
@@ -36,6 +44,29 @@ constexpr int kHotkeyQuit = 3;
 constexpr UINT kSuiteScreenshotMessage = WM_APP + 0x451;
 constexpr UINT kSuiteRecordMessage = WM_APP + 0x452;
 constexpr UINT kSuiteComparisonMessage = WM_APP + 0x453;
+// A single setting, so the session does not have to be restarted to change one. lParam carries the field in
+// its top byte and the value in its low 32 bits; a float value is that number of ten-thousandths.
+constexpr UINT kSuiteTuneMessage = WM_APP + 0x454;
+constexpr std::uint64_t kTuneFieldShift = 56;
+constexpr std::int32_t kTuneScale = 10000;
+
+enum class TuneField : std::uint8_t {
+    None = 0,
+    Intensity = 1,
+    LocalStructure = 2,
+    LocalTone = 3,
+    SkinStructure = 4,
+    Style = 5,
+    AutoMask = 6,
+    Passes = 7,
+    NeuralRendering = 8,
+};
+
+[[nodiscard]] constexpr TuneField FieldOfTune(std::uint64_t word) noexcept { return static_cast<TuneField>(static_cast<std::uint8_t>(word >> kTuneFieldShift)); }
+
+[[nodiscard]] constexpr std::int32_t RawOfTune(std::uint64_t word) noexcept { return static_cast<std::int32_t>(static_cast<std::uint32_t>(word & 0xFFFFFFFFULL)); }
+
+[[nodiscard]] constexpr float FloatOfTune(std::uint64_t word) noexcept { return static_cast<float>(RawOfTune(word)) / static_cast<float>(kTuneScale); }
 
 // Registers a window class, treating "already registered" as success. Shared with the control panel.
 [[nodiscard]] infra::Status<Error> RegisterWindowClass(const WNDCLASSEXW& description) noexcept;

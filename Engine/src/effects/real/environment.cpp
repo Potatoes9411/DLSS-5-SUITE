@@ -215,6 +215,80 @@ constexpr std::uint64_t kSweepFieldMask = (1ULL << kSweepFieldBits) - 1ULL;
     return events.screenshot || events.record || events.comparisonSweep != 0;
 }
 
+// One setting SUITE changed, over the settings the session is running with. Anything that does not parse
+// leaves the picture as it is: a bad number is not worth a restart, and never worth a crash.
+[[nodiscard]] interior::NrTuning TunedBy(const interior::NrTuning& t, std::uint64_t word) noexcept
+{
+    static constexpr auto WithIntensity = [] [[nodiscard]] (const interior::NrTuning& t, float value) noexcept -> interior::NrTuning {
+        const interior::NrIntensity intensity = interior::NrIntensityTag::Parse(value).value_or(t.intensity);
+        return interior::NrTuning{ t.preset, intensity, t.style, t.localStructure, t.localTone, t.skinStructure, t.autoMask, t.uiCorrection };
+    };
+    static constexpr auto WithStructure = [] [[nodiscard]] (const interior::NrTuning& t, float value) noexcept -> interior::NrTuning {
+        const interior::Strength structure = interior::StrengthTag::Parse(value).value_or(t.localStructure);
+        return interior::NrTuning{ t.preset, t.intensity, t.style, structure, t.localTone, t.skinStructure, t.autoMask, t.uiCorrection };
+    };
+    static constexpr auto WithTone = [] [[nodiscard]] (const interior::NrTuning& t, float value) noexcept -> interior::NrTuning {
+        const interior::Strength tone = interior::StrengthTag::Parse(value).value_or(t.localTone);
+        return interior::NrTuning{ t.preset, t.intensity, t.style, t.localStructure, tone, t.skinStructure, t.autoMask, t.uiCorrection };
+    };
+    static constexpr auto WithSkin = [] [[nodiscard]] (const interior::NrTuning& t, float value) noexcept -> interior::NrTuning {
+        const interior::SkinStrength skin = interior::SkinStrengthTag::Parse(value).value_or(t.skinStructure);
+        return interior::NrTuning{ t.preset, t.intensity, t.style, t.localStructure, t.localTone, skin, t.autoMask, t.uiCorrection };
+    };
+    static constexpr auto WithStyle = [] [[nodiscard]] (const interior::NrTuning& t, std::int32_t raw) noexcept -> interior::NrTuning {
+        if (raw < 0 || raw > 2)
+            return t;
+        return interior::NrTuning{ t.preset, t.intensity, static_cast<interior::NrStyle>(raw), t.localStructure, t.localTone, t.skinStructure, t.autoMask, t.uiCorrection };
+    };
+    static constexpr auto WithMask = [] [[nodiscard]] (const interior::NrTuning& t, bool on) noexcept -> interior::NrTuning {
+        return interior::NrTuning{ t.preset, t.intensity, t.style, t.localStructure, t.localTone, t.skinStructure, on, t.uiCorrection };
+    };
+    switch (FieldOfTune(word))
+    {
+    case TuneField::Intensity: return WithIntensity(t, FloatOfTune(word));
+    case TuneField::LocalStructure: return WithStructure(t, FloatOfTune(word));
+    case TuneField::LocalTone: return WithTone(t, FloatOfTune(word));
+    case TuneField::SkinStructure: return WithSkin(t, FloatOfTune(word));
+    case TuneField::Style: return WithStyle(t, RawOfTune(word));
+    case TuneField::AutoMask: return WithMask(t, RawOfTune(word) != 0);
+    case TuneField::None:
+    case TuneField::Passes:
+    case TuneField::NeuralRendering:
+    default: return t;
+    }
+}
+
+[[nodiscard]] interior::LiveSettings TunedBy(const interior::LiveSettings& live, std::uint64_t word) noexcept
+{
+    static constexpr auto WithPasses = [] [[nodiscard]] (const interior::LiveSettings& live, std::int32_t raw) noexcept -> interior::LiveSettings {
+        if (raw <= 0)
+            return live;
+        const interior::PassCount passes = interior::PassCountTag::Parse(static_cast<std::uint32_t>(raw)).value_or(live.passes);
+        return interior::LiveSettings{ live.neuralRendering, live.tuning,        passes,           live.depthInverted, live.mvScaleX,
+                                       live.mvScaleY,        live.vsync,         live.resetThreshold, live.depth };
+    };
+    if (FieldOfTune(word) == TuneField::Passes)
+        return WithPasses(live, RawOfTune(word));
+    if (FieldOfTune(word) == TuneField::NeuralRendering)
+        return interior::LiveSettings{ RawOfTune(word) != 0, live.tuning,   live.passes,         live.depthInverted, live.mvScaleX,
+                                       live.mvScaleY,        live.vsync,    live.resetThreshold, live.depth };
+    return interior::LiveSettings{ live.neuralRendering, TunedBy(live.tuning, word), live.passes,         live.depthInverted, live.mvScaleX,
+                                   live.mvScaleY,        live.vsync,                 live.resetThreshold, live.depth };
+}
+
+// Every change SUITE asked for this frame, in the order it asked.
+[[nodiscard]] interior::LiveSettings TunedByAll(const interior::LiveSettings& live, const TuneRequests& tunes) noexcept
+{
+    return std::ranges::fold_left(tunes.Items(), live, [](const interior::LiveSettings& so, std::uint64_t word) { return TunedBy(so, word); });
+}
+
+// Whether this frame carries anything from SUITE at all: a capture to take, or a setting to change. A
+// setting change is what keeps the session alive across a slider move instead of restarting it.
+[[nodiscard]] bool HasSuiteRequest(const WindowEvents& events) noexcept
+{
+    return HasSuiteCaptureRequest(events) || !events.tunes.IsEmpty();
+}
+
 [[nodiscard]] ComparisonRequest SuiteComparisonOf(const WindowEvents& events) noexcept
 {
     return ComparisonRequest{ .start = events.comparisonSweep != 0, .axes = SweepOf(events.comparisonSweep) };
@@ -229,7 +303,7 @@ constexpr std::uint64_t kSweepFieldMask = (1ULL << kSweepFieldBits) - 1ULL;
 
 [[nodiscard]] PanelReading SuiteReadingOf(const WindowEvents& events, const EnvironmentSettings& settings, const interior::FrameState& state) noexcept
 {
-    return PanelReading{ state.controls, settings.surface, state.display, state.split, SuiteCaptureOf(events, settings.captureFolder) };
+    return PanelReading{ TunedByAll(state.controls, events.tunes), settings.surface, state.display, state.split, SuiteCaptureOf(events, settings.captureFolder) };
 }
 
 [[nodiscard]] PanelReading WithSuiteCapture(PanelReading reading, const WindowEvents& events) noexcept
@@ -239,6 +313,7 @@ constexpr std::uint64_t kSweepFieldMask = (1ULL << kSweepFieldBits) - 1ULL;
     reading.capture.record = reading.capture.record || suite.record;             // WAIVER(R2): a panel reading is merged once with this frame's SUITE request.
     if (suite.comparison.start)
         reading.capture.comparison = suite.comparison; // WAIVER(R2): the explicit SUITE sweep replaces the panel sweep for this one request.
+    reading.live = TunedByAll(reading.live, events.tunes); // WAIVER(R2): a panel reading takes this frame's SUITE changes once.
     return reading;
 }
 
@@ -532,7 +607,7 @@ Result<FrameStart, Error> RealEnvironment::BeginFrame(const interior::FrameState
                             ApplySplit(panel, *drag);
                     };
                     if (surroundings.panel == nullptr)
-                        return HasSuiteCaptureRequest(events) ? std::optional<PanelReading>{ SuiteReadingOf(events, surroundings.settings, state) } : std::nullopt;
+                        return HasSuiteRequest(events) ? std::optional<PanelReading>{ SuiteReadingOf(events, surroundings.settings, state) } : std::nullopt;
                     SteerPanel(*surroundings.panel, events, drag, state);
                     return WithSuiteCapture(ReadControlPanel(*surroundings.panel, state.controls), events);
                 };

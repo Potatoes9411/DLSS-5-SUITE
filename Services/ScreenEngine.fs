@@ -36,6 +36,30 @@ module ScreenEngine =
         [<Literal>]
         let ComparisonMessage = 0x8453u
 
+        /// One model setting, changed while the session runs. Without this the
+        /// engine only reads its settings when it starts, so every slider move
+        /// meant restarting it and the picture went away for a second.
+        [<Literal>]
+        let TuneMessage = 0x8454u
+
+        // The fields the engine takes live, as it numbers them.
+        [<Literal>]
+        let TuneIntensity = 1
+        [<Literal>]
+        let TuneLocalStructure = 2
+        [<Literal>]
+        let TuneLocalTone = 3
+        [<Literal>]
+        let TuneSkin = 4
+        [<Literal>]
+        let TuneStyle = 5
+        [<Literal>]
+        let TuneAutoMask = 6
+        [<Literal>]
+        let TunePasses = 7
+        [<Literal>]
+        let TuneNeuralRendering = 8
+
         [<DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)>]
         extern nativeint FindWindowW(string className, string windowName)
 
@@ -45,6 +69,14 @@ module ScreenEngine =
         let post message payload =
             let window = FindWindowW(OutputWindowClass, null)
             window <> 0n && PostMessageW(window, message, 0un, nativeint payload)
+
+        /// The field in the top byte, the value in the low 32 bits; a number
+        /// with a fraction travels as ten-thousandths, the way the engine reads it.
+        let postTuneRaw (field: int) (raw: int) =
+            post TuneMessage ((int64 field <<< 56) ||| int64 (uint32 raw))
+
+        let postTune (field: int) (value: float) =
+            postTuneRaw field (int (Math.Round(Math.Clamp(value, -200000.0, 200000.0) * 10000.0)))
 
     // =====================================================================
     // SETTINGS
@@ -200,6 +232,19 @@ module ScreenEngine =
           Compare: Compare
           HighPrecisionColour: bool
           Advanced: AdvancedSettings }
+
+    /// The model settings the running engine takes over a window message. A
+    /// change confined to these never restarts the session.
+    let liveFieldsOnly (before: Settings) (after: Settings) =
+        { before with
+            Intensity = after.Intensity
+            Style = after.Style
+            LocalStructure = after.LocalStructure
+            LocalTone = after.LocalTone
+            Skin = after.Skin
+            AutoMask = after.AutoMask
+            Passes = after.Passes
+            NeuralRendering = after.NeuralRendering } = after
 
     /// The engine's own defaults, so a fresh install behaves like the engine
     /// run with no options.
@@ -793,6 +838,32 @@ module ScreenEngine =
 
         member _.ToggleRecording() =
             isAlive () && SuiteControl.post SuiteControl.RecordMessage 0L
+
+        /// Hands the running engine one changed setting per message. The engine
+        /// applies them on its next frame, rebuilding the model only when the
+        /// change actually needs it.
+        member _.Tune(before: Settings, after: Settings) =
+            if not (isAlive ()) then false
+            else
+                let styleCode (style: Style) =
+                    match style with
+                    | Standard -> 0
+                    | Natural -> 1
+                    | Cinematic -> 2
+                let skinValue (skin: Skin) =
+                    match skin with
+                    | FollowStructure -> -1.0
+                    | SkinStrength v -> v
+                let sent =
+                    [ if before.Intensity <> after.Intensity then yield SuiteControl.postTune SuiteControl.TuneIntensity after.Intensity
+                      if before.LocalStructure <> after.LocalStructure then yield SuiteControl.postTune SuiteControl.TuneLocalStructure after.LocalStructure
+                      if before.LocalTone <> after.LocalTone then yield SuiteControl.postTune SuiteControl.TuneLocalTone after.LocalTone
+                      if before.Skin <> after.Skin then yield SuiteControl.postTune SuiteControl.TuneSkin (skinValue after.Skin)
+                      if before.Style <> after.Style then yield SuiteControl.postTuneRaw SuiteControl.TuneStyle (styleCode after.Style)
+                      if before.AutoMask <> after.AutoMask then yield SuiteControl.postTuneRaw SuiteControl.TuneAutoMask (if after.AutoMask then 1 else 0)
+                      if before.Passes <> after.Passes then yield SuiteControl.postTuneRaw SuiteControl.TunePasses after.Passes
+                      if before.NeuralRendering <> after.NeuralRendering then yield SuiteControl.postTuneRaw SuiteControl.TuneNeuralRendering (if after.NeuralRendering then 1 else 0) ]
+                not (List.contains false sent)
 
         member _.StartComparison(parameter: int, values: int) =
             let safeParameter = Math.Clamp(parameter, 0, 6)

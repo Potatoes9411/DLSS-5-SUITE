@@ -146,6 +146,65 @@ module NeuralScreen =
         | ScreenEngine.CompareSplit -> 0.5
         | _ -> 0.0
 
+    /// The controls NeuralScreen has and the Screen Engine does not. They are
+    /// kept beside SUITE's own settings rather than inside ScreenEngine.Settings,
+    /// which describes the engine's command line.
+    type Extras =
+        { /// Run the network at a reduced work resolution and composite the
+          /// result back over the native picture (NeuralScreen's "Boost").
+          Boost: bool
+          /// 0.1 to 1. What fraction of the frame the network sees under Boost.
+          WorkScale: float
+          /// Skip frames that have not changed.
+          SkipStatic: bool
+          /// HDR-compatible capture format.
+          Hdr: bool
+          /// Publish the result as a Spout2 sender.
+          Spout: bool
+          FrameGeneration: bool
+          /// 2 to 4 generated frames per real one.
+          FrameMultiplier: int
+          /// The red dot while recording.
+          RecordingIndicator: bool
+          /// "cpu" or "nvofa" (NVIDIA Optical Flow).
+          MotionBackend: string
+          /// Index of the graphics adapter NeuralScreen runs on.
+          Gpu: int }
+
+    let extrasDefaults =
+        { Boost = true
+          WorkScale = 1.0
+          SkipStatic = false
+          Hdr = false
+          Spout = false
+          FrameGeneration = false
+          FrameMultiplier = 2
+          RecordingIndicator = true
+          MotionBackend = "cpu"
+          Gpu = 0 }
+
+    let normalizeExtras (e: Extras) =
+        { e with
+            WorkScale = Math.Clamp((if Double.IsFinite e.WorkScale then e.WorkScale else 1.0), 0.1, 1.0)
+            FrameMultiplier = Math.Clamp(e.FrameMultiplier, 2, 4)
+            MotionBackend = (if e.MotionBackend = "nvofa" then "nvofa" else "cpu")
+            Gpu = max 0 e.Gpu }
+
+    let private extrasPath () = Path.Combine(dataDir (), "suite-extras.json")
+
+    let loadExtras () =
+        try
+            if File.Exists(extrasPath ()) then
+                normalizeExtras (JsonSerializer.Deserialize<Extras>(File.ReadAllText(extrasPath ())))
+            else extrasDefaults
+        with _ -> extrasDefaults
+
+    let saveExtras (e: Extras) =
+        try
+            Directory.CreateDirectory(dataDir ()) |> ignore
+            File.WriteAllText(extrasPath (), JsonSerializer.Serialize(normalizeExtras e))
+        with _ -> ()
+
     /// SUITE's settings written over NeuralScreen's config, keeping whatever
     /// else it has saved there (presets, hotkeys, its own tuning).
     let writeConfig (s: ScreenEngine.Settings) (captureFolder: string) =
@@ -182,6 +241,19 @@ module NeuralScreen =
         set "passes" (JsonValue.Create(Math.Clamp(s.Passes, 1, 4)))
         set "split" (JsonValue.Create(splitOf s.Compare))
         set "screenshot_dir" (JsonValue.Create(captureFolder))
+        // The NeuralScreen-only controls. Each of these is read once when it
+        // starts; while it runs the same values go through the bridge instead.
+        let extras = normalizeExtras (loadExtras ())
+        set "nr_small" (JsonValue.Create(extras.Boost))
+        set "work_scale" (JsonValue.Create(extras.WorkScale))
+        set "skip_static" (JsonValue.Create(extras.SkipStatic))
+        set "hdr" (JsonValue.Create(extras.Hdr))
+        set "spout" (JsonValue.Create(extras.Spout))
+        set "frame_generation" (JsonValue.Create(extras.FrameGeneration))
+        set "frame_multiplier" (JsonValue.Create(extras.FrameMultiplier))
+        set "rec_indicator" (JsonValue.Create(extras.RecordingIndicator))
+        set "motion_backend" (JsonValue.Create(extras.MotionBackend))
+        set "gpu" (JsonValue.Create(extras.Gpu))
         // SUITE's window is the menu; NeuralScreen's own stays shut.
         set "open_menu_on_start" (JsonValue.Create(false))
         set "lang" (JsonValue.Create("en"))
@@ -365,6 +437,29 @@ module NeuralScreen =
         member _.SetPasses(passes: int) = action [ JsonValue.Create("passes"); JsonValue.Create(Math.Clamp(passes, 1, 4)) ]
         member _.SetSplit(split: float) = action [ JsonValue.Create("split"); JsonValue.Create(Math.Clamp(split, 0.0, 1.0)) ]
         member _.ToggleNeuralRendering() = action [ JsonValue.Create("nr") ]
+
+        // NeuralScreen's own switches are inverting - its menu reports "the
+        // user pressed this", not a value. SUITE is the only menu, so it knows
+        // the state it is turning over and sends one press per real change.
+        member _.ToggleBoost() = action [ JsonValue.Create("toggle"); JsonValue.Create("boost") ]
+        member _.ToggleSkipStatic() = action [ JsonValue.Create("toggle"); JsonValue.Create("skip_static") ]
+        member _.ToggleHdr() = action [ JsonValue.Create("toggle"); JsonValue.Create("hdr") ]
+        member _.ToggleSpout() = action [ JsonValue.Create("toggle"); JsonValue.Create("spout") ]
+        member _.ToggleFrameGeneration() = action [ JsonValue.Create("toggle"); JsonValue.Create("frame_generation") ]
+        member _.ToggleRecordingIndicator() = action [ JsonValue.Create("toggle"); JsonValue.Create("rec_indicator") ]
+
+        member _.SetWorkScale(scale: float) =
+            action [ JsonValue.Create("nr_res"); JsonValue.Create(Math.Clamp(scale, 0.1, 1.0)) ]
+
+        member _.SetFrameMultiplier(times: int) =
+            action [ JsonValue.Create("frame_multiplier"); JsonValue.Create(Math.Clamp(times, 2, 4)) ]
+
+        member _.SetMotionBackend(backend: string) =
+            action [ JsonValue.Create("motion_backend"); JsonValue.Create(if backend = "nvofa" then "nvofa" else "cpu") ]
+
+        /// NeuralScreen reads the index out of the label its own menu uses.
+        member _.SetGpu(index: int) =
+            action [ JsonValue.Create("gpu"); JsonValue.Create(sprintf "%d: adapter" (max 0 index)) ]
 
         /// One window, by handle; 0 goes back to the whole screen.
         member _.CaptureWindow(handle: nativeint) =

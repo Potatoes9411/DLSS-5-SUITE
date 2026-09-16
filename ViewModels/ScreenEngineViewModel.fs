@@ -32,6 +32,10 @@ type ScreenEngineViewModel() as this =
         elif saved = "engine" && canScreenEngine then false
         else not canScreenEngine && canNeuralScreen
     let mutable settings = load ()
+    let mutable extras = NeuralScreen.loadExtras ()
+    // What local tone was before the colours were locked, so turning the lock
+    // off puts the picture back where the user had it rather than at a default.
+    let mutable toneBeforeColourLock = 1.0
     let mutable monitors: MonitorEntry list = []
     let mutable windows: WindowEntry list = []
     let mutable status = ""
@@ -53,6 +57,7 @@ type ScreenEngineViewModel() as this =
     let styles = [ Standard, "Standard"; Natural, "Natural"; Cinematic, "Cinematic" ]
     let superResolutions = [ SrAuto, "Automatic"; SrDlaa, "DLAA (native resolution)"; SrOff, "Off" ]
     let compares = [ CompareOff, "Off"; CompareSplit, "Split view"; CompareOriginal, "Original only" ]
+    let motionBackends = [ "cpu", "CPU (works everywhere)"; "nvofa", "NVIDIA Optical Flow" ]
 
     let indexIn (choices: ('a * string) list) (value: 'a) =
         choices |> List.tryFindIndex (fun (v, _) -> v = value) |> Option.defaultValue 0
@@ -227,6 +232,10 @@ type ScreenEngineViewModel() as this =
         settings <- normalize updated
         save settings
         if nsHost.IsRunning then this.PushToNeuralScreen(previous, settings)
+        // The engine takes the model's own settings live. Only a change it
+        // cannot take that way - a different source, output or capture option -
+        // is worth restarting the session for.
+        elif host.IsRunning && liveFieldsOnly previous settings && host.Tune(previous, settings) then ()
         else this.ScheduleApply()
 
     /// NeuralScreen takes most changes live, the way its own menu sends them;
@@ -249,6 +258,104 @@ type ScreenEngineViewModel() as this =
                     match Int64.TryParse(text.Substring(2), Globalization.NumberStyles.HexNumber, null) with
                     | true, handle -> nsHost.CaptureWindow(nativeint handle) |> ignore
                     | _ -> ()
+
+    // =====================================================================
+    // NEURALSCREEN'S OWN CONTROLS
+    // =====================================================================
+    /// Saved straight away, and handed to a running NeuralScreen the way its
+    /// own menu would. Nothing here reaches the Screen Engine, which has no
+    /// equivalent for them.
+    member private this.ChangeExtras(updated: NeuralScreen.Extras) =
+        let before = extras
+        extras <- NeuralScreen.normalizeExtras updated
+        NeuralScreen.saveExtras extras
+        if useNeuralScreen && nsHost.IsRunning then
+            if before.Boost <> extras.Boost then nsHost.ToggleBoost() |> ignore
+            if before.WorkScale <> extras.WorkScale then nsHost.SetWorkScale(extras.WorkScale) |> ignore
+            if before.SkipStatic <> extras.SkipStatic then nsHost.ToggleSkipStatic() |> ignore
+            if before.Hdr <> extras.Hdr then nsHost.ToggleHdr() |> ignore
+            if before.Spout <> extras.Spout then nsHost.ToggleSpout() |> ignore
+            if before.FrameGeneration <> extras.FrameGeneration then nsHost.ToggleFrameGeneration() |> ignore
+            if before.FrameMultiplier <> extras.FrameMultiplier then nsHost.SetFrameMultiplier(extras.FrameMultiplier) |> ignore
+            if before.RecordingIndicator <> extras.RecordingIndicator then nsHost.ToggleRecordingIndicator() |> ignore
+            if before.MotionBackend <> extras.MotionBackend then nsHost.SetMotionBackend(extras.MotionBackend) |> ignore
+            if before.Gpu <> extras.Gpu then nsHost.SetGpu(extras.Gpu) |> ignore
+        for name in
+            [ "Boost"; "WorkScale"; "WorkScaleText"; "WorkScalePercent"; "SkipStatic"; "Hdr"; "Spout"
+              "FrameGeneration"; "FrameMultiplier"; "FrameMultiplierText"; "RecordingIndicator"
+              "SelectedMotionBackendIndex"; "NeuralScreenGpu"; "NeuralScreenGpuText" ] do
+            this.RaisePropertyChanged(name)
+
+    member this.Boost
+        with get () = extras.Boost
+        and set (v: bool) = if v <> extras.Boost then this.ChangeExtras { extras with Boost = v }
+
+    /// A fraction in the settings, a percentage in the window.
+    member this.WorkScale
+        with get () = extras.WorkScale * 100.0
+        and set (v: float) =
+            let scale = Math.Clamp(v, 10.0, 100.0) / 100.0
+            if abs (scale - extras.WorkScale) > 1e-6 then this.ChangeExtras { extras with WorkScale = scale }
+
+    member this.WorkScaleText
+        with get () = sprintf "%.0f" (extras.WorkScale * 100.0)
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun value -> this.WorkScale <- value)
+            this.RaisePropertyChanged("WorkScaleText")
+
+    member this.SkipStatic
+        with get () = extras.SkipStatic
+        and set (v: bool) = if v <> extras.SkipStatic then this.ChangeExtras { extras with SkipStatic = v }
+
+    member this.Hdr
+        with get () = extras.Hdr
+        and set (v: bool) = if v <> extras.Hdr then this.ChangeExtras { extras with Hdr = v }
+
+    member this.Spout
+        with get () = extras.Spout
+        and set (v: bool) = if v <> extras.Spout then this.ChangeExtras { extras with Spout = v }
+
+    member this.FrameGeneration
+        with get () = extras.FrameGeneration
+        and set (v: bool) = if v <> extras.FrameGeneration then this.ChangeExtras { extras with FrameGeneration = v }
+
+    member this.FrameMultiplier
+        with get () = float extras.FrameMultiplier
+        and set (v: float) =
+            let times = int (Math.Round(Math.Clamp(v, 2.0, 4.0)))
+            if times <> extras.FrameMultiplier then this.ChangeExtras { extras with FrameMultiplier = times }
+
+    member this.FrameMultiplierText
+        with get () = string extras.FrameMultiplier
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun value -> this.FrameMultiplier <- value)
+            this.RaisePropertyChanged("FrameMultiplierText")
+
+    member this.RecordingIndicator
+        with get () = extras.RecordingIndicator
+        and set (v: bool) = if v <> extras.RecordingIndicator then this.ChangeExtras { extras with RecordingIndicator = v }
+
+    member _.MotionBackendOptions = motionBackends |> List.map snd
+
+    member this.SelectedMotionBackendIndex
+        with get () = indexIn motionBackends extras.MotionBackend
+        and set (index: int) =
+            valueAt motionBackends index
+            |> Option.iter (fun backend -> if backend <> extras.MotionBackend then this.ChangeExtras { extras with MotionBackend = backend })
+
+    /// The adapter NeuralScreen renders on, by index. Left at 0 unless a
+    /// machine hands it the wrong card.
+    member this.NeuralScreenGpu
+        with get () = float extras.Gpu
+        and set (v: float) =
+            let index = int (Math.Round(Math.Clamp(v, 0.0, 7.0)))
+            if index <> extras.Gpu then this.ChangeExtras { extras with Gpu = index }
+
+    member this.NeuralScreenGpuText
+        with get () = string extras.Gpu
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun value -> this.NeuralScreenGpu <- value)
+            this.RaisePropertyChanged("NeuralScreenGpuText")
 
     member private this.ScheduleApply() =
         if this.IsRunning then
@@ -410,7 +517,28 @@ type ScreenEngineViewModel() as this =
                 this.RaisePropertyChanged("LocalTone")
                 this.RaisePropertyChanged("LocalToneText")
                 this.RaisePropertyChanged("LocalToneSlider")
+                this.RaisePropertyChanged("KeepOriginalColours")
+                this.RaisePropertyChanged("ColoursUnlocked")
 
+
+    /// Local tone is the one control that changes colour: the model's own
+    /// LocalToneStrength, which both methods pass to NVIDIA's DLL. At zero it
+    /// leaves the picture's colours exactly as they came in, and style has
+    /// nothing to act on either, so the lock reads as one switch.
+    member _.KeepOriginalColours
+        with get () = settings.LocalTone = 0.0
+        and set (on: bool) =
+            if on <> (settings.LocalTone = 0.0) then
+                if on then
+                    toneBeforeColourLock <- (if settings.LocalTone > 0.0 then settings.LocalTone else toneBeforeColourLock)
+                    this.LocalTone <- 0.0
+                else
+                    this.LocalTone <- (if toneBeforeColourLock > 0.0 then toneBeforeColourLock else 1.0)
+                this.RaisePropertyChanged("KeepOriginalColours")
+                this.RaisePropertyChanged("ColoursUnlocked")
+
+    /// The tone and style rows are dead while the colours are locked.
+    member _.ColoursUnlocked = settings.LocalTone <> 0.0
 
     member _.Passes
         with get () = float settings.Passes

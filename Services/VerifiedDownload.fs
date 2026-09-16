@@ -60,12 +60,16 @@ module VerifiedDownload =
         else
             if File.Exists(destination) then File.Delete(destination)
             let partial = destination + ".part"
-            if File.Exists(partial) && expectedSize > 0L && FileInfo(partial).Length > expectedSize then
-                File.Delete(partial)
             if verified partial digest then
                 File.Move(partial, destination, true)
                 progress (sprintf "Using completed verified %s (%.1f MB)" name (mb (FileInfo(destination).Length))) (phaseStart + phaseSize)
             else
+                // Anything already as long as the asset is either finished and
+                // wrong or left over from a different file. There is nothing to
+                // resume from its end, and asking for it is what GitHub answers
+                // with 416 Range Not Satisfiable, so it starts again.
+                if File.Exists(partial) && expectedSize > 0L && FileInfo(partial).Length >= expectedSize then
+                    File.Delete(partial)
                 let mutable complete = false
                 let mutable attempt = 1
                 let mutable lastError: exn option = None
@@ -75,6 +79,12 @@ module VerifiedDownload =
                         use request = new HttpRequestMessage(HttpMethod.Get, uri)
                         if existing > 0L then request.Headers.Range <- RangeHeaderValue(Nullable existing, Nullable())
                         use! response = client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead)
+                        // A refused range means the part file cannot be
+                        // continued. Drop it; the next attempt asks for the
+                        // whole asset instead of failing the install.
+                        if response.StatusCode = HttpStatusCode.RequestedRangeNotSatisfiable then
+                            try File.Delete(partial) with _ -> ()
+                            failwith "the interrupted download could not be resumed"
                         let resumed = existing > 0L && response.StatusCode = HttpStatusCode.PartialContent
                         response.EnsureSuccessStatusCode() |> ignore
                         use! source = response.Content.ReadAsStreamAsync()

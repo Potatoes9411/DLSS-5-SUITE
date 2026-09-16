@@ -580,19 +580,31 @@ Result<WindowEvents, Error> PumpEvents(const OutputWindow&) noexcept
             static constexpr auto Dispatched = [] [[nodiscard]] (const Pump& p, const MSG& msg) noexcept -> Pump {
                 static constexpr auto Merged = [] [[nodiscard]] (const WindowEvents& a, const WindowEvents& b) noexcept -> WindowEvents {
                     static constexpr auto Either = [] [[nodiscard]] (bool a, bool b) noexcept -> bool { return a || b; };
-                    return WindowEvents{ Either(a.quit, b.quit), Either(a.toggleOriginal, b.toggleOriginal), Either(a.toggleSplit, b.toggleSplit), Either(a.screenshot, b.screenshot),
-                                         Either(a.record, b.record), a.comparisonSweep | b.comparisonSweep };
+                    static constexpr auto Joined = [] [[nodiscard]] (const TuneRequests& a, const TuneRequests& b) noexcept -> TuneRequests {
+                        // A frame that somehow overflows the bound keeps the changes it already has: the
+                        // rest arrive as their own messages the next frame, which is what SUITE resends.
+                        return std::ranges::fold_left(b.Items(), a, [](const TuneRequests& so, std::uint64_t word) { return so.Push(word).value_or(so); });
+                    };
+                    return WindowEvents{ Either(a.quit, b.quit),   Either(a.toggleOriginal, b.toggleOriginal),
+                                         Either(a.toggleSplit, b.toggleSplit), Either(a.screenshot, b.screenshot),
+                                         Either(a.record, b.record), a.comparisonSweep | b.comparisonSweep,
+                                         Joined(a.tunes, b.tunes) };
                 };
 
                 static constexpr auto EventsOf = [] [[nodiscard]] (const MSG& msg) noexcept -> WindowEvents {
                     static constexpr auto EventsOfHotkey = [] [[nodiscard]] (WPARAM id) noexcept -> WindowEvents {
                         return WindowEvents{ id == static_cast<WPARAM>(kHotkeyQuit), id == static_cast<WPARAM>(kHotkeyToggleOriginal), id == static_cast<WPARAM>(kHotkeyToggleSplit), false, false,
-                                             0 };
+                                             0, TuneRequests{} };
                     };
                     if (msg.message == WM_HOTKEY)
                         return EventsOfHotkey(msg.wParam);
+                    static constexpr auto TuneOf = [] [[nodiscard]] (const MSG& msg) noexcept -> TuneRequests {
+                        if (msg.message != kSuiteTuneMessage)
+                            return TuneRequests{};
+                        return TuneRequests{}.Push(static_cast<std::uint64_t>(msg.lParam)).value_or(TuneRequests{});
+                    };
                     return WindowEvents{ msg.message == WM_QUIT, false, false, msg.message == kSuiteScreenshotMessage, msg.message == kSuiteRecordMessage,
-                                         msg.message == kSuiteComparisonMessage ? static_cast<std::uint64_t>(msg.lParam) : 0 };
+                                         msg.message == kSuiteComparisonMessage ? static_cast<std::uint64_t>(msg.lParam) : 0, TuneOf(msg) };
                 };
                 ::TranslateMessage(&msg);
                 ::DispatchMessageW(&msg);
