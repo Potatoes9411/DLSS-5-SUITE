@@ -173,13 +173,36 @@ Result<Capture, Error> CreateCapture(const GpuDevice& gpu, const interior::Scree
                     return ActivationFactory(kItemClass, IID_PPV_ARGS(&interop)).transform([&interop] { return interop; });
                 };
 
+                static constexpr auto NativeRectOf = [] [[nodiscard]] (const interior::ScreenRect& rect) noexcept -> RECT {
+                    return RECT{ rect.Left().Get(), rect.Top().Get(), rect.Right().Get(), rect.Bottom().Get() };
+                };
+
+                static constexpr auto CurrentMonitorFor = [] [[nodiscard]] (const interior::MonitorInfo& source) noexcept -> HMONITOR {
+                    const RECT rect = NativeRectOf(source.rect);
+                    return ::MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
+                };
+
+                static constexpr auto WasCreated = [] [[nodiscard]] (HRESULT result) noexcept -> bool { return SUCCEEDED(result); };
+
+                // A display-topology change can invalidate the HMONITOR between enumeration and capture creation.
+                // Resolve the same physical rectangle again and retry the same operation once.
+                static constexpr auto MonitorItemOf = [] [[nodiscard]] (const Com<IGraphicsCaptureItemInterop>& interop, const interior::MonitorInfo& source,
+                                                                        Com<WGC::IGraphicsCaptureItem>& item) noexcept -> HRESULT {
+                    const HRESULT first = interop->CreateForMonitor(reinterpret_cast<HMONITOR>(source.handle.Get()), IID_PPV_ARGS(&item));
+                    if (WasCreated(first))
+                        return first;
+                    item.Reset();
+                    const HMONITOR current = CurrentMonitorFor(source);
+                    return interop->CreateForMonitor(current, IID_PPV_ARGS(&item));
+                };
+
                 // A window is asked for by its own handle, which gives its content whatever is in front of it, and follows
                 // it as it moves. A monitor is asked for by monitor. Neither opens anything belonging to another process.
                 static constexpr auto ItemOf = [] [[nodiscard]] (const Com<IGraphicsCaptureItemInterop>& interop, const interior::MonitorInfo& source,
                                                                  Com<WGC::IGraphicsCaptureItem>& item) noexcept -> HRESULT {
                     if (source.kind == interior::SourceKind::Window)
                         return interop->CreateForWindow(reinterpret_cast<HWND>(source.handle.Get()), IID_PPV_ARGS(&item));
-                    return interop->CreateForMonitor(reinterpret_cast<HMONITOR>(source.handle.Get()), IID_PPV_ARGS(&item));
+                    return MonitorItemOf(interop, source, item);
                 };
                 return ItemInterop().and_then([&monitor](const Com<IGraphicsCaptureItemInterop>& interop) {
                     Com<WGC::IGraphicsCaptureItem> item;

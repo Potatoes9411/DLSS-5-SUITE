@@ -4,6 +4,12 @@ This release integrates the Full-Screen DLSS 5 Screen Engine and finishes its ap
 
 ## Highlights
 
+- Adds two GPU-aware screen methods: Screen Engine for RTX 50 series and NeuralScreen for RTX 30/40 series, with RTX 50 support as an alternative.
+- Labels RTX 20 series as unsupported because the NeuralScreen model can start without processing the picture on that generation.
+- Integrates NeuralScreen controls into SUITE: Num2 opens and hides SUITE's styled control window, with a button to return to the main app.
+- Keeps one-window NeuralScreen output in the normal window stack so Alt+Tab works without per-frame restacking flicker.
+- Synchronizes NeuralScreen's real recording state back to SUITE, including start failures and externally triggered recording changes.
+- Refreshes a rejected Windows monitor handle and retries monitor capture once, fixing stale-handle `CreateForMonitor` failures without changing capture methods.
 - Adds full-monitor and selected-window capture with optional output-monitor selection.
 - Adds an in-app running-window picker while retaining manual title/handle entry.
 - Adds direct screenshot, recording and comparison-sweep controls without requiring the engine's separate panel.

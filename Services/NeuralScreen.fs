@@ -9,7 +9,9 @@ open System.Text.Json.Nodes
 open System.Text.RegularExpressions
 open Microsoft.Win32
 
-/// DLSS 5 on the whole screen for RTX 20/30/40 cards, through NeuralScreen.
+/// DLSS 5 on the whole screen for RTX 30/40 cards, and optionally RTX 50,
+/// through NeuralScreen. RTX 20 is detected but deliberately rejected because
+/// the model starts without processing the picture on that generation.
 ///
 /// NeuralScreen ships inside SUITE in "mod files/neuralscreen" with its own
 /// Python. SUITE is its control panel: it writes NeuralScreen's config.json
@@ -171,6 +173,7 @@ module NeuralScreen =
         let mutable stopping = false
         let stateChanged = Event<string>()
         let controlsRequested = Event<unit>()
+        let recordingChanged = Event<bool>()
 
         /// What NeuralScreen tells SUITE: Num2 asks for the control window.
         let outboxTimer =
@@ -183,6 +186,8 @@ module NeuralScreen =
                                 let text = (try File.ReadAllText file with _ -> "")
                                 (try File.Delete file with _ -> ())
                                 if text.Contains("\"controls\"") then controlsRequested.Trigger()
+                                elif text.Contains("\"recording:on\"") then recordingChanged.Trigger(true)
+                                elif text.Contains("\"recording:off\"") then recordingChanged.Trigger(false)
                     with _ -> ()),
                 null, 150, 150)
 
@@ -214,6 +219,9 @@ module NeuralScreen =
 
         [<CLIEvent>]
         member _.ControlsRequested = controlsRequested.Publish
+
+        [<CLIEvent>]
+        member _.RecordingChanged = recordingChanged.Publish
 
         member this.Start(settings: ScreenEngine.Settings, captureFolder: string, neuralRendering: bool) =
             if not (isAvailable ()) then

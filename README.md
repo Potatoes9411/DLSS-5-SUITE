@@ -42,7 +42,8 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - Automated Lossless Scaling setup using official LosslessProxy/LSP releases and the verified FeedKit route.
 - Need for Speed game-aware Feeder guidance, including the verified DXVK-to-Vulkan path for classic 32-bit D3D9 titles and appropriate D3D11/D3D12 profiles for newer games.
 - Automatic, browser-free application and compatibility-component updates with visible progress.
-- An integrated Screen Engine for applying DLSS 5 Neural Rendering to a full monitor or selected window, with a running-window picker, direct screenshots, recording, comparison sweeps, a selectable capture folder, output, model, motion, cursor, skin, diagnostics and advanced controls.
+- Two GPU-aware screen methods: Screen Engine for RTX 50 series and NeuralScreen for RTX 30/40 series (plus RTX 50 as an alternative). RTX 20 is shown as unsupported because its model can start without processing the picture.
+- Integrated controls for a full monitor or selected window, with a running-window picker, direct screenshots, recording, comparison sweeps where supported, a selectable capture folder, output, model, motion, cursor, skin, diagnostics and advanced controls.
 - DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
 
 Compatibility varies by game, graphics hardware, anti-cheat system and game update. The project does not promise that every title will work, and it does not bypass anti-cheat protections.

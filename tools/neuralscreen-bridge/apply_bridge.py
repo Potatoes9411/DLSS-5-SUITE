@@ -78,6 +78,25 @@ patch("commands.py",
       lines('                    rec_dir = Path(st.cfg.get("screenshot_dir") or (BASE_DIR / "recordings"))  # DLSS 5 SUITE'),
       'st.cfg.get("screenshot_dir") or (BASE_DIR / "recordings")')
 
+patch("commands.py",
+      lines('                        st.recorder = None',
+            '                    else:',
+            '                        print(f"[main] recording started: {path}")'),
+      lines('                        st.recorder = None',
+            '                        suite_bridge.notify("recording:off")  # DLSS 5 SUITE',
+            '                    else:',
+            '                        suite_bridge.notify("recording:on")  # DLSS 5 SUITE',
+            '                        print(f"[main] recording started: {path}")'),
+      'suite_bridge.notify("recording:on")')
+
+patch("commands.py",
+      lines('                    st.recorder = None',
+            '            elif cmd == "window_mode":'),
+      lines('                    st.recorder = None',
+            '                    suite_bridge.notify("recording:off")  # DLSS 5 SUITE: recording stopped',
+            '            elif cmd == "window_mode":'),
+      'suite_bridge.notify("recording:off")  # DLSS 5 SUITE: recording stopped')
+
 # ----- tray.py -----
 patch("tray.py",
       lines("from PIL import Image, ImageDraw"),

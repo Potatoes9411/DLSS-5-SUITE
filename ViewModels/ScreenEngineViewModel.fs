@@ -75,11 +75,20 @@ type ScreenEngineViewModel() as this =
         let onState (message: string) =
             Dispatcher.UIThread.Post(fun () ->
                 status <- message
+                if not (message.StartsWith("Running", StringComparison.OrdinalIgnoreCase)) then
+                    isRecording <- false
+                    this.RaisePropertyChanged("IsRecording")
+                    this.RaisePropertyChanged("RecordButtonText")
                 this.RaisePropertyChanged("Status")
                 this.RaisePropertyChanged("IsRunning")
                 this.RaisePropertyChanged("CanStart"))
         host.StateChanged.Add onState
         nsHost.StateChanged.Add onState
+        nsHost.RecordingChanged.Add(fun active ->
+            Dispatcher.UIThread.Post(fun () ->
+                isRecording <- active
+                this.RaisePropertyChanged("IsRecording")
+                this.RaisePropertyChanged("RecordButtonText")))
 
     member _.IsAvailable = if useNeuralScreen then canNeuralScreen else canScreenEngine
 
