@@ -46,18 +46,31 @@ foreach ($file in $Files) {
     $local = Get-Item $file
     $spaced = $local.Name
     $dotted = $spaced.Replace(' ', '.')
+    $sha = (Get-FileHash $local.FullName -Algorithm SHA256).Hash.ToLower()
+    $matching = @((Get-Release).assets | Where-Object { $_.name -ieq $spaced -or $_.name -ieq $dotted })
 
-    foreach ($a in (Get-Release).assets) {
-        if ($a.name -ieq $spaced -or $a.name -ieq $dotted) {
-            Invoke-RestMethod -Uri $a.url -Method Delete -Headers $Headers | Out-Null
-            Write-Host "  deleted old asset: $($a.name)"
-        }
+    $verified = $matching | Where-Object {
+        $_.state -eq 'uploaded' -and
+        $_.size -eq $local.Length -and
+        $_.digest -eq "sha256:$sha"
+    } | Select-Object -First 1
+
+    if ($verified) {
+        Write-Host "  already verified: $($verified.name)"
+        continue
+    }
+
+    foreach ($a in $matching) {
+        Invoke-RestMethod -Uri $a.url -Method Delete -Headers $Headers | Out-Null
+        Write-Host "  deleted incomplete or mismatched asset: $($a.name)"
     }
 
     $url = "https://uploads.github.com/repos/$Repo/releases/$($release.id)/assets?name=$([uri]::EscapeDataString($dotted))"
     $respFile = [System.IO.Path]::GetTempFileName()
-    $code = & curl.exe -sS -o $respFile -w '%{http_code}' -X POST $url `
+    $code = & curl.exe --http1.1 -sS --retry 4 --retry-delay 5 --retry-all-errors `
+        --connect-timeout 30 --max-time 3600 -o $respFile -w '%{http_code}' -X POST $url `
         -H "Authorization: Bearer $Token" `
+        -H 'Expect:' `
         -H 'Content-Type: application/octet-stream' `
         --data-binary "@$($local.FullName)"
     if ($code -ne '201') {
