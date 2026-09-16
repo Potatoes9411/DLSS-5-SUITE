@@ -17,7 +17,7 @@
     Format: MAJOR.MINOR.PATCH-suite.N
   -->
   <PropertyGroup>
-    <SuiteVersion>1.2.2-suite.1</SuiteVersion>
+    <SuiteVersion>1.2.2-suite.2</SuiteVersion>
   </PropertyGroup>
 
   <PropertyGroup>
