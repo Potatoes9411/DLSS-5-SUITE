@@ -734,15 +734,40 @@ type MainWindow() as this =
     member this.OnPlayClicked(sender: obj, e: RoutedEventArgs) =
         // Handled here, or the card underneath takes it as a click and opens Manage.
         e.Handled <- true
-        this.CardOf sender |> Option.iter (fun card -> card.PressPlay())
+        this.CardOf sender
+        |> Option.iter (fun card ->
+            // A game with its own Screen Engine settings brings them with it.
+            match this.DataContext with
+            | :? MainViewModel as vm when card.IsLaunchIdle && not card.IsChoosingLaunch ->
+                vm.ScreenEngine.UseGamePreset(card.Game.AppId, card.Title) |> ignore
+            | _ -> ()
+            card.PressPlay())
+
+    member this.OnManageSavePresetClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.SaveManagePreset()
+        | _ -> ()
+
+    member this.OnManageDeletePresetClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.DeleteManagePreset()
+        | _ -> ()
+
+    member private this.ChooseAndLaunch(sender: obj, viaSteam: bool) =
+        this.CardOf sender
+        |> Option.iter (fun card ->
+            match this.DataContext with
+            | :? MainViewModel as vm -> vm.ScreenEngine.UseGamePreset(card.Game.AppId, card.Title) |> ignore
+            | _ -> ()
+            card.ChooseLaunch viaSteam)
 
     member this.OnLaunchViaSteamClicked(sender: obj, e: RoutedEventArgs) =
         e.Handled <- true
-        this.CardOf sender |> Option.iter (fun card -> card.ChooseLaunch true)
+        this.ChooseAndLaunch(sender, true)
 
     member this.OnLaunchViaExeClicked(sender: obj, e: RoutedEventArgs) =
         e.Handled <- true
-        this.CardOf sender |> Option.iter (fun card -> card.ChooseLaunch false)
+        this.ChooseAndLaunch(sender, false)
 
     member this.OnManageOpenGameFolderClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with

@@ -134,6 +134,8 @@ type ScreenEngineWindow() as this =
     member this.OnGetNeuralScreenClicked(sender: obj, e: RoutedEventArgs) =
         this.WithEngine(fun engine -> engine.DownloadNeuralScreenAddon())
 
+    member this.OnUseDefaultSettingsClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.UseDefaultSettings())
+
     member this.OnClearWindowClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.ClearWindow())
 
     // ----- engine commands -----

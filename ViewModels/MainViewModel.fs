@@ -1983,8 +1983,25 @@ type MainViewModel() as this =
         | Some card -> card.CanLaunchViaSteam
         | None -> false
 
+    member this.ManageHasPreset =
+        match manageCard with
+        | Some card -> screenEngine.HasPresetFor card.Game.AppId
+        | None -> false
+
+    member this.ManagePresetText =
+        if this.ManageHasPreset then "Has its own Screen Engine settings, used when it starts from its card"
+        else "Uses the default Screen Engine settings"
+
+    member this.SaveManagePreset() =
+        manageCard |> Option.iter (fun card -> screenEngine.SaveGamePreset(card.Game.AppId, card.Title))
+        this.RefreshManageLaunch()
+
+    member this.DeleteManagePreset() =
+        manageCard |> Option.iter (fun card -> screenEngine.DeleteGamePreset card.Game.AppId)
+        this.RefreshManageLaunch()
+
     member this.RefreshManageLaunch() =
-        for name in [ "ManageLaunchArguments"; "ManageLaunchRouteText"; "ManageCanLaunchViaSteam" ] do
+        for name in [ "ManageLaunchArguments"; "ManageLaunchRouteText"; "ManageCanLaunchViaSteam"; "ManageHasPreset"; "ManagePresetText" ] do
             this.RaisePropertyChanged(name)
     member this.ManageFolder = manageFolder
     member this.ManageReShadeText = manageReShadeText

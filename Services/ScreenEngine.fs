@@ -805,8 +805,44 @@ module ScreenEngine =
         try
             Directory.CreateDirectory(dataDir ()) |> ignore
             File.WriteAllText(settingsPath (), serialize s)
-        with _ ->
-            ()
+        with ex ->
+            AppLog.error "Saving the Screen Engine settings failed" ex
+
+    // ----- per-game presets -----
+    // One file per game, named from its library id. The shared settings.json
+    // stays the default and is never touched while a game's preset is in use.
+    let private presetDir () = Path.Combine(dataDir (), "presets")
+
+    let presetFileStem (gameKey: string) =
+        let invalid = Path.GetInvalidFileNameChars()
+        String(gameKey |> Seq.map (fun c -> if Array.contains c invalid then '_' else c) |> Array.ofSeq)
+
+    let presetPath (gameKey: string) = Path.Combine(presetDir (), presetFileStem gameKey + ".json")
+
+    let hasPreset (gameKey: string) = File.Exists(presetPath gameKey)
+
+    let loadPreset (gameKey: string) =
+        try
+            if hasPreset gameKey then Some(deserialize (File.ReadAllText(presetPath gameKey))) else None
+        with ex ->
+            AppLog.error ("Reading the Screen Engine preset for " + gameKey + " failed") ex
+            None
+
+    let savePreset (gameKey: string) (s: Settings) =
+        try
+            Directory.CreateDirectory(presetDir ()) |> ignore
+            File.WriteAllText(presetPath gameKey, serialize s)
+        with ex ->
+            AppLog.error ("Saving the Screen Engine preset for " + gameKey + " failed") ex
+
+    let deletePreset (gameKey: string) =
+        try
+            let path = presetPath gameKey
+            if File.Exists(path) then File.Delete(path)
+            let extras = Path.ChangeExtension(path, ".neuralscreen.json")
+            if File.Exists(extras) then File.Delete(extras)
+        with ex ->
+            AppLog.error ("Removing the Screen Engine preset for " + gameKey + " failed") ex
 
     // =====================================================================
     // THE PROCESS

@@ -93,6 +93,11 @@
                             </Grid>
                             <TextBlock Text="{Binding MethodNote}" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding GpuName}" FontSize="10.5" Foreground="#64748B" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <TextBlock Grid.Column="0" Text="{Binding ActivePresetText}" FontSize="11.5" Foreground="#CBD5E1" VerticalAlignment="Center"
+                                           ToolTip.Tip="Save settings for a game from its Manage sheet; they switch in when you start it from its card." />
+                                <Button Grid.Column="1" Content="Use default settings" Click="OnUseDefaultSettingsClicked" IsVisible="{Binding IsGamePreset}" />
+                            </Grid>
                             <Border IsVisible="{Binding NeuralScreenNeedsInstall}" Background="#22FBBF24" BorderBrush="#55FBBF24" BorderThickness="1" CornerRadius="12" Padding="12,10">
                                 <StackPanel Spacing="8">
                                     <TextBlock Text="NeuralScreen is a separate download (about 221 MB), because only RTX 30/40 cards need it. SUITE fetches and installs it here." Foreground="#FDE68A" FontSize="11.5" TextWrapping="Wrap" />

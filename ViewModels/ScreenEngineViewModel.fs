@@ -33,6 +33,9 @@ type ScreenEngineViewModel() as this =
         else not canScreenEngine && canNeuralScreen
     let mutable settings = load ()
     let mutable extras = NeuralScreen.loadExtras ()
+    /// The game whose own settings are in use, as (library id, title); None
+    /// for the shared defaults. Every change is saved to whichever is active.
+    let mutable presetGame: (string * string) option = None
     // What local tone was before the colours were locked, so turning the lock
     // off puts the picture back where the user had it rather than at a default.
     let mutable toneBeforeColourLock = 1.0
@@ -230,7 +233,7 @@ type ScreenEngineViewModel() as this =
     member private this.Change(updated: Settings) =
         let previous = settings
         settings <- normalize updated
-        save settings
+        this.Persist()
         if nsHost.IsRunning then this.PushToNeuralScreen(previous, settings)
         // The engine takes the model's own settings live. Only a change it
         // cannot take that way - a different source, output or capture option -
@@ -268,7 +271,7 @@ type ScreenEngineViewModel() as this =
     member private this.ChangeExtras(updated: NeuralScreen.Extras) =
         let before = extras
         extras <- NeuralScreen.normalizeExtras updated
-        NeuralScreen.saveExtras extras
+        this.PersistExtras()
         if useNeuralScreen && nsHost.IsRunning then
             if before.Boost <> extras.Boost then nsHost.ToggleBoost() |> ignore
             if before.WorkScale <> extras.WorkScale then nsHost.SetWorkScale(extras.WorkScale) |> ignore
@@ -973,9 +976,86 @@ type ScreenEngineViewModel() as this =
         status <- if host.StartComparison(selectedSweepIndex, values) then "Comparison sweep started." else "The engine is not ready for capture commands yet."
         this.RaisePropertyChanged("Status")
 
+    // =====================================================================
+    // PER-GAME PRESETS
+    // =====================================================================
+    member private this.Persist() =
+        match presetGame with
+        | Some(key, _) -> savePreset key settings
+        | None -> save settings
+
+    member private this.PersistExtras() =
+        NeuralScreen.activeExtras <- Some extras
+        match presetGame with
+        | Some(key, _) -> NeuralScreen.saveExtrasTo (NeuralScreen.presetExtrasPath key) extras
+        | None -> NeuralScreen.saveExtras extras
+
+    member _.IsGamePreset = presetGame.IsSome
+
+    member _.ActivePresetText =
+        match presetGame with
+        | Some(_, title) -> "Settings for " + title
+        | None -> "Default settings (all games)"
+
+    member _.HasPresetFor(gameKey: string) = hasPreset gameKey
+
+    /// Switches every control to a new set of values and restarts a running
+    /// session with them - a different game's look is not a slider tick.
+    member private this.Switch(next: Settings, nextExtras: NeuralScreen.Extras) =
+        settings <- normalize next
+        extras <- NeuralScreen.normalizeExtras nextExtras
+        NeuralScreen.activeExtras <- Some extras
+        this.RaiseEverything()
+        this.ScheduleApply()
+
+    /// Used when a game with its own preset is started from its card. A game
+    /// without one leaves whatever is in use alone.
+    member this.UseGamePreset(gameKey: string, title: string) =
+        match loadPreset gameKey with
+        | Some saved ->
+            presetGame <- Some(gameKey, title)
+            let savedExtras = NeuralScreen.loadExtrasFrom (NeuralScreen.presetExtrasPath gameKey) |> Option.defaultValue extras
+            this.Switch(saved, savedExtras)
+            AppLog.info ("Screen Engine preset in use: " + title)
+            true
+        | None -> false
+
+    /// Keeps the current values as this game's own, and uses them from now on.
+    member this.SaveGamePreset(gameKey: string, title: string) =
+        presetGame <- Some(gameKey, title)
+        this.Persist()
+        this.PersistExtras()
+        this.RaisePropertyChanged("IsGamePreset")
+        this.RaisePropertyChanged("ActivePresetText")
+
+    member this.DeleteGamePreset(gameKey: string) =
+        deletePreset gameKey
+        match presetGame with
+        | Some(key, _) when key = gameKey -> this.UseDefaultSettings()
+        | _ -> ()
+
+    /// Back to the shared settings every game without a preset uses.
+    member this.UseDefaultSettings() =
+        if presetGame.IsSome then
+            presetGame <- None
+            this.Switch(load (), NeuralScreen.loadExtras ())
+
+    member private this.RaiseEverything() =
+        for name in
+            [ "IsGamePreset"; "ActivePresetText"; "KeepOriginalColours"; "ColoursUnlocked"
+              "Boost"; "WorkScale"; "WorkScaleText"; "SkipStatic"; "Hdr"; "Spout"; "FrameGeneration"
+              "FrameMultiplier"; "FrameMultiplierText"; "RecordingIndicator"; "SelectedMotionBackendIndex"
+              "NeuralScreenGpu"; "NeuralScreenGpuText"; "IntensitySlider"; "Window" ] do
+            this.RaisePropertyChanged(name)
+        this.RaiseSettingProperties()
+
     member this.ResetToDefaults() =
         settings <- defaults
-        save settings
+        this.Persist()
+        this.RaiseSettingProperties()
+        this.ScheduleApply()
+
+    member private this.RaiseSettingProperties() =
         for name in
             [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "SelectedWindowIndex"; "CaptureFolder"; "ModelFolder"; "NeuralRendering"
               "Intensity"; "IntensityText"; "LocalStructure"; "LocalStructureText"; "LocalTone"; "LocalToneText"
@@ -989,7 +1069,6 @@ type ScreenEngineViewModel() as this =
               "SelectedAdapterIndex"; "NgxAppId"; "NgxProjectId"; "SkinFollowsStructure"
               "SkinStrength"; "SelectedMotionIndex"; "SelectedCursorIndex"; "HighPrecisionColour" ] do
             this.RaisePropertyChanged(name)
-        this.ScheduleApply()
 
     interface IDisposable with
         member _.Dispose() =

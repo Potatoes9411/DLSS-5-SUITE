@@ -192,18 +192,29 @@ module NeuralScreen =
 
     let private extrasPath () = Path.Combine(dataDir (), "suite-extras.json")
 
-    let loadExtras () =
+    let loadExtrasFrom (path: string) =
         try
-            if File.Exists(extrasPath ()) then
-                normalizeExtras (JsonSerializer.Deserialize<Extras>(File.ReadAllText(extrasPath ())))
-            else extrasDefaults
-        with _ -> extrasDefaults
+            if File.Exists(path) then
+                Some(normalizeExtras (JsonSerializer.Deserialize<Extras>(File.ReadAllText(path))))
+            else None
+        with _ -> None
 
-    let saveExtras (e: Extras) =
+    let saveExtrasTo (path: string) (e: Extras) =
         try
-            Directory.CreateDirectory(dataDir ()) |> ignore
-            File.WriteAllText(extrasPath (), JsonSerializer.Serialize(normalizeExtras e))
-        with _ -> ()
+            Directory.CreateDirectory(Path.GetDirectoryName(path)) |> ignore
+            File.WriteAllText(path, JsonSerializer.Serialize(normalizeExtras e))
+        with ex ->
+            AppLog.error "Saving NeuralScreen settings failed" ex
+
+    let loadExtras () = loadExtrasFrom (extrasPath ()) |> Option.defaultValue extrasDefaults
+    let saveExtras (e: Extras) = saveExtrasTo (extrasPath ()) e
+
+    /// The extras NeuralScreen is started with: the shared ones, or a game's
+    /// when its preset is in use. Set by the Screen Engine card.
+    let mutable activeExtras: Extras option = None
+
+    let presetExtrasPath (gameKey: string) =
+        Path.ChangeExtension(ScreenEngine.presetPath gameKey, ".neuralscreen.json")
 
     /// SUITE's settings written over NeuralScreen's config, keeping whatever
     /// else it has saved there (presets, hotkeys, its own tuning).
@@ -243,7 +254,7 @@ module NeuralScreen =
         set "screenshot_dir" (JsonValue.Create(captureFolder))
         // The NeuralScreen-only controls. Each of these is read once when it
         // starts; while it runs the same values go through the bridge instead.
-        let extras = normalizeExtras (loadExtras ())
+        let extras = normalizeExtras (activeExtras |> Option.defaultWith loadExtras)
         set "nr_small" (JsonValue.Create(extras.Boost))
         set "work_scale" (JsonValue.Create(extras.WorkScale))
         set "skip_static" (JsonValue.Create(extras.SkipStatic))
