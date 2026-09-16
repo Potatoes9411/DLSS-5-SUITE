@@ -47,6 +47,7 @@
 
   <ItemGroup>
     <Compile Include="Models\GameItem.fs" />
+    <Compile Include="Services\AppLog.fs" />
     <Compile Include="Services\DataMigration.fs" />
     <Compile Include="Services\Localization.fs" />
     <Compile Include="Services\ExtrasStore.fs" />

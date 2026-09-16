@@ -1042,10 +1042,9 @@ module GameScanner =
           SortMode = sortModes.[0]
           ShowNonGameApps = false }
 
-    let loadSettings () : AppSettings =
-        try
-            let p = getSettingsFilePath ()
-            if File.Exists(p) then
+    /// Reads one settings file. Split out so the backup can be tried with
+    /// exactly the same rules when the main file cannot be read.
+    let private readSettingsFile (p: string) : AppSettings =
                 let json = File.ReadAllText(p)
                 let options = JsonSerializerOptions()
                 options.PropertyNameCaseInsensitive <- true
@@ -1068,17 +1067,57 @@ module GameScanner =
                         (if String.IsNullOrWhiteSpace(s.OverlayHotkey) then "Shift+O" else s.OverlayHotkey)
                     SupportPromptVersion = (if isNull s.SupportPromptVersion then "" else s.SupportPromptVersion)
                     LastRunVersion = (if isNull s.LastRunVersion then "" else s.LastRunVersion) }
-            else defaultSettings ()
-        with _ -> defaultSettings ()
 
+    /// A settings file that cannot be read no longer turns into a fresh
+    /// install. The last good copy is tried first, and the unreadable one is
+    /// set aside rather than overwritten by the next save, so nothing a user
+    /// set is thrown away because one write went wrong.
+    let loadSettings () : AppSettings =
+        let p = getSettingsFilePath ()
+        let backup = p + ".bak"
+        if not (File.Exists(p)) then
+            if File.Exists(backup) then
+                try readSettingsFile backup
+                with ex ->
+                    AppLog.error "settings.json was missing and its backup could not be read" ex
+                    defaultSettings ()
+            else defaultSettings ()
+        else
+            try
+                readSettingsFile p
+            with ex ->
+                AppLog.error "settings.json could not be read" ex
+                (try
+                    let aside = p + "." + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".unreadable"
+                    File.Copy(p, aside, true)
+                    AppLog.warn ("The unreadable settings were kept as " + aside)
+                 with _ -> ())
+                if File.Exists(backup) then
+                    try
+                        let restored = readSettingsFile backup
+                        AppLog.info "Settings restored from settings.json.bak"
+                        restored
+                    with backupError ->
+                        AppLog.error "settings.json.bak could not be read either; using defaults" backupError
+                        defaultSettings ()
+                else
+                    defaultSettings ()
+
+    /// Written to a temporary file and swapped in, with the previous copy kept
+    /// as settings.json.bak. A crash or a full disk mid-write leaves the old
+    /// file whole instead of a truncated one.
     let saveSettings (settings: AppSettings) : unit =
         try
             let p = getSettingsFilePath ()
             let options = JsonSerializerOptions()
             options.WriteIndented <- true
             let json = JsonSerializer.Serialize(settings, options)
-            File.WriteAllText(p, json)
-        with _ -> ()
+            let tmp = p + ".tmp"
+            File.WriteAllText(tmp, json)
+            if File.Exists(p) then File.Replace(tmp, p, p + ".bak", true)
+            else File.Move(tmp, p)
+        with ex ->
+            AppLog.error "Saving settings.json failed" ex
 
     // =========================================================================
     // MAIN UNIFIED ASYNCHRONOUS SCANNER

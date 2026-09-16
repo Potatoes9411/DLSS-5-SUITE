@@ -42,6 +42,17 @@ module Program =
 
     [<EntryPoint; STAThread>]
     let main argv =
+        let version =
+            match Reflection.Assembly.GetExecutingAssembly().GetCustomAttributes(typeof<Reflection.AssemblyInformationalVersionAttribute>, false) with
+            | [| :? Reflection.AssemblyInformationalVersionAttribute as a |] -> a.InformationalVersion
+            | _ -> "unknown"
+        DLSS_5_MANAGER.Services.AppLog.info (sprintf "DLSS 5 SUITE %s starting on %s" version (Environment.OSVersion.VersionString))
+        AppDomain.CurrentDomain.UnhandledException.Add(fun e ->
+            match e.ExceptionObject with
+            | :? exn as ex -> DLSS_5_MANAGER.Services.AppLog.error "Unhandled exception" ex
+            | other -> DLSS_5_MANAGER.Services.AppLog.warn (sprintf "Unhandled non-exception: %A" other))
+        Threading.Tasks.TaskScheduler.UnobservedTaskException.Add(fun e ->
+            DLSS_5_MANAGER.Services.AppLog.error "Unobserved task exception" e.Exception)
         // One-time import of the folder older builds used. See DataMigration.
         DLSS_5_MANAGER.Services.DataMigration.run ()
         buildAvaloniaApp().StartWithClassicDesktopLifetime(argv)

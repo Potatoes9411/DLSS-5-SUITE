@@ -336,20 +336,31 @@ module AnalysisStore =
         analysis
 
     /// Analyze a whole batch (library scan / folder import) and persist once.
-    let refreshMany (games: GameItem list) (onProgress: int -> int -> string -> unit) : unit =
+    /// Analyzes games until done or until asked to stop. What was analyzed
+    /// before the stop is kept and saved - a stopped scan is not thrown away.
+    let refreshManyUntil (stopRequested: unit -> bool) (games: GameItem list) (onProgress: int -> int -> string -> unit) : bool =
         let total = games.Length
         let mutable index = 0
+        let mutable stopped = false
 
         for game in games do
-            index <- index + 1
-            onProgress index total game.Title
+            if not stopped then
+                if stopRequested () then
+                    stopped <- true
+                else
+                    index <- index + 1
+                    onProgress index total game.Title
 
-            try
-                put (analyze game)
-            with _ ->
-                ()
+                    try
+                        put (analyze game)
+                    with ex ->
+                        AppLog.error ("Analyzing " + game.Title + " failed") ex
 
         save ()
+        not stopped
+
+    let refreshMany (games: GameItem list) (onProgress: int -> int -> string -> unit) : unit =
+        refreshManyUntil (fun () -> false) games onProgress |> ignore
 
     /// Only analyze the games we have never seen before - used after adding
     /// folders so existing entries are not rescanned.

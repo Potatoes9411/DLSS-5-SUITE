@@ -560,6 +560,13 @@ type MainViewModel() as this =
     /// How the library grid is ordered. One of GameScanner.sortModes.
     let mutable sortMode = GameScanner.sortModes.[0]
 
+    /// Which games the grid shows: 0 all, 1 installed, 2 Steam, 3 Epic,
+    /// 4 GOG, 5 everything else. For this session only.
+    let mutable libraryFilter = 0
+
+    /// Set by Cancel; the scan checks it between steps and between games.
+    let mutable scanStopRequested = false
+
     let createRadialBrush (centerHex: string) =
         let brush = RadialGradientBrush()
         brush.Center <- RelativePoint(0.5, 0.5, RelativeUnit.Relative)
@@ -769,9 +776,19 @@ type MainViewModel() as this =
         filteredGames.Clear()
         let query = searchText.Trim().ToLowerInvariant()
 
+        let passesFilter (card: GameCardViewModel) =
+            match libraryFilter with
+            | 1 -> card.HasModBadge
+            | 2 -> card.LauncherType = "STEAM"
+            | 3 -> card.LauncherType = "EPIC GAMES"
+            | 4 -> card.LauncherType = "GOG GALAXY"
+            | 5 -> not (List.contains card.LauncherType [ "STEAM"; "EPIC GAMES"; "GOG GALAXY" ])
+            | _ -> true
+
         allGames
         |> Seq.filter (fun card ->
             (showNonGameApps || not (NonGameAppClassifier.isUtility card.Game))
+            && passesFilter card
             && (if String.IsNullOrWhiteSpace(query) then true
             else
                 card.Title.ToLowerInvariant().Contains(query)
@@ -1065,6 +1082,26 @@ type MainViewModel() as this =
                           OverlayHotkey = overlayHotkey
                           SortMode = sortMode
                           ShowNonGameApps = showNonGameApps }
+
+    member _.FilterOptions =
+        [| "All games"; "Installed"; "Steam"; "Epic Games"; "GOG"; "Other" |]
+
+    member this.SelectedFilterIndex
+        with get () = libraryFilter
+        and set (index: int) =
+            if index >= 0 && index <= 5 && index <> libraryFilter then
+                libraryFilter <- index
+                filterGamesList ()
+                this.RaisePropertyChanged("SelectedFilterIndex")
+                this.RaisePropertyChanged("HasGames")
+
+    /// Stops a scan or an analysis at the next game. Whatever it had found by
+    /// then is kept.
+    member this.CancelScan() =
+        if isScanning then
+            scanStopRequested <- true
+            this.ScanStatusText <- "Stopping..."
+            AppLog.info "Scan cancelled by the user"
 
     member this.IsWindowActive
         with get () = isWindowActive
@@ -1770,8 +1807,10 @@ type MainViewModel() as this =
     member this.StartScanAsync() =
         this.CloseSettings()
         if not isScanning then
+            scanStopRequested <- false
             this.IsScanning <- true
             this.ScanStatusText <- "Scanning games library..."
+            AppLog.info "Library scan started"
 
             System.Threading.Tasks.Task.Run(fun () ->
                 try
@@ -1793,9 +1832,11 @@ type MainViewModel() as this =
 
                     // Deep-scan every title once and store it, so opening a game
                     // and pressing Install are instant from now on.
-                    AnalysisStore.refreshMany combined (fun index total title ->
-                        Dispatcher.UIThread.Post(fun () ->
-                            this.ScanStatusText <- sprintf "Analyzing %d/%d - %s" index total title))
+                    let analysisFinished =
+                        (not scanStopRequested)
+                        && AnalysisStore.refreshManyUntil (fun () -> scanStopRequested) combined (fun index total title ->
+                            Dispatcher.UIThread.Post(fun () ->
+                                this.ScanStatusText <- sprintf "Analyzing %d/%d - %s" index total title))
 
                     Dispatcher.UIThread.Post(fun () ->
                         allGames.Clear()
@@ -1812,18 +1853,22 @@ type MainViewModel() as this =
                     // The emulators are their own search, and it follows on in
                     // the same task with no gap - one press of Re-scan settles
                     // the whole library, games and emulators together.
-                    let emulatorsAdded = this.RunEmulatorDetection()
+                    let emulatorsAdded = if analysisFinished then this.RunEmulatorDetection() else 0
+
+                    AppLog.info (sprintf "Library scan %s: %d games, %d emulators added" (if analysisFinished then "finished" else "stopped") combined.Length emulatorsAdded)
 
                     Dispatcher.UIThread.Post(fun () ->
                         this.IsScanning <- false
 
                         this.ScanStatusText <-
-                            if emulatorsAdded > 0 then
+                            if not analysisFinished then
+                                sprintf "%d Games Ready · scan stopped, some not analyzed yet" combined.Length
+                            elif emulatorsAdded > 0 then
                                 sprintf "%d Games Ready · %d emulator(s) added" combined.Length emulatorsAdded
                             else
                                 sprintf "%d Games Ready" combined.Length)
                 with ex ->
-                    printfn "[DLSS5Manager Error] Scan failed: %s" (ex.ToString())
+                    AppLog.error "Library scan failed" ex
                     Dispatcher.UIThread.Post(fun () ->
                         this.IsScanning <- false
                         this.ScanStatusText <- "Ready"))
@@ -1836,13 +1881,15 @@ type MainViewModel() as this =
         let pending = games |> List.filter (fun g -> (AnalysisStore.tryGet g).IsNone)
 
         if not pending.IsEmpty then
+            scanStopRequested <- false
             this.IsScanning <- true
             this.ScanStatusText <- "Analyzing games..."
 
             System.Threading.Tasks.Task.Run(fun () ->
-                AnalysisStore.refreshMany pending (fun index total title ->
+                AnalysisStore.refreshManyUntil (fun () -> scanStopRequested) pending (fun index total title ->
                     Dispatcher.UIThread.Post(fun () ->
                         this.ScanStatusText <- sprintf "Analyzing %d/%d - %s" index total title))
+                |> ignore
 
                 Dispatcher.UIThread.Post(fun () ->
                     // These cards were built from the games cache before the
@@ -1883,7 +1930,7 @@ type MainViewModel() as this =
                         AnalysisStore.refreshExecutableOnly item |> ignore
                         Some item
                     with ex ->
-                        printfn "[DLSS5Manager Error] Manual add failed: %s" (ex.ToString())
+                        AppLog.error "Adding a game by hand failed" ex
                         None
 
                 Dispatcher.UIThread.Post(fun () ->
@@ -2082,7 +2129,7 @@ type MainViewModel() as this =
         let games = allGames |> Seq.map (fun c -> c.Game) |> Seq.toArray
         System.Threading.Tasks.Task.Run(fun () ->
             try ModInstaller.syncOverlays enabled theme hotkey games
-            with _ -> ())
+            with ex -> AppLog.error "Updating the overlay in installed games failed" ex)
         |> ignore
 
         GameScanner.saveSettings
@@ -3139,7 +3186,7 @@ type MainViewModel() as this =
                     try
                         GameScanner.scanCustomFolder folderPath
                     with ex ->
-                        printfn "[DLSS5Manager Error] Folder add failed: %s" (ex.ToString())
+                        AppLog.error "Adding a folder failed" ex
                         []
 
                 Dispatcher.UIThread.Post(fun () ->
@@ -3203,7 +3250,7 @@ type MainViewModel() as this =
                         AnalysisStore.refreshExecutableOnly item |> ignore
                         Some item
                     with ex ->
-                        printfn "[DLSS5Manager Error] Emulator add failed: %s" (ex.ToString())
+                        AppLog.error "Adding an emulator failed" ex
                         None
 
                 Dispatcher.UIThread.Post(fun () ->

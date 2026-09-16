@@ -323,6 +323,11 @@ type MainWindow() as this =
                             s.Opacity <- sin (Math.PI * (p ** 0.75))
                             shooterState.[i] <- (e, duration, x0, y0, dx, dy, nextAt))
 
+        this.AddHandler(
+            InputElement.KeyDownEvent,
+            EventHandler<KeyEventArgs>(fun _ e -> this.OnShortcutKey e),
+            RoutingStrategies.Tunnel)
+
         // Clear TextBox focus whenever the user clicks anywhere outside of it
         this.AddHandler(
             InputElement.PointerPressedEvent,
@@ -1141,7 +1146,7 @@ type MainWindow() as this =
                 match path with
                 | Some executable ->
                     try Process.Start(ProcessStartInfo(executable, UseShellExecute = true)) |> ignore
-                    with _ -> ()
+                    with ex -> AppLog.error ("Starting " + executable + " failed") ex
                 | None -> ()
             } |> Async.StartImmediate
         | _ -> ()
@@ -1159,7 +1164,7 @@ type MainWindow() as this =
                 match path with
                 | Some executable ->
                     try Process.Start(ProcessStartInfo(executable, UseShellExecute = true)) |> ignore
-                    with _ -> ()
+                    with ex -> AppLog.error ("Starting " + executable + " failed") ex
                 | None -> ()
             } |> Async.StartImmediate
         | _ -> ()
@@ -1190,6 +1195,61 @@ type MainWindow() as this =
     member this.OnRescanClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> vm.StartScanAsync()
+        | _ -> ()
+
+    member this.OnCancelScanClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.CancelScan()
+        | _ -> ()
+
+    member this.OnOpenDataFolderClicked(sender: obj, e: RoutedEventArgs) =
+        try
+            let folder = AppLog.dataFolder ()
+            Directory.CreateDirectory(folder) |> ignore
+            Process.Start(ProcessStartInfo("explorer.exe", "\"" + folder + "\"", UseShellExecute = true)) |> ignore
+        with ex ->
+            AppLog.error "Opening the data folder failed" ex
+
+    member this.OnOpenLogClicked(sender: obj, e: RoutedEventArgs) =
+        try
+            let log = AppLog.logPath ()
+            if not (File.Exists(log)) then AppLog.info "Log opened from Settings"
+            Process.Start(ProcessStartInfo(log, UseShellExecute = true)) |> ignore
+        with ex ->
+            AppLog.error "Opening the log failed" ex
+
+    /// Ctrl+F search, Esc to back out of whatever is open, F5 to rescan.
+    /// Registered on the tunnel so a focused text box cannot swallow Esc.
+    member private this.OnShortcutKey(e: KeyEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm ->
+            let ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            match e.Key with
+            | Key.F when ctrl ->
+                let name = if vm.IsSidebarLayout then "SearchInputBoxSidebar" else "SearchInputBox"
+                match this.FindControl<TextBox>(name) with
+                | null -> ()
+                | box ->
+                    box.Focus() |> ignore
+                    box.SelectAll()
+                    e.Handled <- true
+            | Key.Escape ->
+                if vm.IsManageOpen then
+                    vm.CloseManage()
+                    e.Handled <- true
+                elif vm.IsBatchOpen then
+                    vm.CloseBatch()
+                    e.Handled <- true
+                elif vm.IsSettingsOpen then
+                    vm.CloseSettings()
+                    e.Handled <- true
+                elif not (String.IsNullOrEmpty(vm.SearchText)) then
+                    vm.SearchText <- ""
+                    e.Handled <- true
+            | Key.F5 ->
+                if not vm.IsScanning then vm.StartScanAsync()
+                e.Handled <- true
+            | _ -> ()
         | _ -> ()
 
     member this.OnClearCacheClicked(sender: obj, e: RoutedEventArgs) =
