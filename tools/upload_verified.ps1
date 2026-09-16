@@ -21,7 +21,22 @@ $Token = $env:GITHUB_TOKEN
 if (-not $Token) { throw 'Set the GITHUB_TOKEN environment variable first.' }
 $Headers = @{ Authorization = "Bearer $Token"; Accept = 'application/vnd.github+json' }
 
-function Get-Release { Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$Tag" -Headers $Headers }
+function Get-Release {
+    try {
+        return Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/tags/$Tag" -Headers $Headers
+    }
+    catch {
+        if ($_.Exception.Response.StatusCode.value__ -ne 404) { throw }
+
+        # GitHub's release-by-tag endpoint does not return draft releases even
+        # to their owner. The authenticated releases list does, so a new release
+        # can stay private until every large asset has uploaded and verified.
+        $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=100" -Headers $Headers
+        $draft = $releases | Where-Object { $_.tag_name -eq $Tag } | Select-Object -First 1
+        if (-not $draft) { throw "release not found for tag $Tag" }
+        return $draft
+    }
+}
 
 $release = Get-Release
 Write-Host "release $Tag  id=$($release.id)"
