@@ -11,6 +11,17 @@ This release integrates the Full-Screen DLSS 5 Screen Engine and finishes its ap
 - Synchronizes NeuralScreen's real recording state back to SUITE, including start failures and externally triggered recording changes.
 - Refreshes a rejected Windows monitor handle and retries monitor capture once, fixing stale-handle `CreateForMonitor` failures without changing capture methods.
 - Adds full-monitor and selected-window capture with optional output-monitor selection.
+- Bundles NVIDIA's signed neural-rendering model beside the compatibility model and prefers it, so the Screen Engine starts on a current driver without any manual step.
+- Adds a chosen model folder for the Screen Engine, leaving the bundled files untouched.
+- Runs the NeuralScreen model one to four times per frame through ping-pong targets, so the Passes control works in both methods.
+- Arms the window crosshair on a single click: switch to any window with Alt+Tab and the next click picks it. Dragging still works.
+- Hides the NeuralScreen picture and overlay while the captured application is not focused, so unrelated windows stop flashing.
+- Presents every NeuralScreen surface - taskbar button, tray, popups and window titles - with SUITE's name, icon and palette.
+- Applies Screen Engine and NeuralScreen changes by themselves shortly after the last edit, so a running session needs no Apply button.
+- Accepts typed values beside every slider, past the slider's own range where the engine allows it.
+- Moves the Screen Engine into its own themed window, opened from Settings, independent of the main window.
+- Installs a motion-vector provider with the game mod (bundled QuantMotion, or the Lumenite kernel on the Need for Speed route) and orders it ahead of the DLSS 5 feed, so the add-on no longer reports missing motion vectors.
+- Downloads the large compatibility packages one at a time, resumable and SHA-256 verified, with megabyte progress, stall detection and retries instead of a status that never changes.
 - Adds an in-app running-window picker while retaining manual title/handle entry.
 - Adds direct screenshot, recording and comparison-sweep controls without requiring the engine's separate panel.
 - Adds Neural Rendering intensity, structure, tone, skin, style, masks and repeat-pass controls.
