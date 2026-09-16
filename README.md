@@ -6,7 +6,7 @@
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-[![Version](https://img.shields.io/badge/Version-1.2.2--suite.1-35d22b?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.2.3-35d22b?style=flat-square)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-24292e?style=flat-square)]()
 [![Framework](https://img.shields.io/badge/Framework-.NET%208%20|%20Avalonia%20UI-512bd4?style=flat-square)]()
 [![Language](https://img.shields.io/badge/Language-F%23-30b9db?style=flat-square)]()
@@ -45,6 +45,10 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - DLSS 5 over the whole desktop through two methods chosen by your card: the Screen Engine for RTX 50 series, and NeuralScreen for RTX 30/40 series with RTX 50 as an alternative. RTX 20 is marked unsupported, because that generation starts without processing the picture.
 - One themed window for both methods, opened from Settings: a full monitor or a single window, a crosshair that is dragged or armed with a click, Neural Rendering strength, style, skin, auto mask and one to four passes, super resolution, comparison modes, screenshots, recording, comparison sweeps, a capture folder, and the model, motion, cursor, adapter and diagnostic settings behind an advanced section. Changes apply on their own while a session runs.
 - Num2 brings those controls up over whatever is on screen while NeuralScreen runs, with a button back to the main window; NeuralScreen's own menu never opens.
+- Game cards can launch and stop games directly. Steam games can use Steam or their executable, remember that choice per game, and expose launch options, an ask-again action, and Open game folder.
+- Screen Engine settings can be saved per game and loaded automatically when that game starts.
+- Library search and filters, cancellable scans, safer atomic settings saves, a persistent diagnostic log, and keyboard shortcuts keep larger libraries responsive and easier to troubleshoot.
+- Screen Engine changes tune a running session live when possible; source and capture changes restart only the part that needs restarting.
 - Game installs receive a motion-vector provider and the technique order DLSS 5 needs, so the overlay reports real motion vectors instead of none.
 - NeuralScreen ships as its own download. SUITE keeps the method locked until its zip is installed from the Screen Engine window.
 - DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
@@ -99,10 +103,10 @@ For Need for Speed, the app labels the route rather than pretending the games ha
 Application data, cached artwork, settings, manifests and backups are stored under:
 
 ```text
-%LOCALAPPDATA%\DLSS5Manager\
+%LOCALAPPDATA%\DLSS5Suite\
 ```
 
-The existing folder name is retained for compatibility with installations of the original application.
+Data from the original `%LOCALAPPDATA%\DLSS5Manager` folder is imported once without overwriting newer SUITE data.
 
 ## Source availability
 

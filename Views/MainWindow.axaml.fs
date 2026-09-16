@@ -411,11 +411,9 @@ type MainWindow() as this =
 
                 // Arriving at an edge with speed left over throws that speed
                 // into the band instead of through the wall.
-                if stepped < -0.01 && scrollVelocity < 0.0 then
-                    overscroll <- Math.Clamp(overscroll - scrollVelocity * 0.05, -170.0, 170.0)
-                    scrollVelocity <- 0.0
-                elif stepped > maxOffset + 0.01 && scrollVelocity > 0.0 then
-                    overscroll <- Math.Clamp(overscroll - scrollVelocity * 0.05, -170.0, 170.0)
+                // No rubber band: the edge is a hard stop. The band fought
+                // scrolling back the other way at both ends.
+                if (stepped < -0.01 && scrollVelocity < 0.0) || (stepped > maxOffset + 0.01 && scrollVelocity > 0.0) then
                     scrollVelocity <- 0.0
 
                 sv.Offset <- Vector(sv.Offset.X, clamped)
@@ -653,23 +651,9 @@ type MainWindow() as this =
                 // Scrolling back toward the content always reduces the band
                 // first, which is what makes an edge escapable: the wheel is
                 // not fighting a target that is parked outside the range.
-                if proposed < 0.0 then
-                    let beyond = -proposed
-                    let resisted = beyond / (1.0 + abs overscroll / 55.0)
-                    overscroll <- Math.Clamp(overscroll + resisted * 0.32, -170.0, 170.0)
-                    scrollTargetY <- 0.0
-                elif proposed > maxOffset then
-                    let beyond = proposed - maxOffset
-                    let resisted = beyond / (1.0 + abs overscroll / 55.0)
-                    overscroll <- Math.Clamp(overscroll - resisted * 0.32, -170.0, 170.0)
-                    scrollTargetY <- maxOffset
-                else
-                    // Back inside the valid range: cancel any lingering band
-                    // so it does not fight the new direction.
-                    if abs overscroll > 0.01 then
-                        overscroll <- 0.0
-                        overscrollVelocity <- 0.0
-                    scrollTargetY <- proposed
+                overscroll <- 0.0
+                overscrollVelocity <- 0.0
+                scrollTargetY <- Math.Clamp(proposed, 0.0, maxOffset)
 
                 if not isScrollAnimating then
                     isScrollAnimating <- true
