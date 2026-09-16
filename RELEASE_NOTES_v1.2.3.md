@@ -36,7 +36,7 @@ Version 1.2.3 turns the library into a practical launch surface and makes the Sc
 - **Safer settings and diagnostics:** settings are replaced atomically, a persistent application log records failures, and startup recovers cleanly from an interrupted save.
 - **Correct motion-vector setup:** ReShade receives the real Lumenite technique names, and SUITE removes the provider that was not selected.
 - **DX11 OptiScaler DLSS-NR:** the Neural Rendering route enables NR and selects the D3D12 bridge that OptiScaler needs for DirectX 11 games.
-- **Clean final UI behavior:** numeric fields have enough room for typed values, the play control stays above card hints, and scrolling stops cleanly at library edges without trapping movement in an overscroll band.
+- **Clean final UI behavior:** numeric fields have enough room for typed values, the play control stays above card hints, and the edge rubber band releases immediately when scrolling back into the library instead of fighting the new direction.
 - **Reliable add-on download resume:** a fully downloaded partial file is verified and promoted instead of sending an invalid resume request.
 
 ## Compatibility-model trust policy

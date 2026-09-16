@@ -409,11 +409,15 @@ type MainWindow() as this =
                 // against it.
                 let clamped = Math.Clamp(stepped, 0.0, maxOffset)
 
-                // Arriving at an edge with speed left over throws that speed
-                // into the band instead of through the wall.
-                // No rubber band: the edge is a hard stop. The band fought
-                // scrolling back the other way at both ends.
-                if (stepped < -0.01 && scrollVelocity < 0.0) || (stepped > maxOffset + 0.01 && scrollVelocity > 0.0) then
+                // Arriving at an edge with speed left over throws a small part
+                // of that speed into the visual band. The real scroll target
+                // remains at the edge, so the band can never hold scrolling
+                // hostage when the next gesture points back into the content.
+                if stepped < -0.01 && scrollVelocity < 0.0 then
+                    overscroll <- Math.Clamp(overscroll - scrollVelocity * 0.025, -96.0, 96.0)
+                    scrollVelocity <- 0.0
+                elif stepped > maxOffset + 0.01 && scrollVelocity > 0.0 then
+                    overscroll <- Math.Clamp(overscroll - scrollVelocity * 0.025, -96.0, 96.0)
                     scrollVelocity <- 0.0
 
                 sv.Offset <- Vector(sv.Offset.X, clamped)
@@ -641,7 +645,21 @@ type MainWindow() as this =
                 // Notches that arrive while the spring is still moving stack
                 // up, so a fast flick travels much further than the same number
                 // of slow ones - that is the momentum the old model threw away.
-                let proposed = scrollTargetY - (e.Delta.Y * step)
+                let wheelDistance = -(e.Delta.Y * step)
+
+                // A gesture back into the content cancels the visual stretch
+                // immediately and spends its full distance on scrolling. This
+                // is the important escape rule: no spring force or stored
+                // velocity is allowed to fight the user's new direction.
+                let movingInwardFromBand =
+                    abs overscroll > 0.01 && overscroll * wheelDistance > 0.0
+
+                if movingInwardFromBand then
+                    overscroll <- 0.0
+                    overscrollVelocity <- 0.0
+                    scrollVelocity <- 0.0
+
+                let proposed = scrollTargetY + wheelDistance
 
                 // The target itself never leaves the real range. Anything that
                 // would go past an end is handed to the band instead, against a
@@ -651,9 +669,20 @@ type MainWindow() as this =
                 // Scrolling back toward the content always reduces the band
                 // first, which is what makes an edge escapable: the wheel is
                 // not fighting a target that is parked outside the range.
-                overscroll <- 0.0
-                overscrollVelocity <- 0.0
-                scrollTargetY <- Math.Clamp(proposed, 0.0, maxOffset)
+                if proposed < 0.0 then
+                    let beyond = -proposed
+                    let resistance = 1.0 + abs overscroll / 42.0
+                    overscroll <- Math.Clamp(overscroll + beyond * 0.28 / resistance, -96.0, 96.0)
+                    overscrollVelocity <- 0.0
+                    scrollTargetY <- 0.0
+                elif proposed > maxOffset then
+                    let beyond = proposed - maxOffset
+                    let resistance = 1.0 + abs overscroll / 42.0
+                    overscroll <- Math.Clamp(overscroll - beyond * 0.28 / resistance, -96.0, 96.0)
+                    overscrollVelocity <- 0.0
+                    scrollTargetY <- maxOffset
+                else
+                    scrollTargetY <- proposed
 
                 if not isScrollAnimating then
                     isScrollAnimating <- true
