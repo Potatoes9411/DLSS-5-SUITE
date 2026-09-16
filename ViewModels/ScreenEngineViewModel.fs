@@ -40,6 +40,9 @@ type ScreenEngineViewModel() as this =
     let mutable isRecording = false
     let mutable selectedSweepIndex = 0
     let mutable sweepValues = 5.0
+    let mutable addonProgress = 0.0
+    let mutable addonStatus = ""
+    let mutable isInstallingAddon = false
     let mutable pickerText = "Click, then Alt+Tab and click a window — or drag the crosshair onto it"
 
     // Changes apply by themselves. A running engine only reads its options at
@@ -112,6 +115,49 @@ type ScreenEngineViewModel() as this =
         | NeuralScreen.Rtx20 -> "RTX 20 series cards cannot run the DLSS 5 model, with either method."
         | NeuralScreen.NoRtx -> "DLSS 5 needs an NVIDIA RTX 30, 40 or 50 series card."
         | _ -> "NeuralScreen is a separate download. Install the add-on to use it."
+
+    member _.AddonProgress = addonProgress
+    member _.AddonStatus = addonStatus
+    member _.IsInstallingAddon = isInstallingAddon
+
+    /// Fetches the add-on from the release this build belongs to, checks it
+    /// and unpacks it, without sending anyone to a browser.
+    member this.DownloadNeuralScreenAddon() =
+        if not isInstallingAddon then
+            isInstallingAddon <- true
+            addonProgress <- 0.0
+            addonStatus <- "Looking up the NeuralScreen add-on..."
+            for name in [ "IsInstallingAddon"; "AddonProgress"; "AddonStatus" ] do
+                this.RaisePropertyChanged(name)
+
+            let report (message: string) (percent: float) =
+                Dispatcher.UIThread.Post(fun () ->
+                    addonStatus <- message
+                    addonProgress <- Math.Clamp(percent, 0.0, 100.0)
+                    this.RaisePropertyChanged("AddonStatus")
+                    this.RaisePropertyChanged("AddonProgress"))
+
+            async {
+                let! outcome =
+                    NeuralScreen.Addon.install report
+                    |> Async.AwaitTask
+                    |> Async.Catch
+                Dispatcher.UIThread.Post(fun () ->
+                    isInstallingAddon <- false
+                    match outcome with
+                    | Choice1Of2 () ->
+                        canNeuralScreen <- cardRunsNeuralScreen && NeuralScreen.isAvailable ()
+                        addonStatus <- "NeuralScreen add-on installed."
+                        addonProgress <- 100.0
+                    | Choice2Of2 error ->
+                        addonStatus <- "The add-on could not be installed: " + error.Message
+                        addonProgress <- 0.0
+                    for name in
+                        [ "IsInstallingAddon"; "AddonProgress"; "AddonStatus"; "CanUseNeuralScreen"; "NeuralScreenLocked"
+                          "NeuralScreenNeedsInstall"; "NeuralScreenTip"; "MethodNote"; "IsAvailable"; "CanStart"; "Status" ] do
+                        this.RaisePropertyChanged(name))
+            }
+            |> Async.Start
 
     /// The card can run it, but the add-on is not installed: it is a separate
     /// download because of its size and its own NVIDIA runtimes.

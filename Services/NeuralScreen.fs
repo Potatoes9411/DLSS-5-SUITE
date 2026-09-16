@@ -4,6 +4,7 @@ open System
 open System.Diagnostics
 open System.Globalization
 open System.IO
+open System.IO.Compression
 open System.Text.Json
 open System.Text.Json.Nodes
 open System.Text.RegularExpressions
@@ -165,6 +166,66 @@ module NeuralScreen =
         let tmp = configPath () + ".tmp"
         File.WriteAllText(tmp, cfg.ToJsonString(JsonSerializerOptions(WriteIndented = true)))
         File.Move(tmp, configPath (), true)
+
+    // =====================================================================
+    // FETCHING THE ADD-ON
+    // =====================================================================
+    /// NeuralScreen is published beside SUITE as its own release asset. It is
+    /// fetched, verified and unpacked in the app: nothing here sends the user
+    /// to a browser.
+    module Addon =
+        let private client =
+            let c = new Net.Http.HttpClient(Timeout = TimeSpan.FromMinutes(30.0))
+            c.DefaultRequestHeaders.UserAgent.ParseAdd("DLSS5-SUITE-NeuralScreen")
+            c
+
+        [<Literal>]
+        let private Repo = "Potatoes9411/DLSS-5-SUITE"
+
+        let private isAddon (name: string) =
+            name.Contains("NeuralScreen", StringComparison.OrdinalIgnoreCase)
+            && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+
+        /// The newest published add-on: its address, size and the digest the
+        /// download is checked against.
+        let private locate () = task {
+            use! response = client.GetAsync(sprintf "https://api.github.com/repos/%s/releases/latest" Repo)
+            response.EnsureSuccessStatusCode() |> ignore
+            use! stream = response.Content.ReadAsStreamAsync()
+            use document = JsonDocument.Parse(stream)
+            let asset =
+                document.RootElement.GetProperty("assets").EnumerateArray()
+                |> Seq.tryFind (fun item -> isAddon (item.GetProperty("name").GetString()))
+                |> Option.defaultWith (fun () -> failwith "This release does not carry the NeuralScreen add-on.")
+            let digest =
+                match asset.TryGetProperty("digest") with
+                | true, value when not (String.IsNullOrWhiteSpace(value.GetString())) -> value.GetString().Replace("sha256:", "").ToUpperInvariant()
+                | _ -> failwith "GitHub published no digest for the add-on; the download was refused."
+            return
+                asset.GetProperty("name").GetString(),
+                asset.GetProperty("browser_download_url").GetString(),
+                digest,
+                asset.GetProperty("size").GetInt64()
+        }
+
+        /// Unpacking replaces the folder's files, so a half-written archive
+        /// from an interrupted run can never be left behind as an install:
+        /// the download verifies its SHA-256 before it is opened.
+        let install (progress: string -> float -> unit) = task {
+            let! (name, url, digest, size) = locate ()
+            let cache = Path.Combine(dataDir (), "download")
+            Directory.CreateDirectory(cache) |> ignore
+            let archive = Path.Combine(cache, name)
+            do! VerifiedDownload.download client name url digest size archive progress 0.0 92.0
+            progress "Unpacking the NeuralScreen add-on..." 94.0
+            let target = Path.GetDirectoryName(folder ())
+            Directory.CreateDirectory(target) |> ignore
+            ZipFile.ExtractToDirectory(archive, target, true)
+            progress "Tidying up..." 99.0
+            try File.Delete archive with _ -> ()
+            if not (isAvailable ()) then failwith "The add-on was unpacked but NeuralScreen is still missing."
+            progress "NeuralScreen add-on installed." 100.0
+        }
 
     // =====================================================================
     // RUNNING IT
