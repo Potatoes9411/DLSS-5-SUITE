@@ -83,12 +83,34 @@ module NeuralScreen =
     // =====================================================================
     // WHERE THINGS LIVE
     // =====================================================================
-    let folder () = Path.Combine(ModInstaller.modFilesRoot (), "neuralscreen")
-    let private pythonPath () = Path.Combine(folder (), "runtime", "pythonw.exe")
-    let isAvailable () = File.Exists(pythonPath ()) && File.Exists(Path.Combine(folder (), "main.py"))
-
     let dataDir () =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite", "NeuralScreen")
+
+    /// Where a copy shipped beside the app would sit. An install under
+    /// Program Files is read-only for a standard user, so nothing is ever
+    /// written here: it is only used when something already put it there.
+    let private bundledFolder () = Path.Combine(ModInstaller.modFilesRoot (), "neuralscreen")
+
+    /// Where SUITE unpacks the add-on itself. Per-user and always writable,
+    /// which an installed "mod files" folder is not.
+    let installRoot () = Path.Combine(dataDir (), "app")
+
+    let private holdsNeuralScreen (dir: string) =
+        File.Exists(Path.Combine(dir, "main.py")) && File.Exists(Path.Combine(dir, "runtime", "pythonw.exe"))
+
+    /// The copy that is actually used: one shipped with the app wins, then the
+    /// one the user installed, and when neither is there the install location
+    /// is what the panel points at.
+    let folder () =
+        let bundled = bundledFolder ()
+        let installed = Path.Combine(installRoot (), "neuralscreen")
+        if holdsNeuralScreen bundled then bundled
+        elif holdsNeuralScreen installed then installed
+        elif Directory.Exists bundled then bundled
+        else installed
+
+    let private pythonPath () = Path.Combine(folder (), "runtime", "pythonw.exe")
+    let isAvailable () = holdsNeuralScreen (folder ())
 
     let private configPath () = Path.Combine(dataDir (), "config.json")
     let private inboxDir () = Path.Combine(dataDir (), "inbox")
@@ -218,7 +240,7 @@ module NeuralScreen =
             let archive = Path.Combine(cache, name)
             do! VerifiedDownload.download client name url digest size archive progress 0.0 92.0
             progress "Unpacking the NeuralScreen add-on..." 94.0
-            let target = Path.GetDirectoryName(folder ())
+            let target = installRoot ()
             Directory.CreateDirectory(target) |> ignore
             ZipFile.ExtractToDirectory(archive, target, true)
             progress "Tidying up..." 99.0

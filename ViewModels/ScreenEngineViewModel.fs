@@ -168,7 +168,7 @@ type ScreenEngineViewModel() as this =
     /// Unpacks "DLSS 5 SUITE NeuralScreen Add-on.zip" into mod files.
     member this.InstallNeuralScreenAddon(zipPath: string) =
         try
-            let target = Path.GetDirectoryName(NeuralScreen.folder ())
+            let target = NeuralScreen.installRoot ()
             Directory.CreateDirectory(target) |> ignore
             status <- "Installing the NeuralScreen add-on..."
             this.RaisePropertyChanged("Status")
