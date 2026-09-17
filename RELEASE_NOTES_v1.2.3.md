@@ -41,6 +41,9 @@ Version 1.2.3 turns the library into a practical launch surface and makes the Sc
 - **DLSS 5 Neural Rendering for GTA V and FiveM, installed in-app:** a button in Manage deploys ReShade, RenoDX's DLSS5 Tool, the compatibility model and the Streamline runtime straight into the GTA V Enhanced or Legacy game folder, or into FiveM's own cache folder for FiveM Enhanced, with FiveM's classic client Plugins folder supported as a fallback. Every file it uses is already part of SUITE's own trusted payload - nothing is fetched from a browser or a Discord link, and a Remove button restores what it replaced.
 - **An older OptiScaler build for RTX 20/30 series:** SUITE bundles the current OptiScaler build, which upstream testing found less stable on RTX 20/30 than the release right before it. That older build (0.7.9) can now be fetched from OptiScaler's own GitHub releases and verified in-app; once downloaded, it is used automatically for a qualifying card.
 - **Update progress you can actually see:** checking for or downloading an update now shows a small floating progress card from any tab, not only inside Settings.
+- **RobloxShadeHost:** the Roblox / ReShade method is compiled and bundled in this build.
+- **The Manage sheet scrolls:** its header stays put; a tall route - GTA V's extra cards among them - scrolls underneath instead of running off the bottom of the window.
+- **GTA V's BattlEye is disabled automatically:** installing the GTA V Enhanced fix or the DLSS 5 Neural Rendering route sets `-nobattleye` as the game's launch options, unless something is already typed there. No Rockstar Launcher setting to find by hand.
 
 ## Compatibility-model trust policy
 
