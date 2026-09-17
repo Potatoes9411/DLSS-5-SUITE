@@ -2387,12 +2387,16 @@ type MainViewModel() as this =
         | None -> routeHint
 
     member this.IsGtaEnhancedProfile = GtaProfiles.isEnhanced manageTitle manageExePath
+    member this.IsGtaLegacyProfile = GtaProfiles.isGta manageTitle && not (GtaProfiles.isEnhanced manageTitle manageExePath) && not (manageTitle.IndexOf("fivem", StringComparison.OrdinalIgnoreCase) >= 0)
     member this.GtaFixInstalling = gtaFixInstalling
     member this.GtaFixStatus = gtaFixStatus
     member this.GtaFixProgress = gtaFixProgress
     member this.HasGtaFixStatus = not (String.IsNullOrWhiteSpace(gtaFixStatus))
     member _.GtaPresetFixText =
-        "GTA V Enhanced preset/configuration fix: DirectStorage can make the game folder read-only repeatedly. SUITE downloads and installs Script Hook V, Ultimate ASI Loader, Script Hook V .NET Enhanced and DirectStorageFix beside the Enhanced executable. Disable BattlEye in Rockstar Games Launcher before launching. If ReShade stops loading after an update or file verification, rerun this fix and copy the ReShade DLL it created, keeping the original, then rename the copy to ReShade64.asi. Use End instead of Home for the ReShade menu (KeyOverlay=35,0,0,0)."
+        "GTA V Enhanced compatibility prerequisites: DirectStorage can make the game folder read-only repeatedly. SUITE downloads and installs Script Hook V, Ultimate ASI Loader, Script Hook V .NET Enhanced and DirectStorageFix beside the Enhanced executable. Disable BattlEye before launching. After a launcher update or verification, rerun this fix if ReShade64.asi was removed. ReShade settings use End instead of Home (KeyOverlay=35,0,0,0)."
+
+    member _.GtaLegacyFixText =
+        "GTA V Legacy has no native DLSS path, so DLSS 5 Neural Rendering will remain WAITING there. Use the DX11 single-player ReShade + DLSS5-Feeder route instead. If an update or file verification removes ReShade64.asi, copy the ReShade module created beside the game executable and rename the copy to ReShade64.asi. Rockstar GTA Online is not supported by this workflow."
 
     member this.InstallGtaEnhancedFix() =
         if not gtaFixInstalling then
@@ -2568,6 +2572,7 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("ManageDlssText")
         this.RaisePropertyChanged("ManageStreamlineText")
         this.RaisePropertyChanged("IsGtaEnhancedProfile")
+        this.RaisePropertyChanged("IsGtaLegacyProfile")
         this.RaisePropertyChanged("GtaFixInstalling")
         this.RaisePropertyChanged("GtaFixStatus")
         this.RaisePropertyChanged("GtaFixProgress")

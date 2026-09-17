@@ -2355,6 +2355,12 @@
                                         <TextBlock Text="{Binding GtaFixStatus}" FontSize="11" Foreground="#FDE68A" TextWrapping="Wrap" IsVisible="{Binding HasGtaFixStatus}" />
                                     </StackPanel>
                                 </Border>
+                                <Border IsVisible="{Binding IsGtaLegacyProfile}" Background="#180EA5E9" BorderBrush="#4267E8F9" BorderThickness="1" CornerRadius="14" Padding="14,11">
+                                    <StackPanel Spacing="7">
+                                        <TextBlock Text="GTA V LEGACY GUIDANCE" FontSize="9.5" FontWeight="Bold" Foreground="#7DD3FC" LetterSpacing="0.8" />
+                                        <TextBlock Text="{Binding GtaLegacyFixText}" FontSize="11" Foreground="#E0F2FE" TextWrapping="Wrap" LineHeight="16" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </Border>
 
