@@ -227,7 +227,7 @@ type ScreenEngineViewModel() as this =
                 Directory.CreateDirectory(NeuralScreen.dataDir ()) |> ignore
                 File.WriteAllText(methodPath (), if neuralScreen then "neuralscreen" else "engine")
              with _ -> ())
-            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsAvailable"; "CanStart"; "Status" ] do
+            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsRobloxShadeHost"; "IsAvailable"; "CanStart"; "Status" ] do
                 this.RaisePropertyChanged(name)
             if wasRunning then this.Start()
 
