@@ -65,6 +65,7 @@
     <Compile Include="Services\ShaderGlassDetector.fs" />
     <Compile Include="Services\EmulatorCatalog.fs" />
     <Compile Include="Services\ModInstaller.fs" />
+    <Compile Include="Services\GtaDlss5.fs" />
     <Compile Include="Services\ScreenEngine.fs" />
     <Compile Include="Services\NeuralScreen.fs" />
     <Compile Include="Services\RobloxShadeHost.fs" />

@@ -2367,6 +2367,54 @@
                                         <TextBlock Text="{Binding GtaFiveMFixText}" FontSize="11" Foreground="#DBEAFE" TextWrapping="Wrap" LineHeight="16" />
                                     </StackPanel>
                                 </Border>
+                                <Border Background="#1822C55E" BorderBrush="#4222C55E" BorderThickness="1" CornerRadius="14" Padding="14,11"
+                                        IsVisible="{Binding IsGtaEnhancedProfile}">
+                                    <StackPanel Spacing="9">
+                                        <TextBlock Text="DLSS 5 NEURAL RENDERING" FontSize="9.5" FontWeight="Bold" Foreground="#86EFAC" LetterSpacing="0.8" />
+                                        <TextBlock Text="ReShade64 renamed to dxgi.dll, RenoDX's DLSS5 Tool, the compatibility model and Streamline runtime - the same files the main install already carries." FontSize="11" Foreground="#D1FAE5" TextWrapping="Wrap" LineHeight="16" />
+                                        <TextBlock Text="{Binding GtaFiveMTargetMissingText}" FontSize="11" Foreground="#FCA5A5" TextWrapping="Wrap" IsVisible="{Binding !GtaDlssTargetFound}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="PrimaryActionBtn" Content="Install DLSS 5 Neural Rendering" Click="OnInstallGtaDlss5Clicked"
+                                                    IsEnabled="{Binding !GtaDlssInstalling}" IsVisible="{Binding !IsGtaDlssInstalled}" HorizontalAlignment="Left" Padding="12,7" />
+                                            <Button Classes="EmptyActionBtn" Content="Remove" Click="OnRemoveGtaDlss5Clicked"
+                                                    IsVisible="{Binding IsGtaDlssInstalled}" HorizontalAlignment="Left" Padding="12,7" />
+                                        </StackPanel>
+                                        <ProgressBar Minimum="0" Maximum="100" Height="6" Value="{Binding GtaDlssProgress}" IsVisible="{Binding GtaDlssInstalling}" />
+                                        <TextBlock Text="{Binding GtaDlssStatus}" FontSize="11" Foreground="#FDE68A" TextWrapping="Wrap" IsVisible="{Binding HasGtaDlssStatus}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="#1822C55E" BorderBrush="#4222C55E" BorderThickness="1" CornerRadius="14" Padding="14,11"
+                                        IsVisible="{Binding IsGtaLegacyProfile}">
+                                    <StackPanel Spacing="9">
+                                        <TextBlock Text="DLSS 5 NEURAL RENDERING" FontSize="9.5" FontWeight="Bold" Foreground="#86EFAC" LetterSpacing="0.8" />
+                                        <TextBlock Text="ReShade64 renamed to dxgi.dll, RenoDX's DLSS5 Tool, the compatibility model and Streamline runtime - the same files the main install already carries." FontSize="11" Foreground="#D1FAE5" TextWrapping="Wrap" LineHeight="16" />
+                                        <TextBlock Text="{Binding GtaFiveMTargetMissingText}" FontSize="11" Foreground="#FCA5A5" TextWrapping="Wrap" IsVisible="{Binding !GtaDlssTargetFound}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="PrimaryActionBtn" Content="Install DLSS 5 Neural Rendering" Click="OnInstallGtaDlss5Clicked"
+                                                    IsEnabled="{Binding !GtaDlssInstalling}" IsVisible="{Binding !IsGtaDlssInstalled}" HorizontalAlignment="Left" Padding="12,7" />
+                                            <Button Classes="EmptyActionBtn" Content="Remove" Click="OnRemoveGtaDlss5Clicked"
+                                                    IsVisible="{Binding IsGtaDlssInstalled}" HorizontalAlignment="Left" Padding="12,7" />
+                                        </StackPanel>
+                                        <ProgressBar Minimum="0" Maximum="100" Height="6" Value="{Binding GtaDlssProgress}" IsVisible="{Binding GtaDlssInstalling}" />
+                                        <TextBlock Text="{Binding GtaDlssStatus}" FontSize="11" Foreground="#FDE68A" TextWrapping="Wrap" IsVisible="{Binding HasGtaDlssStatus}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Background="#1822C55E" BorderBrush="#4222C55E" BorderThickness="1" CornerRadius="14" Padding="14,11"
+                                        IsVisible="{Binding IsGtaFiveMProfile}">
+                                    <StackPanel Spacing="9">
+                                        <TextBlock Text="DLSS 5 NEURAL RENDERING" FontSize="9.5" FontWeight="Bold" Foreground="#86EFAC" LetterSpacing="0.8" />
+                                        <TextBlock Text="Installs into FiveM's own game cache folder for GTA V Enhanced, found automatically - not the FiveM.app folder itself." FontSize="11" Foreground="#D1FAE5" TextWrapping="Wrap" LineHeight="16" />
+                                        <TextBlock Text="{Binding GtaFiveMTargetMissingText}" FontSize="11" Foreground="#FCA5A5" TextWrapping="Wrap" IsVisible="{Binding !GtaDlssTargetFound}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="PrimaryActionBtn" Content="Install DLSS 5 Neural Rendering" Click="OnInstallGtaDlss5Clicked"
+                                                    IsEnabled="{Binding !GtaDlssInstalling}" IsVisible="{Binding !IsGtaDlssInstalled}" HorizontalAlignment="Left" Padding="12,7" />
+                                            <Button Classes="EmptyActionBtn" Content="Remove" Click="OnRemoveGtaDlss5Clicked"
+                                                    IsVisible="{Binding IsGtaDlssInstalled}" HorizontalAlignment="Left" Padding="12,7" />
+                                        </StackPanel>
+                                        <ProgressBar Minimum="0" Maximum="100" Height="6" Value="{Binding GtaDlssProgress}" IsVisible="{Binding GtaDlssInstalling}" />
+                                        <TextBlock Text="{Binding GtaDlssStatus}" FontSize="11" Foreground="#FDE68A" TextWrapping="Wrap" IsVisible="{Binding HasGtaDlssStatus}" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </Border>
 
@@ -2568,6 +2616,23 @@
                             </StackPanel>
                         </Button>
                     </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Update progress: floating so it is visible from any tab, not just Settings -->
+            <Border IsVisible="{Binding IsCheckingUpdates}" ZIndex="9800"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,64,20,0"
+                    Width="300" CornerRadius="14" Padding="16,13"
+                    Background="#E6101418" BorderBrush="#30FFFFFF" BorderThickness="1"
+                    BoxShadow="0 12 32 0 #80000000" IsHitTestVisible="False">
+                <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <PathIcon Grid.Column="0" Data="M 12,2 L 6,8 H 10 V 15 H 14 V 8 H 18 Z M 5,18 H 19 V 21 H 5 Z"
+                                  Width="12" Height="12" Foreground="#86EFAC" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock Grid.Column="1" Text="{Binding UpdateStatusText}" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="#F5F5F7" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    </Grid>
+                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding UpdateDownloadProgress}" Height="5" />
                 </StackPanel>
             </Border>
 

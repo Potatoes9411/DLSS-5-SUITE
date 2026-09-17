@@ -151,6 +151,8 @@
 
                             <StackPanel Spacing="6">
                                 <TextBlock Text="Capture one window" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
+                                <TextBlock Text="Live Flow: DLSS 5 over any app or game window - switch it to borderless windowed mode first, then pick it here."
+                                           FontSize="10.5" Foreground="#7DD3FC" TextWrapping="Wrap" />
                                 <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                                     <Border Grid.Column="0" Width="46" Height="46" CornerRadius="12" Cursor="Cross"
                                             Background="#5C121619" BorderBrush="#5500FF88" BorderThickness="1"

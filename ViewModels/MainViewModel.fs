@@ -384,6 +384,9 @@ type MainViewModel() as this =
     let mutable gtaFixInstalling = false
     let mutable gtaFixStatus = ""
     let mutable gtaFixProgress = 0.0
+    let mutable gtaDlssInstalling = false
+    let mutable gtaDlssStatus = ""
+    let mutable gtaDlssProgress = 0.0
     let mutable isAnalyzing = false
     let mutable isInstalling = false
     let mutable isModInstalled = false
@@ -2437,6 +2440,73 @@ type MainViewModel() as this =
             }
             |> Async.Start
 
+    /// Where the DLSS 5 Neural Rendering payload for this profile goes: the
+    /// game's own folder for single-player, or FiveM's build-specific game
+    /// cache folder for FiveM Enhanced - found by what is in it, since its
+    /// name changes with every FiveM update.
+    member this.GtaDlssTarget =
+        if this.IsGtaFiveMProfile then GtaDlss5.findFiveMEnhancedTarget () |> Option.defaultValue ""
+        else manageFolder
+
+    member this.GtaDlssTargetFound = this.GtaDlssTarget <> "" && IO.Directory.Exists(this.GtaDlssTarget)
+    member this.GtaDlssPayloadReady = GtaDlss5.payloadReady ()
+    member this.IsGtaDlssInstalled = this.GtaDlssTargetFound && GtaDlss5.isInstalled this.GtaDlssTarget
+    member this.GtaDlssInstalling = gtaDlssInstalling
+    member this.GtaDlssStatus = gtaDlssStatus
+    member this.GtaDlssProgress = gtaDlssProgress
+    member this.HasGtaDlssStatus = not (String.IsNullOrWhiteSpace(gtaDlssStatus))
+
+    member _.GtaFiveMTargetMissingText =
+        "FiveM's game cache folder for GTA V Enhanced was not found. Launch FiveM once so it creates its cache, then reopen this game."
+
+    member private this.RaiseGtaDlss() =
+        for name in
+            [ "GtaDlssTarget"; "GtaDlssTargetFound"; "IsGtaDlssInstalled"; "GtaDlssInstalling"
+              "GtaDlssStatus"; "GtaDlssProgress"; "HasGtaDlssStatus" ] do
+            this.RaisePropertyChanged(name)
+
+    /// Every file here is already part of SUITE's own trusted payload - the
+    /// same ReShade module, model and Streamline runtime the main install
+    /// uses - so nothing is fetched and nothing new is trusted.
+    member this.InstallGtaDlss5() =
+        if not gtaDlssInstalling then
+            let target = this.GtaDlssTarget
+            if target = "" || not (IO.Directory.Exists(target)) then
+                gtaDlssStatus <- this.GtaFiveMTargetMissingText
+                this.RaiseGtaDlss()
+            else
+                gtaDlssInstalling <- true
+                gtaDlssStatus <- "Installing DLSS 5 Neural Rendering..."
+                gtaDlssProgress <- 0.0
+                this.RaiseGtaDlss()
+                let report message percent =
+                    Dispatcher.UIThread.Post(fun () ->
+                        gtaDlssStatus <- message
+                        gtaDlssProgress <- percent
+                        this.RaiseGtaDlss())
+                async {
+                    let! result =
+                        Threading.Tasks.Task.Run(fun () -> GtaDlss5.install target report)
+                        |> Async.AwaitTask
+                        |> Async.Catch
+                    Dispatcher.UIThread.Post(fun () ->
+                        gtaDlssInstalling <- false
+                        gtaDlssStatus <-
+                            match result with
+                            | Choice1Of2 () -> "DLSS 5 Neural Rendering installed. Enable DLSS in the game's graphics settings, then press Home (End for GTA V Enhanced) to open ReShade."
+                            | Choice2Of2 error -> AppLog.error "GTA/FiveM DLSS 5 install failed" error; "Could not install: " + error.Message
+                        gtaDlssProgress <- (match result with Choice1Of2 () -> 100.0 | Choice2Of2 _ -> 0.0)
+                        this.RaiseGtaDlss())
+                }
+                |> Async.Start
+
+    member this.RemoveGtaDlss5() =
+        let target = this.GtaDlssTarget
+        if target <> "" then
+            GtaDlss5.uninstall target
+            gtaDlssStatus <- "DLSS 5 Neural Rendering removed; original files restored where SUITE replaced one."
+            this.RaiseGtaDlss()
+
     member this.IsModInstalled
         with get () = isModInstalled
         and set value = this.SetProperty(&isModInstalled, value) |> ignore
@@ -2578,6 +2648,7 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("IsGtaEnhancedProfile")
         this.RaisePropertyChanged("IsGtaFiveMProfile")
         this.RaisePropertyChanged("IsGtaLegacyProfile")
+        this.RaiseGtaDlss()
         this.RaisePropertyChanged("GtaFixInstalling")
         this.RaisePropertyChanged("GtaFixStatus")
         this.RaisePropertyChanged("GtaFixProgress")

@@ -792,6 +792,16 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.InstallGtaEnhancedFix()
         | _ -> ()
 
+    member this.OnInstallGtaDlss5Clicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.InstallGtaDlss5()
+        | _ -> ()
+
+    member this.OnRemoveGtaDlss5Clicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.RemoveGtaDlss5()
+        | _ -> ()
+
     member this.OnManageResetLaunchRouteClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm ->
