@@ -2400,7 +2400,7 @@ type MainViewModel() as this =
     member this.GtaFixProgress = gtaFixProgress
     member this.HasGtaFixStatus = not (String.IsNullOrWhiteSpace(gtaFixStatus))
     member _.GtaPresetFixText =
-        "GTA V Enhanced compatibility prerequisites: DirectStorage can make the game folder read-only repeatedly. SUITE downloads and installs Script Hook V, Ultimate ASI Loader, Script Hook V .NET Enhanced and DirectStorageFix beside the Enhanced executable. Disable BattlEye before launching. After a launcher update or verification, rerun this fix if ReShade64.asi was removed. ReShade settings use End instead of Home (KeyOverlay=35,0,0,0)."
+        "GTA V Enhanced compatibility prerequisites: DirectStorage can make the game folder read-only repeatedly. SUITE downloads and installs Script Hook V, Ultimate ASI Loader, Script Hook V .NET Enhanced and DirectStorageFix beside the Enhanced executable. BattlEye is disabled automatically through the game's launch options - no Rockstar Launcher setting to find. After a launcher update or verification, rerun this fix if ReShade64.asi was removed. ReShade settings use End instead of Home (KeyOverlay=35,0,0,0)."
 
     member _.GtaLegacyFixText =
         "GTA V Legacy uses the DX11 single-player ReShade + DLSS5-Feeder route; its native DLSS5 Neural Rendering status can remain WAITING. Install ReShade 6.8.0 with add-on support and select DX10/11/12, then place the matching Feeder files beside the GTA executable. In ReShade, use Home, set Hook point to On Present, and turn Manually load DLLs ON. Keep the display and in-game resolution identical. If motion looks wrong, test VSync or Smooth Motion and check reshade.log. Remove dxgi.dll, d3d11.dll, reshade64.dll, ENB files, and stale ASI/reshade-shaders copies from the GTA root before trying another package; use a clean FiveM Plugins folder and never mix the single-player and FiveM files. Steam or Rockstar verification can remove the loader files, so repeat the setup afterward. Rockstar GTA Online is not supported by this workflow."
@@ -2408,8 +2408,20 @@ type MainViewModel() as this =
     member _.GtaFiveMFixText =
         "FiveM uses a separate Plugins route. Start with a clean FiveM.app/Plugins folder, install the matching DLSS5/ReShade package there, and keep single-player GTA root files out of Plugins. In ReShade use On Present and enable manual DLL loading. Complete FiveM's CitizenFX.ini ReShade acknowledgement using the ID shown in the F8 console. Disable third-party FPS counters, use FiveM's built-in counter, and use Window Capture when streaming. Do not use this route in Rockstar GTA Online; server rules still apply."
 
+    /// -nobattleye is the documented Steam launch option for this; GameLauncher
+    /// passes launch arguments straight to the executable either way, so it
+    /// works whichever route the card is set to start through. Never
+    /// overwrites something the user already typed.
+    member private this.EnsureNoBattleye() =
+        match manageCard with
+        | Some card when String.IsNullOrWhiteSpace(card.LaunchArguments) ->
+            card.LaunchArguments <- "-nobattleye"
+            this.RaisePropertyChanged("ManageLaunchArguments")
+        | _ -> ()
+
     member this.InstallGtaEnhancedFix() =
         if not gtaFixInstalling then
+            this.EnsureNoBattleye()
             gtaFixInstalling <- true
             gtaFixStatus <- "Preparing the GTA V Enhanced fix..."
             gtaFixProgress <- 0.0
@@ -2431,7 +2443,7 @@ type MainViewModel() as this =
                     gtaFixInstalling <- false
                     gtaFixStatus <-
                         match result with
-                        | Choice1Of2 () -> "GTA V Enhanced fix installed. Disable BattlEye, then launch single-player."
+                        | Choice1Of2 () -> "GTA V Enhanced fix installed. BattlEye is disabled through the launch options; launch single-player."
                         | Choice2Of2 error -> "The GTA V Enhanced fix could not be installed: " + error.Message
                     match result with
                     | Choice1Of2 () -> gtaFixProgress <- 100.0
@@ -2478,6 +2490,7 @@ type MainViewModel() as this =
     /// uses - so nothing is fetched and nothing new is trusted.
     member this.InstallGtaDlss5() =
         if not gtaDlssInstalling then
+            this.EnsureNoBattleye()
             let target = this.GtaDlssTarget
             if target = "" || not (IO.Directory.Exists(target)) then
                 gtaDlssStatus <- this.GtaFiveMTargetMissingText

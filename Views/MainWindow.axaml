@@ -2082,16 +2082,19 @@
                 <!-- Dimming backdrop: click outside to dismiss -->
                 <Border Background="#96000000" PointerPressed="OnManageBackdropPressed" />
 
-                <Border Classes="GlassModalCard" Width="560" Padding="26,22"
+                <Border Classes="GlassModalCard" Width="560" MaxHeight="760" Padding="26,22"
                         HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <StackPanel Spacing="18">
+                    <DockPanel LastChildFill="True">
 
                         <!-- Header.
                              SHARE RESULT lives up here rather than in the action
                              row below: four buttons plus "Complete Installation"
                              do not fit inside a 560px sheet, and the last one was
-                             pushed straight out through the frame. -->
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                             pushed straight out through the frame. Docked to the
+                             top and kept out of the scroller below, so the title
+                             and close button stay put while a tall route (GTA V's
+                             extra cards, for one) scrolls under them. -->
+                        <Grid DockPanel.Dock="Top" Margin="0,0,0,18" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                             <StackPanel Grid.Column="0" Spacing="3">
                                 <TextBlock Text="{Binding ManageTitle}" FontSize="17" FontWeight="Bold" Foreground="#FFFFFF"
                                            TextTrimming="CharacterEllipsis" MaxWidth="330" HorizontalAlignment="Left" />
@@ -2144,6 +2147,10 @@
                                 </Ellipse>
                             </Border>
                         </Grid>
+
+                        <!-- Everything else scrolls; the header above does not. -->
+                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Spacing="18">
 
                         <!-- Detected target: reference information, folded away by default -->
                         <Border Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
@@ -2559,7 +2566,9 @@
                                     IsVisible="{Binding ShowUninstallButton}" IsEnabled="{Binding IsManageReady}"
                                     Content="{Binding Loc.RemoveDlss}" />
                         </Grid>
-                    </StackPanel>
+                        </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
                 </Border>
             </Panel>
 
