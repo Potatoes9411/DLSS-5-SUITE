@@ -2387,7 +2387,8 @@ type MainViewModel() as this =
         | None -> routeHint
 
     member this.IsGtaEnhancedProfile = GtaProfiles.isEnhanced manageTitle manageExePath
-    member this.IsGtaLegacyProfile = GtaProfiles.isGta manageTitle && not (GtaProfiles.isEnhanced manageTitle manageExePath) && not (manageTitle.IndexOf("fivem", StringComparison.OrdinalIgnoreCase) >= 0)
+    member this.IsGtaFiveMProfile = GtaProfiles.isFiveM manageTitle
+    member this.IsGtaLegacyProfile = GtaProfiles.isGta manageTitle && not (GtaProfiles.isEnhanced manageTitle manageExePath) && not (GtaProfiles.isFiveM manageTitle)
     member this.GtaFixInstalling = gtaFixInstalling
     member this.GtaFixStatus = gtaFixStatus
     member this.GtaFixProgress = gtaFixProgress
@@ -2396,7 +2397,10 @@ type MainViewModel() as this =
         "GTA V Enhanced compatibility prerequisites: DirectStorage can make the game folder read-only repeatedly. SUITE downloads and installs Script Hook V, Ultimate ASI Loader, Script Hook V .NET Enhanced and DirectStorageFix beside the Enhanced executable. Disable BattlEye before launching. After a launcher update or verification, rerun this fix if ReShade64.asi was removed. ReShade settings use End instead of Home (KeyOverlay=35,0,0,0)."
 
     member _.GtaLegacyFixText =
-        "GTA V Legacy has no native DLSS path, so DLSS 5 Neural Rendering will remain WAITING there. Use the DX11 single-player ReShade + DLSS5-Feeder route instead. If an update or file verification removes ReShade64.asi, copy the ReShade module created beside the game executable and rename the copy to ReShade64.asi. Rockstar GTA Online is not supported by this workflow."
+        "GTA V Legacy uses the DX11 single-player ReShade + DLSS5-Feeder route; its native DLSS5 Neural Rendering status can remain WAITING. Install ReShade 6.8.0 with add-on support and select DX10/11/12, then place the matching Feeder files beside the GTA executable. In ReShade, use Home, set Hook point to On Present, and turn Manually load DLLs ON. Keep the display and in-game resolution identical. If motion looks wrong, test VSync or Smooth Motion and check reshade.log. Remove dxgi.dll, d3d11.dll, reshade64.dll, ENB files, and stale ASI/reshade-shaders copies from the GTA root before trying another package; use a clean FiveM Plugins folder and never mix the single-player and FiveM files. Steam or Rockstar verification can remove the loader files, so repeat the setup afterward. Rockstar GTA Online is not supported by this workflow."
+
+    member _.GtaFiveMFixText =
+        "FiveM uses a separate Plugins route. Start with a clean FiveM.app/Plugins folder, install the matching DLSS5/ReShade package there, and keep single-player GTA root files out of Plugins. In ReShade use On Present and enable manual DLL loading. Complete FiveM's CitizenFX.ini ReShade acknowledgement using the ID shown in the F8 console. Disable third-party FPS counters, use FiveM's built-in counter, and use Window Capture when streaming. Do not use this route in Rockstar GTA Online; server rules still apply."
 
     member this.InstallGtaEnhancedFix() =
         if not gtaFixInstalling then
@@ -2572,6 +2576,7 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("ManageDlssText")
         this.RaisePropertyChanged("ManageStreamlineText")
         this.RaisePropertyChanged("IsGtaEnhancedProfile")
+        this.RaisePropertyChanged("IsGtaFiveMProfile")
         this.RaisePropertyChanged("IsGtaLegacyProfile")
         this.RaisePropertyChanged("GtaFixInstalling")
         this.RaisePropertyChanged("GtaFixStatus")

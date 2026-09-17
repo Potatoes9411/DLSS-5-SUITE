@@ -2361,6 +2361,12 @@
                                         <TextBlock Text="{Binding GtaLegacyFixText}" FontSize="11" Foreground="#E0F2FE" TextWrapping="Wrap" LineHeight="16" />
                                     </StackPanel>
                                 </Border>
+                                <Border IsVisible="{Binding IsGtaFiveMProfile}" Background="#181D4ED8" BorderBrush="#4260A5FA" BorderThickness="1" CornerRadius="14" Padding="14,11">
+                                    <StackPanel Spacing="7">
+                                        <TextBlock Text="FIVEM PLUGINS GUIDANCE" FontSize="9.5" FontWeight="Bold" Foreground="#93C5FD" LetterSpacing="0.8" />
+                                        <TextBlock Text="{Binding GtaFiveMFixText}" FontSize="11" Foreground="#DBEAFE" TextWrapping="Wrap" LineHeight="16" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </Border>
 

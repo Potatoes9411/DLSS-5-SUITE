@@ -12,6 +12,8 @@ module GtaProfiles =
     let isGta (title: string) =
         contains "grand theft auto v" title || contains "gta v" title || contains "gta 5" title || contains "fivem" title
 
+    let isFiveM (title: string) = contains "fivem" title
+
     let isEnhanced (title: string) (executablePath: string) =
         isGta title && (contains "enhanced" title || contains "enhanced" executablePath)
 
