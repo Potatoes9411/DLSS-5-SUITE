@@ -2150,7 +2150,7 @@
 
                         <!-- Everything else scrolls; the header above does not. -->
                         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Spacing="18">
+                        <StackPanel Spacing="18" Margin="0,0,12,24">
 
                         <!-- Detected target: reference information, folded away by default -->
                         <Border Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
