@@ -2320,6 +2320,20 @@
                                     </Border>
                                 </Grid>
 
+                                <!-- OptiScaler on RTX 20/30: NODIX found the current build
+                                     less stable there than the last one before it. -->
+                                <Border IsVisible="{Binding OptiScalerLegacyOfferVisible}" Background="#180EA5E9" BorderBrush="#4267E8F9" BorderThickness="1" CornerRadius="14" Padding="14,11">
+                                    <StackPanel Spacing="9">
+                                        <TextBlock Text="OPTISCALER FOR RTX 20/30" FontSize="9.5" FontWeight="Bold" Foreground="#7DD3FC" LetterSpacing="0.8" />
+                                        <TextBlock Text="{Binding OptiScalerLegacyVersionText, StringFormat='OptiScaler {0} is often more stable on RTX 20/30 series than the current build. Fetched from the OptiScaler project'}"
+                                                   FontSize="11" Foreground="#E0F2FE" TextWrapping="Wrap" LineHeight="16" />
+                                        <Button Classes="EmptyActionBtn" Content="Download the older build" Click="OnInstallOptiScalerLegacyClicked"
+                                                IsEnabled="{Binding !OptiLegacyInstalling}" HorizontalAlignment="Left" Padding="12,7" />
+                                        <ProgressBar Minimum="0" Maximum="100" Height="6" Value="{Binding OptiLegacyProgress}" IsVisible="{Binding OptiLegacyInstalling}" />
+                                        <TextBlock Text="{Binding OptiLegacyStatus}" FontSize="11" Foreground="#93C5FD" TextWrapping="Wrap" IsVisible="{Binding HasOptiLegacyStatus}" />
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Build: only DX11 and DX9 come in two -->
                                 <Grid Classes="RouteReveal" Classes.Shown="{Binding IsArchChoiceVisible}" ColumnDefinitions="Auto,*" ColumnSpacing="12" IsVisible="{Binding IsArchChoiceVisible}">
                                     <TextBlock Grid.Column="0" Text="BUILD" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0"

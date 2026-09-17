@@ -57,6 +57,7 @@
     <Compile Include="Services\GameLauncher.fs" />
     <Compile Include="Services\LosslessScalingDetector.fs" />
     <Compile Include="Services\VerifiedDownload.fs" />
+    <Compile Include="Services\OptiScalerLegacy.fs" />
     <Compile Include="Services\LosslessScalingInstaller.fs" />
     <Compile Include="Services\NeedForSpeedProfiles.fs" />
     <Compile Include="Services\GtaProfiles.fs" />
@@ -101,6 +102,7 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <PackageReference Include="SharpCompress" Version="0.50.4" />
   </ItemGroup>
 
   <!-- ================================================================= -->

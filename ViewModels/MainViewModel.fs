@@ -387,6 +387,9 @@ type MainViewModel() as this =
     let mutable gtaDlssInstalling = false
     let mutable gtaDlssStatus = ""
     let mutable gtaDlssProgress = 0.0
+    let mutable optiLegacyInstalling = false
+    let mutable optiLegacyStatus = ""
+    let mutable optiLegacyProgress = 0.0
     let mutable isAnalyzing = false
     let mutable isInstalling = false
     let mutable isModInstalled = false
@@ -2512,6 +2515,49 @@ type MainViewModel() as this =
             GtaDlss5.uninstall target
             gtaDlssStatus <- "DLSS 5 Neural Rendering removed; original files restored where SUITE replaced one."
             this.RaiseGtaDlss()
+
+    // ---- the older OptiScaler build for RTX 20/30 ----
+    member _.IsOlderGpuGeneration = OptiScalerLegacy.isOlderGeneration ()
+    member _.HasOptiScalerLegacy = OptiScalerLegacy.isAvailable ()
+    member _.OptiScalerLegacyOfferVisible = this.IsOlderGpuGeneration && not this.HasOptiScalerLegacy
+    member _.OptiScalerLegacyVersionText = OptiScalerLegacy.DisplayVersion
+    member _.OptiLegacyInstalling = optiLegacyInstalling
+    member _.OptiLegacyStatus = optiLegacyStatus
+    member _.OptiLegacyProgress = optiLegacyProgress
+    member _.HasOptiLegacyStatus = not (String.IsNullOrWhiteSpace(optiLegacyStatus))
+
+    member private this.RaiseOptiLegacy() =
+        for name in
+            [ "HasOptiScalerLegacy"; "OptiScalerLegacyOfferVisible"; "OptiLegacyInstalling"
+              "OptiLegacyStatus"; "OptiLegacyProgress"; "HasOptiLegacyStatus" ] do
+            this.RaisePropertyChanged(name)
+
+    /// Fetched from OptiScaler's own GitHub releases and verified against the
+    /// SHA-256 GitHub itself publishes - the same shape as the NeuralScreen
+    /// add-on download, nothing routed through a browser.
+    member this.InstallOptiScalerLegacy() =
+        if not optiLegacyInstalling then
+            optiLegacyInstalling <- true
+            optiLegacyStatus <- "Looking up OptiScaler " + OptiScalerLegacy.DisplayVersion + "..."
+            optiLegacyProgress <- 0.0
+            this.RaiseOptiLegacy()
+            let report (message: string) (percent: float) =
+                Dispatcher.UIThread.Post(fun () ->
+                    optiLegacyStatus <- message
+                    optiLegacyProgress <- Math.Clamp(percent, 0.0, 100.0)
+                    this.RaiseOptiLegacy())
+            async {
+                let! result = OptiScalerLegacy.install report |> Async.AwaitTask |> Async.Catch
+                Dispatcher.UIThread.Post(fun () ->
+                    optiLegacyInstalling <- false
+                    optiLegacyStatus <-
+                        match result with
+                        | Choice1Of2 () -> "OptiScaler " + OptiScalerLegacy.DisplayVersion + " installed. The next OptiScaler install on an RTX 20/30 card uses it automatically."
+                        | Choice2Of2 error -> AppLog.error "OptiScaler legacy build install failed" error; "Could not install: " + error.Message
+                    optiLegacyProgress <- (match result with Choice1Of2 () -> 100.0 | Choice2Of2 _ -> 0.0)
+                    this.RaiseOptiLegacy())
+            }
+            |> Async.Start
 
     member this.IsModInstalled
         with get () = isModInstalled

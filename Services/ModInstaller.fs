@@ -1813,7 +1813,13 @@ module ModInstaller =
             // =============================================================
             if mode = OptiScalerMode then
                 let optiDirName = optiScalerPayloadDirName optiApi
-                let optiRoot = Path.Combine(modRoot, optiDirName)
+                let bundledOptiRoot = Path.Combine(modRoot, optiDirName)
+                // The DLSS-NR fork is a different codebase; the older/newer
+                // choice is only between the two builds of ordinary OptiScaler.
+                let optiRoot =
+                    if optiApi = OptiNeural then bundledOptiRoot
+                    else OptiScalerLegacy.preferredRoot bundledOptiRoot
+                let usingLegacyOpti = optiRoot <> bundledOptiRoot
 
                 if not (Directory.Exists(optiRoot)) then
                     { Success = false
@@ -1915,7 +1921,9 @@ module ModInstaller =
                               (match optiApi with
                                | OptiNeural when neuralDx11 -> "OptiScaler DLSS-NR installed (DirectX 11 through the D3D12 bridge)"
                                | OptiNeural -> "OptiScaler DLSS-NR installed"
+                               | OptiVulkan when usingLegacyOpti -> sprintf "Vulkan + OptiScaler %s (older build for RTX 20/30) installed" OptiScalerLegacy.DisplayVersion
                                | OptiVulkan -> "Vulkan + OptiScaler installed"
+                               | OptiDx12 when usingLegacyOpti -> sprintf "DX12 + OptiScaler %s (older build for RTX 20/30) installed" OptiScalerLegacy.DisplayVersion
                                | OptiDx12 -> "DX12 + OptiScaler (recommended) installed")
                           yield sprintf "%d OptiScaler file(s) deployed" (deployed + 1)
                           yield sprintf "Hooked as %s" slotName
