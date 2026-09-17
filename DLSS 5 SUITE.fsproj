@@ -59,12 +59,15 @@
     <Compile Include="Services\VerifiedDownload.fs" />
     <Compile Include="Services\LosslessScalingInstaller.fs" />
     <Compile Include="Services\NeedForSpeedProfiles.fs" />
+    <Compile Include="Services\GtaProfiles.fs" />
+    <Compile Include="Services\GtaEnhancedInstaller.fs" />
     <Compile Include="Services\NonGameAppClassifier.fs" />
     <Compile Include="Services\ShaderGlassDetector.fs" />
     <Compile Include="Services\EmulatorCatalog.fs" />
     <Compile Include="Services\ModInstaller.fs" />
     <Compile Include="Services\ScreenEngine.fs" />
     <Compile Include="Services\NeuralScreen.fs" />
+    <Compile Include="Services\RobloxShadeHost.fs" />
     <Compile Include="Services\AnalysisStore.fs" />
     <Compile Include="Services\UpdateChecker.fs" />
     <Compile Include="Services\SystemSpecs.fs" />

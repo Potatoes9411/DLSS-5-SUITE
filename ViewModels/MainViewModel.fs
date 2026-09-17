@@ -381,6 +381,9 @@ type MainViewModel() as this =
     let mutable manageReShadeText = "Checking..."
     let mutable manageDlssText = "Checking..."
     let mutable manageStreamlineText = "Checking..."
+    let mutable gtaFixInstalling = false
+    let mutable gtaFixStatus = ""
+    let mutable gtaFixProgress = 0.0
     let mutable isAnalyzing = false
     let mutable isInstalling = false
     let mutable isModInstalled = false
@@ -2375,9 +2378,56 @@ type MainViewModel() as this =
             | ModInstaller.Dx9 -> "dgVoodoo translates Direct3D 9; ReShade moves to the dxgi slot."
             | ModInstaller.Emulator -> "ReShade on Vulkan with the DLSS 5 emulator payload."
             | ModInstaller.AmdMode -> "AMD RDNA 4: the AMD payload and the ray reconstruction model, nothing else."
-        match NeedForSpeedProfiles.tryDescribe manageTitle detectedApi detectedArch with
-        | Some profile -> routeHint + "\n\n" + profile
+        let profile =
+            match GtaProfiles.tryDescribe manageTitle detectedApi with
+            | Some gta -> Some gta
+            | None -> NeedForSpeedProfiles.tryDescribe manageTitle detectedApi detectedArch
+        match profile with
+        | Some text -> routeHint + "\n\n" + text
         | None -> routeHint
+
+    member this.IsGtaEnhancedProfile = GtaProfiles.isEnhanced manageTitle manageExePath
+    member this.GtaFixInstalling = gtaFixInstalling
+    member this.GtaFixStatus = gtaFixStatus
+    member this.GtaFixProgress = gtaFixProgress
+    member this.HasGtaFixStatus = not (String.IsNullOrWhiteSpace(gtaFixStatus))
+    member _.GtaPresetFixText =
+        "GTA V Enhanced preset/configuration fix: DirectStorage can make the game folder read-only repeatedly. SUITE downloads and installs Script Hook V, Ultimate ASI Loader, Script Hook V .NET Enhanced and DirectStorageFix beside the Enhanced executable. Disable BattlEye in Rockstar Games Launcher before launching. If ReShade stops loading after an update or file verification, rerun this fix and copy the ReShade DLL it created, keeping the original, then rename the copy to ReShade64.asi. Use End instead of Home for the ReShade menu (KeyOverlay=35,0,0,0)."
+
+    member this.InstallGtaEnhancedFix() =
+        if not gtaFixInstalling then
+            gtaFixInstalling <- true
+            gtaFixStatus <- "Preparing the GTA V Enhanced fix..."
+            gtaFixProgress <- 0.0
+            this.RaisePropertyChanged("GtaFixInstalling")
+            this.RaisePropertyChanged("GtaFixStatus")
+            this.RaisePropertyChanged("GtaFixProgress")
+            let report message percent =
+                Dispatcher.UIThread.Post(fun () ->
+                    gtaFixStatus <- message
+                    gtaFixProgress <- percent
+                    this.RaisePropertyChanged("GtaFixStatus")
+                    this.RaisePropertyChanged("GtaFixProgress"))
+            async {
+                let! result =
+                    GtaEnhancedInstaller.install manageFolder report
+                    |> Async.AwaitTask
+                    |> Async.Catch
+                Dispatcher.UIThread.Post(fun () ->
+                    gtaFixInstalling <- false
+                    gtaFixStatus <-
+                        match result with
+                        | Choice1Of2 () -> "GTA V Enhanced fix installed. Disable BattlEye, then launch single-player."
+                        | Choice2Of2 error -> "The GTA V Enhanced fix could not be installed: " + error.Message
+                    match result with
+                    | Choice1Of2 () -> gtaFixProgress <- 100.0
+                    | Choice2Of2 _ -> ()
+                    this.RaisePropertyChanged("GtaFixInstalling")
+                    this.RaisePropertyChanged("GtaFixStatus")
+                    this.RaisePropertyChanged("GtaFixProgress")
+                    this.RaisePropertyChanged("HasGtaFixStatus"))
+            }
+            |> Async.Start
 
     member this.IsModInstalled
         with get () = isModInstalled
@@ -2517,6 +2567,11 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("ManageReShadeText")
         this.RaisePropertyChanged("ManageDlssText")
         this.RaisePropertyChanged("ManageStreamlineText")
+        this.RaisePropertyChanged("IsGtaEnhancedProfile")
+        this.RaisePropertyChanged("GtaFixInstalling")
+        this.RaisePropertyChanged("GtaFixStatus")
+        this.RaisePropertyChanged("GtaFixProgress")
+        this.RaisePropertyChanged("HasGtaFixStatus")
         this.RaisePropertyChanged("HasExecutable")
 
     /// Paints the sheet from a cached deep-scan record - no disk walking.
@@ -2587,6 +2642,9 @@ type MainViewModel() as this =
             |> ignore
 
     member this.OpenManage(card: GameCardViewModel) =
+        gtaFixInstalling <- false
+        gtaFixStatus <- ""
+        gtaFixProgress <- 0.0
         manageCard <- Some card
         manageAnalysis <- None
         manageTitle <- card.Title

@@ -1,0 +1,28 @@
+name: Preset submission
+description: Share a preset without opening a pull request
+labels: [preset]
+body:
+  - type: markdown
+    attributes:
+      value: Presets may only use effects from [ReShade's official package list](https://github.com/crosire/reshade-shaders/blob/list/EffectPackages.ini). Depth-based effects do nothing, since Roblox provides no depth buffer.
+  - type: input
+    id: name
+    attributes:
+      label: Preset name
+    validations:
+      required: true
+  - type: textarea
+    id: file
+    attributes:
+      label: Preset file
+      description: Paste the contents of the `.ini` saved by ReShade.
+      render: ini
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Before and after in a Roblox experience.
+    validations:
+      required: true

@@ -65,7 +65,7 @@
                                 </Grid>
                             </Border>
                             <StackPanel Spacing="6">
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                                 <Panel Grid.Column="0" ToolTip.Tip="{Binding ScreenEngineTip}" ToolTip.ShowOnDisabled="True" Background="Transparent">
                                     <Button Classes="SegmentedTab" Classes.Active="{Binding IsScreenEngine}" Click="OnMethodScreenEngineClicked" IsEnabled="{Binding !ScreenEngineLocked}"
                                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10,8">
@@ -76,6 +76,17 @@
                                     </Button>
                                     <!-- Locked: a red line across the button -->
                                     <Line IsVisible="{Binding ScreenEngineLocked}" StartPoint="8,44" EndPoint="236,6" Stretch="Fill" Margin="10,6"
+                                          Stroke="#EF4444" StrokeThickness="2.5" IsHitTestVisible="False" />
+                                </Panel>
+                                <Panel Grid.Column="2" ToolTip.Tip="{Binding RobloxShadeHostTip}" ToolTip.ShowOnDisabled="True" Background="Transparent">
+                                    <Button Classes="SegmentedTab" Classes.Active="{Binding IsRobloxShadeHost}" Click="OnMethodRobloxShadeHostClicked" IsEnabled="{Binding !RobloxShadeHostLocked}"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="10,8">
+                                        <StackPanel Spacing="1">
+                                            <TextBlock Text="RobloxShadeHost" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                            <TextBlock Text="Roblox / ReShade" FontSize="10.5" Opacity="0.75" HorizontalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Line IsVisible="{Binding RobloxShadeHostLocked}" StartPoint="8,44" EndPoint="236,6" Stretch="Fill" Margin="10,6"
                                           Stroke="#EF4444" StrokeThickness="2.5" IsHitTestVisible="False" />
                                 </Panel>
                                 <Panel Grid.Column="1" ToolTip.Tip="{Binding NeuralScreenTip}" ToolTip.ShowOnDisabled="True" Background="Transparent">

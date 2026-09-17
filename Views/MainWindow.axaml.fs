@@ -787,6 +787,11 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.ManageCard |> Option.iter (fun card -> card.OpenGameFolder())
         | _ -> ()
 
+    member this.OnGtaEnhancedFixClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.InstallGtaEnhancedFix()
+        | _ -> ()
+
     member this.OnManageResetLaunchRouteClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm ->

@@ -120,6 +120,7 @@ type ScreenEngineWindow() as this =
 
     member this.OnMethodScreenEngineClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.SelectMethod false)
     member this.OnMethodNeuralScreenClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.SelectMethod true)
+    member this.OnMethodRobloxShadeHostClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.SelectRobloxShadeHost())
 
     member this.OnInstallNeuralScreenClicked(sender: obj, e: RoutedEventArgs) =
         async {

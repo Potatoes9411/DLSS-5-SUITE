@@ -80,6 +80,24 @@ else
     cp "$APP/Engine/LICENSE" "$APP/publish/engine/LICENSE.txt"
 fi
 
+# RobloxShadeHost is an optional third method. It observes Roblox through
+# Windows Graphics Capture and runs ReShade beside it, so it is kept in its
+# own folder and does not alter Roblox files. The source is included under
+# RobloxShadeHost/ and its CMake build downloads only the pinned upstream
+# headers declared by that project.
+if [ "$SKIP_ROBLOXSHADEHOST" = "1" ]; then
+    echo "--- RobloxShadeHost skipped (SKIP_ROBLOXSHADEHOST=1) ---"
+else
+    echo "--- building RobloxShadeHost method ---"
+    ROBLOX_CMAKE="${CMAKE_EXE:-cmake}"
+    "$ROBLOX_CMAKE" -S "$APP/RobloxShadeHost" -B "$APP/RobloxShadeHost/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+    "$ROBLOX_CMAKE" --build "$APP/RobloxShadeHost/build"
+    mkdir -p "$APP/publish/methods/RobloxShadeHost"
+    cp "$APP/RobloxShadeHost/build/RobloxShadeHost.exe" "$APP/publish/methods/RobloxShadeHost/"
+    cp -r "$APP/RobloxShadeHost/presets" "$APP/publish/methods/RobloxShadeHost/"
+    cp "$APP/RobloxShadeHost/LICENSE" "$APP/publish/methods/RobloxShadeHost/LICENSE.txt"
+fi
+
 # NeuralScreen is its own download: it is 435 MB, only RTX 30/40 cards need it,
 # and it carries NVIDIA runtimes of its own. The setup ships without it and
 # SUITE installs the zip on request, into the same "mod files/neuralscreen".

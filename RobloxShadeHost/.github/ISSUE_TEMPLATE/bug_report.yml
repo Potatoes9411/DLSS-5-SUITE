@@ -1,0 +1,53 @@
+name: Bug report
+description: Something does not work
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: RobloxShadeHost version
+      description: Printed in the console window when the host starts.
+      placeholder: 0.1.1
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Installer (RobloxShadeHost-Setup.exe)
+        - Manual (RobloxShadeHost.exe and the ReShade installer)
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: reshade
+    attributes:
+      label: ReShade version
+      description: Shown in the top of the ReShade menu. Say whether it is the full add-on support build.
+      placeholder: 6.5.1 with full add-on support
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Run `winver`.
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: Graphics card and driver version
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: Copy the text from the host's console window. For installer problems, run the installer with `/LOG="setup.log"` and attach the file.
+      render: text

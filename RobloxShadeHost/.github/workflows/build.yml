@@ -1,0 +1,51 @@
+name: Build and release
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DBUILD_TESTING=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Build installer
+        run: cmake --build build --config Release --target installer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RobloxShadeHost-windows-x64
+          path: |
+            build/Release/RobloxShadeHost.exe
+            build/installer/RobloxShadeHost-Setup.exe
+            LICENSE
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: RobloxShadeHost-windows-x64
+          path: release
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" release/build/Release/RobloxShadeHost.exe release/build/installer/RobloxShadeHost-Setup.exe release/LICENSE --verify-tag --title "$RELEASE_TAG" --generate-notes

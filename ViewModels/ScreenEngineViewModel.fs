@@ -18,6 +18,7 @@ type ScreenEngineViewModel() as this =
 
     let host = new Host()
     let nsHost = new NeuralScreen.Host()
+    let robloxHost = new RobloxShadeHost.Host()
     let gpuName, gpuTier = NeuralScreen.detect ()
 
     // Which program runs DLSS 5 over the screen. The Screen Engine needs an
@@ -26,11 +27,12 @@ type ScreenEngineViewModel() as this =
     let cardRunsNeuralScreen = (match gpuTier with NeuralScreen.Rtx50 | NeuralScreen.RtxOlder _ -> true | _ -> false)
     let mutable canNeuralScreen = cardRunsNeuralScreen && NeuralScreen.isAvailable ()
     let methodPath () = Path.Combine(NeuralScreen.dataDir (), "method.txt")
+    let savedMethod = (try File.ReadAllText(methodPath ()).Trim() with _ -> "")
     let mutable useNeuralScreen =
-        let saved = (try File.ReadAllText(methodPath ()).Trim() with _ -> "")
-        if saved = "neuralscreen" && canNeuralScreen then true
-        elif saved = "engine" && canScreenEngine then false
+        if savedMethod = "neuralscreen" && canNeuralScreen then true
+        elif savedMethod = "engine" && canScreenEngine then false
         else not canScreenEngine && canNeuralScreen
+    let mutable useRobloxShadeHost = savedMethod = "robloxshadehost" && RobloxShadeHost.isAvailable ()
     let mutable settings = load ()
     let mutable extras = NeuralScreen.loadExtras ()
     /// The game whose own settings are in use, as (library id, title); None
@@ -75,7 +77,7 @@ type ScreenEngineViewModel() as this =
         // The engine is a separate process and would otherwise keep running
         // after SUITE closes, including the Environment.Exit before an update,
         // where its locked executable would break the install.
-        AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> host.Stop(); nsHost.Stop())
+        AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> host.Stop(); nsHost.Stop(); robloxHost.Stop())
         monitors <- listMonitors ()
         windows <- listVisibleWindows ()
 
@@ -95,13 +97,17 @@ type ScreenEngineViewModel() as this =
                 this.RaisePropertyChanged("CanStart"))
         host.StateChanged.Add onState
         nsHost.StateChanged.Add onState
+        robloxHost.StateChanged.Add onState
         nsHost.RecordingChanged.Add(fun active ->
             Dispatcher.UIThread.Post(fun () ->
                 isRecording <- active
                 this.RaisePropertyChanged("IsRecording")
                 this.RaisePropertyChanged("RecordButtonText")))
 
-    member _.IsAvailable = if useNeuralScreen then canNeuralScreen else canScreenEngine
+    member _.IsAvailable =
+        if useRobloxShadeHost then RobloxShadeHost.isAvailable ()
+        elif useNeuralScreen then canNeuralScreen
+        else canScreenEngine
 
     // ----- method: Screen Engine or NeuralScreen -----
     member _.GpuName = if gpuName = "" then "No graphics card found" else gpuName
@@ -109,8 +115,11 @@ type ScreenEngineViewModel() as this =
     member _.CanUseNeuralScreen = canNeuralScreen
     member _.ScreenEngineLocked = not canScreenEngine
     member _.NeuralScreenLocked = not canNeuralScreen
-    member _.IsNeuralScreen = useNeuralScreen
-    member _.IsScreenEngine = not useNeuralScreen
+    member _.IsNeuralScreen = useNeuralScreen && not useRobloxShadeHost
+    member _.IsScreenEngine = not useNeuralScreen && not useRobloxShadeHost
+    member _.IsRobloxShadeHost = useRobloxShadeHost
+    member _.CanUseRobloxShadeHost = RobloxShadeHost.isAvailable ()
+    member _.RobloxShadeHostLocked = not (RobloxShadeHost.isAvailable ())
 
     member _.ScreenEngineTip =
         if canScreenEngine then "DLSS 5 through SUITE's Screen Engine. RTX 50 series."
@@ -123,6 +132,12 @@ type ScreenEngineViewModel() as this =
         | NeuralScreen.Rtx20 -> "RTX 20 series cards cannot run the DLSS 5 model, with either method."
         | NeuralScreen.NoRtx -> "DLSS 5 needs an NVIDIA RTX 30, 40 or 50 series card."
         | _ -> "NeuralScreen is a separate download. Install the add-on to use it."
+
+    member _.RobloxShadeHostTip =
+        if RobloxShadeHost.isAvailable () then
+            "RobloxShadeHost captures Roblox externally and runs ReShade beside it."
+        else
+            "Install the optional RobloxShadeHost method to process Roblox through SUITE."
 
     member _.AddonProgress = addonProgress
     member _.AddonStatus = addonStatus
@@ -191,18 +206,22 @@ type ScreenEngineViewModel() as this =
             this.RaisePropertyChanged(name)
 
     member _.MethodNote =
-        match gpuTier with
-        | NeuralScreen.Rtx50 -> "RTX 50 series detected: both methods work."
-        | NeuralScreen.RtxOlder s when canNeuralScreen -> sprintf "RTX %d series detected: NeuralScreen is used. The Screen Engine is RTX 50 series only." s
-        | NeuralScreen.RtxOlder s -> sprintf "RTX %d series detected: DLSS 5 needs the NeuralScreen add-on, a separate download." s
-        | NeuralScreen.Rtx20 -> "RTX 20 series detected: this card cannot run DLSS 5."
-        | NeuralScreen.NoRtx -> "No RTX card detected: DLSS 5 needs an RTX 30, 40 or 50 series card."
+        if useRobloxShadeHost then
+            "RobloxShadeHost is selected. Start it from SUITE, then open Roblox; it waits safely until Roblox is available."
+        else
+            match gpuTier with
+            | NeuralScreen.Rtx50 -> "RTX 50 series detected: both methods work."
+            | NeuralScreen.RtxOlder s when canNeuralScreen -> sprintf "RTX %d series detected: NeuralScreen is used. The Screen Engine is RTX 50 series only." s
+            | NeuralScreen.RtxOlder s -> sprintf "RTX %d series detected: DLSS 5 needs the NeuralScreen add-on, a separate download." s
+            | NeuralScreen.Rtx20 -> "RTX 20 series detected: this card cannot run DLSS 5."
+            | NeuralScreen.NoRtx -> "No RTX card detected: DLSS 5 needs an RTX 30, 40 or 50 series card."
 
     member this.SelectMethod(neuralScreen: bool) =
         let allowed = if neuralScreen then canNeuralScreen else canScreenEngine
-        if allowed && neuralScreen <> useNeuralScreen then
+        if allowed && neuralScreen <> useNeuralScreen || (allowed && useRobloxShadeHost) then
             let wasRunning = this.IsRunning
             this.Stop()
+            useRobloxShadeHost <- false
             useNeuralScreen <- neuralScreen
             (try
                 Directory.CreateDirectory(NeuralScreen.dataDir ()) |> ignore
@@ -212,12 +231,26 @@ type ScreenEngineViewModel() as this =
                 this.RaisePropertyChanged(name)
             if wasRunning then this.Start()
 
+    member this.SelectRobloxShadeHost() =
+        if RobloxShadeHost.isAvailable () && not useRobloxShadeHost then
+            let wasRunning = this.IsRunning
+            this.Stop()
+            useRobloxShadeHost <- true
+            useNeuralScreen <- false
+            (try
+                Directory.CreateDirectory(NeuralScreen.dataDir ()) |> ignore
+                File.WriteAllText(methodPath (), "robloxshadehost")
+             with _ -> ())
+            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsRobloxShadeHost"; "IsAvailable"; "CanStart"; "Status" ] do
+                this.RaisePropertyChanged(name)
+            if wasRunning then this.Start()
+
     member this.Status =
         if status <> "" then status
         elif not this.IsAvailable then (if useNeuralScreen then this.NeuralScreenTip else this.ScreenEngineTip)
         else "Stopped"
 
-    member _.IsRunning = host.IsRunning || nsHost.IsRunning
+    member _.IsRunning = host.IsRunning || nsHost.IsRunning || robloxHost.IsRunning
 
     /// Num2 in NeuralScreen: SUITE's control window, as an overlay.
     [<CLIEvent>]
@@ -905,7 +938,11 @@ type ScreenEngineViewModel() as this =
 
     member this.Start() =
         hasPendingChanges <- false
-        if useNeuralScreen then
+        if useRobloxShadeHost then
+            host.Stop()
+            nsHost.Stop()
+            if not (robloxHost.Start()) then status <- "RobloxShadeHost is not installed in this SUITE build."
+        elif useNeuralScreen then
             host.Stop()
             nsHost.Start(settings, this.CaptureFolder, settings.NeuralRendering)
             if settings.Window.StartsWith("0x", StringComparison.OrdinalIgnoreCase) then
@@ -923,6 +960,7 @@ type ScreenEngineViewModel() as this =
         applyTimer.Stop()
         host.Stop()
         nsHost.Stop()
+        robloxHost.Stop()
         isRecording <- false
         hasPendingChanges <- false
         status <- "Stopped"

@@ -1,0 +1,22 @@
+RobloxShadeHost
+Copyright 2026 RobloxShadeHost contributors. MIT license.
+https://github.com/OMouta/RobloxShadeHost
+
+ReShade
+By Patrick Mours (crosire) and contributors. BSD 3-Clause license.
+https://reshade.me/
+The ReShade license is shown separately when you select ReShade.
+
+DLSS5 optional add-on
+renodx-dlss.addon64: RenoDX / clshortfuse
+https://github.com/clshortfuse
+https://discord.com/invite/renodx
+
+nvngx_dlssnr.dll: NVIDIA DLSSNR
+Copyright 2026 NVIDIA Corporation.
+
+The DLSS5 files are downloaded separately and are not bundled in this installer.
+Third-party files are not covered by RobloxShadeHost's MIT license.
+Their inclusion does not imply endorsement by their authors.
+
+Removal requests: tiago@mouta.me
