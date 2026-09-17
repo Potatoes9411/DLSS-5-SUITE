@@ -6,7 +6,7 @@
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-[![Version](https://img.shields.io/badge/Version-1.2.3-35d22b?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.2.4-35d22b?style=flat-square)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-24292e?style=flat-square)]()
 [![Framework](https://img.shields.io/badge/Framework-.NET%208%20|%20Avalonia%20UI-512bd4?style=flat-square)]()
 [![Language](https://img.shields.io/badge/Language-F%23-30b9db?style=flat-square)]()
