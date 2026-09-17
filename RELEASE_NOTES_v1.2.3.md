@@ -38,6 +38,9 @@ Version 1.2.3 turns the library into a practical launch surface and makes the Sc
 - **DX11 OptiScaler DLSS-NR:** the Neural Rendering route enables NR and selects the D3D12 bridge that OptiScaler needs for DirectX 11 games.
 - **Clean final UI behavior:** numeric fields have enough room for typed values, the play control stays above card hints, and the edge rubber band releases immediately when scrolling back into the library instead of fighting the new direction.
 - **Reliable add-on download resume:** a fully downloaded partial file is verified and promoted instead of sending an invalid resume request.
+- **DLSS 5 Neural Rendering for GTA V and FiveM, installed in-app:** a button in Manage deploys ReShade, RenoDX's DLSS5 Tool, the compatibility model and the Streamline runtime straight into the GTA V Enhanced or Legacy game folder, or into FiveM's own cache folder for FiveM Enhanced, with FiveM's classic client Plugins folder supported as a fallback. Every file it uses is already part of SUITE's own trusted payload - nothing is fetched from a browser or a Discord link, and a Remove button restores what it replaced.
+- **An older OptiScaler build for RTX 20/30 series:** SUITE bundles the current OptiScaler build, which upstream testing found less stable on RTX 20/30 than the release right before it. That older build (0.7.9) can now be fetched from OptiScaler's own GitHub releases and verified in-app; once downloaded, it is used automatically for a qualifying card.
+- **Update progress you can actually see:** checking for or downloading an update now shows a small floating progress card from any tab, not only inside Settings.
 
 ## Compatibility-model trust policy
 
