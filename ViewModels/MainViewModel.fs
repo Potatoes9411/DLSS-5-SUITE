@@ -2440,13 +2440,18 @@ type MainViewModel() as this =
             }
             |> Async.Start
 
-    /// Where the DLSS 5 Neural Rendering payload for this profile goes: the
-    /// game's own folder for single-player, or FiveM's build-specific game
-    /// cache folder for FiveM Enhanced - found by what is in it, since its
-    /// name changes with every FiveM update.
+    /// Where the DLSS 5 Neural Rendering payload for this profile goes, and
+    /// what to name the ReShade proxy there. Single-player uses the game's own
+    /// folder; FiveM tries its Enhanced game-cache folder first (found by what
+    /// is in it, since its name changes with every FiveM update), then falls
+    /// back to the classic client's Plugins folder.
     member this.GtaDlssTarget =
-        if this.IsGtaFiveMProfile then GtaDlss5.findFiveMEnhancedTarget () |> Option.defaultValue ""
+        if this.IsGtaFiveMProfile then GtaDlss5.findFiveMTarget () |> Option.map fst |> Option.defaultValue ""
         else manageFolder
+
+    member this.GtaDlssProxyName =
+        if this.IsGtaFiveMProfile then GtaDlss5.findFiveMTarget () |> Option.map snd |> Option.defaultValue "dxgi.dll"
+        else "dxgi.dll"
 
     member this.GtaDlssTargetFound = this.GtaDlssTarget <> "" && IO.Directory.Exists(this.GtaDlssTarget)
     member this.GtaDlssPayloadReady = GtaDlss5.payloadReady ()
@@ -2484,9 +2489,10 @@ type MainViewModel() as this =
                         gtaDlssStatus <- message
                         gtaDlssProgress <- percent
                         this.RaiseGtaDlss())
+                let proxyName = this.GtaDlssProxyName
                 async {
                     let! result =
-                        Threading.Tasks.Task.Run(fun () -> GtaDlss5.install target report)
+                        Threading.Tasks.Task.Run(fun () -> GtaDlss5.install target proxyName report)
                         |> Async.AwaitTask
                         |> Async.Catch
                     Dispatcher.UIThread.Post(fun () ->

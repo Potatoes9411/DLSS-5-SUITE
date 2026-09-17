@@ -50,10 +50,14 @@ module GtaDlss5 =
         else Path.Combine(ModInstaller.modFilesRoot (), "dlss 5", "nvngx_dlssnr.dll")
 
     /// Every payload file, as (name-in-the-target-folder, source-in-mod-files).
-    let private payload () =
+    /// `proxyName` is "dxgi.dll" beside a game executable or in FiveM's own
+    /// game-cache folder, and "d3d11.dll" in FiveM's Plugins folder - FiveM.exe
+    /// already owns dxgi.dll there, so the community packages hook d3d11
+    /// instead, and every one of them checked out byte-identical to our own.
+    let private payload (proxyName: string) =
         let root = ModInstaller.modFilesRoot ()
         let streamline sub = Path.Combine(root, "streamline_dlss", sub)
-        [ "dxgi.dll", Path.Combine(root, "if 32 bit", "host64", "dxgi.dll")
+        [ proxyName, Path.Combine(root, "if 32 bit", "host64", "dxgi.dll")
           "renodx-dlss5.addon64", Path.Combine(root, "renodx-dlss5.addon64")
           "nvngx_dlssnr.dll", modelFile ()
           "nvngx_dlss.dll", streamline "dlss/nvngx_dlss.dll"
@@ -69,7 +73,7 @@ module GtaDlss5 =
 
     /// Every file this route needs is present in "mod files" before the button
     /// is even shown as usable.
-    let payloadReady () = payload () |> List.forall (fun (_, source) -> File.Exists(source))
+    let payloadReady () = payload "dxgi.dll" |> List.forall (fun (_, source) -> File.Exists(source))
 
     /// FiveM Enhanced keeps its game cache under a build-specific subfolder
     /// ("gamecache_gen9\1158_13"), which changes with FiveM's own updates -
@@ -85,7 +89,29 @@ module GtaDlss5 =
                 |> Array.tryHead
         with _ -> None
 
-    let install (targetFolder: string) (report: string -> float -> unit) =
+    /// The classic (non-Enhanced) FiveM client's own Plugins folder, used by
+    /// the community's earlier "Plugins_FiveM.app.zip" style packages. Created
+    /// empty by a fresh FiveM install, so its absence just means the folder
+    /// has never been populated yet - not that FiveM itself is missing.
+    let findFiveMPluginsTarget () =
+        try
+            let appRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FiveM", "FiveM.app")
+            if not (Directory.Exists(appRoot)) then None
+            else
+                let plugins = Path.Combine(appRoot, "plugins")
+                Directory.CreateDirectory(plugins) |> ignore
+                Some plugins
+        with _ -> None
+
+    /// FiveM Enhanced's game-cache folder when it exists, the classic
+    /// client's Plugins folder otherwise - whichever the user actually has
+    /// installed, with the right proxy name for each.
+    let findFiveMTarget () =
+        match findFiveMEnhancedTarget () with
+        | Some dir -> Some(dir, "dxgi.dll")
+        | None -> findFiveMPluginsTarget () |> Option.map (fun dir -> dir, "d3d11.dll")
+
+    let install (targetFolder: string) (proxyName: string) (report: string -> float -> unit) =
         if String.IsNullOrWhiteSpace(targetFolder) || not (Directory.Exists(targetFolder)) then
             failwith "That folder was not found."
         if not (payloadReady ()) then
@@ -95,7 +121,7 @@ module GtaDlss5 =
         let backupDir = Path.Combine(dataRoot (), "GtaBackups", Path.GetFileName(manifestPath targetFolder).Replace(".json", ""))
         Directory.CreateDirectory(backupDir) |> ignore
 
-        let files = payload ()
+        let files = payload proxyName
         let mutable done_ = 0
         let total = float files.Length
         let recorded =
