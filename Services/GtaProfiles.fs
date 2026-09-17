@@ -1,6 +1,7 @@
 namespace DLSS_5_MANAGER.Services
 
 open System
+open System.IO
 
 /// GTA V and FiveM guidance derived from the user's supplied community notes.
 /// This is intentionally guidance-only for FiveM: SUITE does not copy unknown
@@ -23,6 +24,31 @@ module GtaProfiles =
     let ScriptHookEnhancedUrl = "https://www.gta5-mods.com/tools/script-hook-v-net-enhanced"
     [<Literal>]
     let DirectStorageFixUrl = "https://www.gta5-mods.com/scripts/directstoragefix"
+
+    /// -nobattleye as a launch option only works through Steam's own launch
+    /// options field or the Rockstar Games Launcher's BattlEye checkbox -
+    /// neither of which SUITE can reach from outside the process. What GTA V
+    /// itself honours regardless of launcher is commandline.txt beside the
+    /// executable, so the flag goes there instead. Community reports on
+    /// whether commandline.txt overrides the Rockstar Launcher's own
+    /// BattlEye setting are mixed; this covers Steam for certain and gives
+    /// the Rockstar Launcher its best automatic shot without touching
+    /// settings storage SUITE has no located, verified path to.
+    let ensureNoBattleye (gameFolder: string) : Result<unit, string> =
+        try
+            if String.IsNullOrWhiteSpace(gameFolder) || not (Directory.Exists(gameFolder)) then
+                Error "The game folder was not found."
+            else
+                let path = Path.Combine(gameFolder, "commandline.txt")
+                let existing = if File.Exists(path) then File.ReadAllText(path) else ""
+                if existing.IndexOf("-nobattleye", StringComparison.OrdinalIgnoreCase) >= 0 then
+                    Ok()
+                else
+                    let updated = (existing.TrimEnd() + " -nobattleye").TrimStart()
+                    File.WriteAllText(path, updated)
+                    Ok()
+        with ex ->
+            Error ex.Message
 
     let tryDescribe (title: string) (api: string) =
         if not (isGta title) then None
