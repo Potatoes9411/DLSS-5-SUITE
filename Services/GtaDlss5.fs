@@ -160,7 +160,8 @@ module GtaDlss5 =
             [ "EffectSearchPaths", ".\\reshade-shaders\\Shaders\\**"
               "TextureSearchPaths", ".\\reshade-shaders\\Textures\\**"
               "KeyOverlay", "35,0,0,0"
-              "TutorialProgress", "4" ]
+              "TutorialProgress", "4"
+              "PreprocessorDefinitions", "DLSS5_MV_PROVIDER=3" ]
         try
             let startsWithKey (key: string) (line: string) = line.TrimStart().StartsWith(key + "=", StringComparison.OrdinalIgnoreCase)
             let existing = if File.Exists(ini) then File.ReadAllLines(ini) |> List.ofArray else []
