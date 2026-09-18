@@ -16,7 +16,7 @@ module AppLog =
     let private gate = obj ()
 
     let dataFolder () =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite")
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS 5 SUITE")
 
     let logFolder () = Path.Combine(dataFolder (), "logs")
     let logPath () = Path.Combine(logFolder (), "suite.log")

@@ -17,10 +17,8 @@
     Format: MAJOR.MINOR.PATCH-suite.N
   -->
   <PropertyGroup>
-    <SuiteVersion>1.2.4</SuiteVersion>
-  </PropertyGroup>
-
-  <PropertyGroup>
+    <SuiteVersion>1.2.4-suite.2</SuiteVersion>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <!-- Windows version resources hold four numbers and no text, so the suite
          number becomes the fourth: 1.2.2-suite.1 -> 1.2.2.1. That keeps every
          suite build distinguishable in the file's own properties. -->

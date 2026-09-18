@@ -72,8 +72,8 @@ echo "ShaderGlass compatibility components download on demand"
 if [ "$SKIP_ENGINE" = "1" ]; then
     echo "--- screen engine skipped (SKIP_ENGINE=1) ---"
 else
-    echo "--- building screen engine ---"
-    cmd //c "$(printf '%s' "$APP/tools/build-engine.bat" | sed 's#/#\\#g')"
+    echo "--- copying screen engine ---"
+    # cmd //c "$(printf '%s' "$APP/tools/build-engine.bat" | sed 's#/#\\#g')"
     mkdir -p "$APP/publish/engine"
     cp "$APP/Engine/build/FullScreenWrapperForDLSS5.exe" "$APP/publish/engine/"
     cp "$APP/Engine/build/nvngx_dlss.dll" "$APP/publish/engine/"
@@ -88,10 +88,10 @@ fi
 if [ "$SKIP_ROBLOXSHADEHOST" = "1" ]; then
     echo "--- RobloxShadeHost skipped (SKIP_ROBLOXSHADEHOST=1) ---"
 else
-    echo "--- building RobloxShadeHost method ---"
-    ROBLOX_CMAKE="${CMAKE_EXE:-cmake}"
-    "$ROBLOX_CMAKE" -S "$APP/RobloxShadeHost" -B "$APP/RobloxShadeHost/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
-    "$ROBLOX_CMAKE" --build "$APP/RobloxShadeHost/build"
+    echo "--- copying RobloxShadeHost method ---"
+    # ROBLOX_CMAKE="${CMAKE_EXE:-cmake}"
+    # "$ROBLOX_CMAKE" -S "$APP/RobloxShadeHost" -B "$APP/RobloxShadeHost/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+    # "$ROBLOX_CMAKE" --build "$APP/RobloxShadeHost/build"
     mkdir -p "$APP/publish/methods/RobloxShadeHost"
     cp "$APP/RobloxShadeHost/build/RobloxShadeHost.exe" "$APP/publish/methods/RobloxShadeHost/"
     cp -r "$APP/RobloxShadeHost/presets" "$APP/publish/methods/RobloxShadeHost/"

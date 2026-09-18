@@ -78,6 +78,6 @@ module DataMigration =
     let run () =
         try
             let local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-            migrate (Path.Combine(local, "DLSS5Manager")) (Path.Combine(local, "DLSS5Suite")) |> ignore
+            migrate (Path.Combine(local, "DLSS5Manager")) (Path.Combine(local, "DLSS 5 SUITE")) |> ignore
         with _ ->
             ()
