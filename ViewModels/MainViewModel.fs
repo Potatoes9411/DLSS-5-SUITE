@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.ViewModels
+namespace DLSS_5_MANAGER.ViewModels
 
 open System
 open System.Collections.ObjectModel
@@ -2470,8 +2470,8 @@ type MainViewModel() as this =
         else manageFolder
 
     member this.GtaDlssProxyName =
-        if this.IsGtaFiveMProfile then GtaDlss5.findFiveMTarget () |> Option.map snd |> Option.defaultValue "dxgi.dll"
-        else "dxgi.dll"
+        if this.IsGtaFiveMProfile then GtaDlss5.findFiveMTarget () |> Option.map snd |> Option.defaultValue "d3d11.dll"
+        else "d3d11.dll"
 
     member this.GtaDlssTargetFound = this.GtaDlssTarget <> "" && IO.Directory.Exists(this.GtaDlssTarget)
     member this.GtaDlssPayloadReady = GtaDlss5.payloadReady ()
