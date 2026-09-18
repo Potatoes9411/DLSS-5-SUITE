@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Services
+namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -2705,35 +2705,50 @@ module ModInstaller =
                             not (String.IsNullOrWhiteSpace(f.TargetPath)) && 
                             Path.GetFileName(f.TargetPath).Equals(overlayAddonName, StringComparison.OrdinalIgnoreCase))
                     
-                    match overlayEntry with
-                    | Some f ->
-                        let targetAddon = f.TargetPath
-                        let exeDir = Path.GetDirectoryName(targetAddon)
-                        let targetIni = Path.Combine(exeDir, overlayConfigName)
-                        if globalEnabled then
-                            if File.Exists(source) then
-                                File.Copy(source, targetAddon, true)
-                                let (key, ctrl, shift, alt) = parseOverlayHotkey hotkey
-                                let flag (value: bool) = if value then "true" else "false"
-                                let contents =
-                                    String.Join(
-                                        "\r\n",
-                                        [ "; DLSS 5 Overlay - written by DLSS 5 SUITE."
-                                          "; The overlay rewrites this file when you change something from"
-                                          "; inside the game, so hand edits survive until the next install."
-                                          ""
-                                          "[Overlay]"
-                                          "Enabled=true"
-                                          "Theme=" + theme
-                                          sprintf "HotKey=%d" key
-                                          "HotKeyCtrl=" + flag ctrl
-                                          "HotKeyShift=" + flag shift
-                                          "HotKeyAlt=" + flag alt
-                                          "" ]
-                                    )
-                                File.WriteAllText(targetIni, contents)
-                        else
-                            if File.Exists(targetAddon) then File.Delete(targetAddon)
-                            if File.Exists(targetIni) then File.Delete(targetIni)
-                    | None -> ()
+                    let mutable manifestChanged = false
+                    let mutable newFiles = if isNull (box m.Files) then [] else List.ofArray m.Files
+
+                    let exeDir = 
+                        match overlayEntry with
+                        | Some f -> Path.GetDirectoryName(f.TargetPath)
+                        | None -> Path.GetDirectoryName(game.TargetExecutablePath)
+                        
+                    let targetAddon = Path.Combine(exeDir, overlayAddonName)
+                    let targetIni = Path.Combine(exeDir, overlayConfigName)
+
+                    if globalEnabled then
+                        if File.Exists(source) then
+                            File.Copy(source, targetAddon, true)
+                            let (key, ctrl, shift, alt) = parseOverlayHotkey hotkey
+                            let flag (value: bool) = if value then "true" else "false"
+                            let contents =
+                                String.Join(
+                                    "\r\n",
+                                    [ "; DLSS 5 Overlay - written by DLSS 5 SUITE."
+                                      "; The overlay rewrites this file when you change something from"
+                                      "; inside the game, so hand edits survive until the next install."
+                                      ""
+                                      "[Overlay]"
+                                      "Enabled=true"
+                                      "Theme=" + theme
+                                      sprintf "HotKey=%d" key
+                                      "HotKeyCtrl=" + flag ctrl
+                                      "HotKeyShift=" + flag shift
+                                      "HotKeyAlt=" + flag alt
+                                      "" ]
+                                )
+                            File.WriteAllText(targetIni, contents)
+                            
+                            if overlayEntry.IsNone then
+                                newFiles <- newFiles @ [ { TargetPath = targetAddon; BackupPath = ""; WasExisting = false }
+                                                         { TargetPath = targetIni; BackupPath = ""; WasExisting = false } ]
+                                manifestChanged <- true
+                    else
+                        if File.Exists(targetAddon) then File.Delete(targetAddon)
+                        if File.Exists(targetIni) then File.Delete(targetIni)
+
+                    if manifestChanged then
+                        let m2 = { m with Files = newFiles |> Array.ofList }
+                        let text = JsonSerializer.Serialize(m2, JsonSerializerOptions(WriteIndented = true))
+                        File.WriteAllText(path, text)
                 with _ -> ()
