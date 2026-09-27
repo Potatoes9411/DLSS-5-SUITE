@@ -35,9 +35,6 @@ module Program =
                 )
             )
             .WithInterFont()
-#if DEBUG
-            .WithDeveloperTools()
-#endif
             .LogToTrace(areas = Array.empty)
 
     [<EntryPoint; STAThread>]

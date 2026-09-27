@@ -52,6 +52,9 @@ module ModInstaller =
           /// DX9 / AMD install. Empty everywhere else, and on every manifest
           /// written before the option existed.
           Neural: string
+          /// "1" when a ReShade route also deployed dlss5-feed. Empty means
+          /// the game uses the RenoDX route without the optional feeder.
+          Feeder: string
           Files: InstalledFile[] }
 
     /// The mutually exclusive install routes offered in the Manage sheet.
@@ -997,6 +1000,22 @@ module ModInstaller =
         with _ ->
             false
 
+    /// Whether the recorded ReShade install uses the optional DLSS 5 feeder.
+    /// Old manifests predate this switch and retain the old behaviour.
+    let installedFeeder (game: GameItem) : bool =
+        try
+            let path = manifestPath game
+
+            if File.Exists(path) then
+                let options = JsonSerializerOptions()
+                options.PropertyNameCaseInsensitive <- true
+                let m = JsonSerializer.Deserialize<InstallManifest>(File.ReadAllText(path), options)
+                isNull (box m.Feeder) || not (String.IsNullOrWhiteSpace(m.Feeder))
+            else
+                false
+        with _ ->
+            false
+
     let inspect (game: GameItem) (exePath: string) (dlssDirs: string[]) (streamlineDirs: string[]) : Dlss5Status =
         let managed = isInstalled game
 
@@ -1027,6 +1046,7 @@ module ModInstaller =
             let missing = List<string>()
 
             let (installedRoute, installedArch) = installedRouteAndArch game
+            let feederExpected = installedFeeder game
 
             // OptiScaler is its own route - ReShade and the RenoDX add-ons are
             // deliberately absent there, so they must not read as "missing".
@@ -1062,8 +1082,8 @@ module ModInstaller =
             elif is32BitInstall then
                 if not (GameAnalyzer.isReShadeInstalled exePath) then missing.Add("ReShade")
 
-                if not (File.Exists(Path.Combine(exeDir, feedAddon32Name))) then
-                    missing.Add("32-bit DLSS 5 feed add-on")
+                if feederExpected && not (File.Exists(Path.Combine(exeDir, feedAddon32Name))) then
+                   missing.Add("32-bit DLSS 5 feed add-on")
 
                 if not (File.Exists(Path.Combine(exeDir, host64DirName, "dlss5-feed-host64.exe"))) then
                     missing.Add("64-bit host")
@@ -1073,7 +1093,7 @@ module ModInstaller =
                 if not (File.Exists(Path.Combine(exeDir, renodxAddonName))) then
                     missing.Add("RenoDX DLSS 5 add-on")
 
-                if not (File.Exists(Path.Combine(exeDir, feedAddonName))) then
+                if feederExpected && not (File.Exists(Path.Combine(exeDir, feedAddonName))) then
                     missing.Add("DLSS 5 feed add-on")
 
             // OptiScaler only ever wants the model next to the executable, so a
@@ -1703,6 +1723,9 @@ module ModInstaller =
         /// DX9 and AMD routes. OptiScaler has its own neural payload and
         /// ignores this.
         (neural: bool)
+        /// Feeder is optional on standard ReShade routes. Some games need only
+        /// RenoDX, so avoiding it keeps their working ReShade install lean.
+        (feeder: bool)
         /// The in-game overlay, as set up in Settings. Ignored on any route
         /// `overlaySupported` says no to.
         (overlay: OverlayOptions)
@@ -1750,6 +1773,7 @@ module ModInstaller =
             // OptiScaler picks a whole different payload for it instead, so it
             // never reads this.
             let neuralWanted = neural && mode <> OptiScalerMode && mode <> Emulator
+            let feederWanted = feeder && mode <> OptiScalerMode && mode <> Emulator && mode <> AmdMode
             let neuralAddonFile = Path.Combine(modRoot, neuralAddonName)
 
             // The overlay only travels with the routes that can actually host
@@ -1774,6 +1798,7 @@ module ModInstaller =
                       Arch = archKey arch
                       Api = optiApiKey optiApi
                       Neural = (if neuralWanted then "1" else "")
+                      Feeder = (if feederWanted then "1" else "")
                       Files = tracker.Entries }
 
                 let options = JsonSerializerOptions()
@@ -2116,11 +2141,11 @@ module ModInstaller =
 
             let missing =
                 [ yield setupExe
-                  if is32Bit then
+                  if is32Bit && feederWanted then
                       yield feedAddon32File
                   else
                       yield addonFile
-                      yield feedAddonFile
+                      if feederWanted then yield feedAddonFile
                       yield dlssnrFile ]
                 |> List.filter (fun p -> not (File.Exists(p)))
 
@@ -2265,6 +2290,8 @@ module ModInstaller =
             // it out of the host64 folder.
             let host64Files =
                 if is32Bit then
+                    if not feederWanted then
+                        failwith "The 32-bit ReShade route requires DLSS 5 Feeder."
                     report "Installing the 32-bit add-on..." 0.30
                     copyIfEnabled tracker feedAddon32Name feedAddon32File (Path.Combine(exeDir, feedAddon32Name)) |> ignore
 
@@ -2289,7 +2316,8 @@ module ModInstaller =
                 else
                     report "Installing RenoDX DLSS 5 add-on..." 0.30
                     copyIfEnabled tracker renodxAddonName addonFile (Path.Combine(exeDir, renodxAddonName)) |> ignore
-                    copyIfEnabled tracker feedAddonName feedAddonFile (Path.Combine(exeDir, feedAddonName)) |> ignore
+                    if feederWanted then
+                        copyIfEnabled tracker feedAddonName feedAddonFile (Path.Combine(exeDir, feedAddonName)) |> ignore
                     0
 
             // Motion vectors. The Need for Speed route carries the fuller
@@ -2297,16 +2325,17 @@ module ModInstaller =
             // QuantMotion (4). Without one of them DLSS 5 runs on the current
             // frame alone, which is what "no motion vectors" in the add-on's
             // overlay means.
-            let isNeedForSpeed = NeedForSpeedProfiles.tryRecommendedRoute game.Title |> Option.isSome
-            let mvProvider = if isNeedForSpeed then 3 else 4
-            let feedCfgPath = Path.Combine(exeDir, "dlss5-feed.cfg")
-            if not (File.Exists(feedCfgPath)) then
-                try
-                    File.WriteAllText(feedCfgPath, sprintf "DLSS5_MV_PROVIDER=%d\n" mvProvider)
-                    tracker.Record(feedCfgPath, false, "")
-                with _ -> ()
+            if feederWanted then
+                let isNeedForSpeed = NeedForSpeedProfiles.tryRecommendedRoute game.Title |> Option.isSome
+                let mvProvider = if isNeedForSpeed then 3 else 4
+                let feedCfgPath = Path.Combine(exeDir, "dlss5-feed.cfg")
+                if not (File.Exists(feedCfgPath)) then
+                    try
+                        File.WriteAllText(feedCfgPath, sprintf "DLSS5_MV_PROVIDER=%d\n" mvProvider)
+                        tracker.Record(feedCfgPath, false, "")
+                    with _ -> ()
 
-            ensureMotionVectorProvider tracker exeDir mvProvider
+                ensureMotionVectorProvider tracker exeDir mvProvider
 
             // -------------------------------------------------------------
             // 3-4. NVIDIA Streamline + DLSS runtime

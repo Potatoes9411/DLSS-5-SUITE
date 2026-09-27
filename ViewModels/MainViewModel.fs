@@ -425,12 +425,17 @@ type MainViewModel() as this =
     /// add-on next to the game. Off unless the user asks for it.
     let mutable useNeuralAddon = false
 
+    /// DLSS 5 Feeder is separate from Neural upstream. It is useful for games
+    /// that need its motion-vector path, but standard RenoDX installs do not.
+    let mutable useFeeder = false
+
     /// The route and build recorded in the manifest for the open game, "" when
     /// this app did not install it. Drives the Install / Switch / Remove button.
     let mutable installedRoute = ""
     let mutable installedArch = ""
     let mutable installedApi = ""
     let mutable installedNeural = false
+    let mutable installedFeeder = false
 
     /// True once the user has picked a route in the open sheet. Detection then
     /// stops overriding it - see SetInstallMode.
@@ -2234,6 +2239,27 @@ type MainViewModel() as this =
         && installedRoute <> ""
         && installedRoute = ModInstaller.modeKey installMode
 
+    member this.IsFeederVisible =
+        not isEmulatorTarget
+        && (installMode = ModInstaller.Dx12Auto || installMode = ModInstaller.Dx11 || installMode = ModInstaller.Dx9)
+
+    member this.IsFeederOn = useFeeder
+    member this.IsFeederOff = not useFeeder
+
+    member this.IsFeederEnabled
+        with get () = useFeeder
+        and set value = this.SetFeeder(value)
+
+    member this.SetFeeder(on: bool) =
+        if useFeeder <> on then
+            useFeeder <- on
+            this.RaiseInstallModeState()
+
+    member this.IsFeederInstalled =
+        installedFeeder
+        && installedRoute <> ""
+        && installedRoute = ModInstaller.modeKey installMode
+
     member this.IsBit64 = (installArch = ModInstaller.Bit64)
     member this.IsBit32 = (installArch = ModInstaller.Bit32)
 
@@ -2253,9 +2279,14 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("IsOptiVulkan")
         this.RaisePropertyChanged("IsOptiNeural")
         this.RaisePropertyChanged("IsNeuralAddonVisible")
+        this.RaisePropertyChanged("IsFeederVisible")
         this.RaisePropertyChanged("IsOverlayRouteSupported")
         this.RaisePropertyChanged("IsNeuralAddonOn")
         this.RaisePropertyChanged("IsNeuralAddonOff")
+        this.RaisePropertyChanged("IsFeederOn")
+        this.RaisePropertyChanged("IsFeederOff")
+        this.RaisePropertyChanged("IsFeederEnabled")
+        this.RaisePropertyChanged("IsFeederInstalled")
         this.RaisePropertyChanged("IsBit64")
         this.RaisePropertyChanged("IsBit32")
         this.RaisePropertyChanged("InstallModeHintText")
@@ -2598,7 +2629,8 @@ type MainViewModel() as this =
                 && installedApi <> ModInstaller.optiApiKey optiApi)
             // Turning the neural upstream add-on on or off changes what is on
             // the game, so it is a switch like any other.
-            || (this.IsNeuralAddonVisible && installedNeural <> useNeuralAddon))
+            || (this.IsNeuralAddonVisible && installedNeural <> useNeuralAddon)
+            || (this.IsFeederVisible && installedFeeder <> useFeeder))
 
     member this.ShowInstallButton = not dlss5Present && not isInstalling
     member this.ShowSwitchButton = this.IsSwitchingRoute && not isInstalling
@@ -2747,6 +2779,11 @@ type MainViewModel() as this =
             | Some card -> ModInstaller.installedNeuralAddon card.Game
             | None -> false
 
+        installedFeeder <-
+            match manageCard with
+            | Some card -> ModInstaller.installedFeeder card.Game
+            | None -> false
+
         if not (String.IsNullOrWhiteSpace(analysis.ExecutablePath)) then
             manageExePath <- analysis.ExecutablePath
             manageFolder <- analysis.ExecutableFolder
@@ -2820,10 +2857,12 @@ type MainViewModel() as this =
         installedArch <- arch
         installedApi <- ModInstaller.installedOptiApi card.Game
         installedNeural <- ModInstaller.installedNeuralAddon card.Game
+        installedFeeder <- ModInstaller.installedFeeder card.Game
 
         // Open on whatever the recorded install actually used, so the sheet
         // offers Remove rather than a switch to itself.
         useNeuralAddon <- installedNeural
+        useFeeder <- installedFeeder
 
         // A fresh sheet: nothing has been picked in it yet, and whether this
         // game arrived with an install is what decides if detection may route
@@ -2916,6 +2955,7 @@ type MainViewModel() as this =
             let targetArch = installArch
             let targetApi = optiApi
             let targetNeural = useNeuralAddon
+            let targetFeeder = useFeeder
             let targetOverlay = this.OverlayOptions
 
             this.InstallResultText <- ""
@@ -2949,7 +2989,7 @@ type MainViewModel() as this =
                             (false, "Could not remove the previous install: " + removal.Message)
                         else
                             let outcome =
-                                ModInstaller.install game exePath plan target targetArch targetApi targetNeural targetOverlay (scaled 0.33 0.67)
+                                ModInstaller.install game exePath plan target targetArch targetApi targetNeural targetFeeder targetOverlay (scaled 0.33 0.67)
                             (outcome.Success, "Switched. " + outcome.Message)
                     with ex ->
                         (false, ex.Message)
@@ -3001,7 +3041,7 @@ type MainViewModel() as this =
                     try
                         let outcome =
                             if isInstallAction then
-                                ModInstaller.install game exePath plan installMode installArch optiApi useNeuralAddon this.OverlayOptions report
+                                ModInstaller.install game exePath plan installMode installArch optiApi useNeuralAddon useFeeder this.OverlayOptions report
                             else
                                 ModInstaller.uninstall game exePath plan report
 
@@ -3128,6 +3168,7 @@ type MainViewModel() as this =
 
             let overlay = this.OverlayOptions
             let neural = useNeuralAddon
+            let feeder = useFeeder
 
             System.Threading.Tasks.Task.Run(fun () ->
                 let mutable ok = 0
@@ -3161,7 +3202,7 @@ type MainViewModel() as this =
                                 if isInstallAction then
                                     ModInstaller.install
                                         row.Game row.ExecutablePath plan
-                                        row.Mode row.Arch row.OptiApi neural overlay report
+                                        row.Mode row.Arch row.OptiApi neural feeder overlay report
                                 else
                                     ModInstaller.uninstall row.Game row.ExecutablePath plan report
 
