@@ -52,6 +52,7 @@
     <Compile Include="Services\Localization.fs" />
     <Compile Include="Services\ExtrasStore.fs" />
     <Compile Include="Services\GameAnalyzer.fs" />
+    <Compile Include="Services\AntiCheat.fs" />
     <Compile Include="Services\IconExtractor.fs" />
     <Compile Include="Services\GameScanner.fs" />
     <Compile Include="Services\GameLauncher.fs" />

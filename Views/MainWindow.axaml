@@ -2196,6 +2196,18 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Informational only: never prevents the user from choosing an install route. -->
+                        <Border IsVisible="{Binding HasManageAntiCheat}" Background="#201F1204" BorderBrush="#66F59E0B"
+                                BorderThickness="1" CornerRadius="14" Padding="14,11">
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                                <TextBlock Text="!" FontSize="16" FontWeight="Black" Foreground="#FCD34D" VerticalAlignment="Top" />
+                                <StackPanel Grid.Column="1" Spacing="3">
+                                    <TextBlock Text="ANTI-CHEAT DETECTED" FontSize="10" FontWeight="Bold" Foreground="#FCD34D" LetterSpacing="0.7" />
+                                    <TextBlock Text="{Binding ManageAntiCheatText}" FontSize="11.5" Foreground="#FDE68A" TextWrapping="Wrap" LineHeight="16" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
                         <!-- Launching: how this game starts from its card, and with what -->
                         <Border IsVisible="{Binding IsGameTarget}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
                             <StackPanel Spacing="10">

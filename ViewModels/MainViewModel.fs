@@ -376,6 +376,9 @@ type MainViewModel() as this =
     let mutable manageCard: GameCardViewModel option = None
     let mutable manageAnalysis: AnalysisStore.GameAnalysis option = None
     let mutable manageTitle = ""
+    // Informational only. Detection never blocks an install: it gives people
+    // a clear warning before a render-hook route touches a protected game.
+    let mutable manageAntiCheat: string option = None
     let mutable manageExePath = ""
     let mutable manageFolder = ""
     let mutable manageReShadeText = "Checking..."
@@ -1977,6 +1980,17 @@ type MainViewModel() as this =
 
     member this.ManageCard = manageCard
     member this.ManageTitle = manageTitle
+
+    member _.HasManageAntiCheat = manageAntiCheat.IsSome
+
+    member _.ManageAntiCheatText =
+        match manageAntiCheat with
+        | Some name when not (String.IsNullOrWhiteSpace(name)) ->
+            sprintf "%s detected. Render-hook installs can be blocked or lead to enforcement in online modes. Use only where the game's rules allow it." name
+        | Some _ ->
+            "Possible anti-cheat detected. Render-hook installs can be blocked or lead to enforcement in online modes."
+        | None -> ""
+
     member this.ManageExePath = manageExePath
 
     // ---- launching, per game ----
@@ -2836,6 +2850,9 @@ type MainViewModel() as this =
         manageCard <- Some card
         manageAnalysis <- None
         manageTitle <- card.Title
+        manageAntiCheat <- None
+        this.RaisePropertyChanged("HasManageAntiCheat")
+        this.RaisePropertyChanged("ManageAntiCheatText")
         manageExePath <- card.ExecutablePath
         this.RefreshManageLaunch()
 
@@ -2849,6 +2866,24 @@ type MainViewModel() as this =
         this.InstallProgress <- 0.0
         this.InstallStatusText <- ""
         this.IsManageOpen <- true
+
+        // The bounded scan can touch the game's files, so it runs away from the
+        // UI thread and only updates the sheet if the same card remains open.
+        let antiCheatTitle = card.Title
+        let antiCheatFolder = manageFolder
+        let antiCheatExe = manageExePath
+        System.Threading.Tasks.Task.Run(fun () ->
+            let found =
+                try AntiCheat.detect antiCheatTitle antiCheatFolder antiCheatExe
+                with _ -> None
+            Dispatcher.UIThread.Post(fun () ->
+                match manageCard with
+                | Some openCard when obj.ReferenceEquals(openCard, card) ->
+                    manageAntiCheat <- found
+                    this.RaisePropertyChanged("HasManageAntiCheat")
+                    this.RaisePropertyChanged("ManageAntiCheatText")
+                | _ -> ()))
+        |> ignore
 
         // Preselect whichever route a managed install already used, so the
         // sheet opens on "Remove" rather than offering to switch to itself.
