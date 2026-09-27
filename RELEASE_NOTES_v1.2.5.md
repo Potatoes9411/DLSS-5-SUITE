@@ -1,4 +1,4 @@
-# DLSS 5 SUITE v1.2.3-suite.1
+# DLSS 5 SUITE v1.2.5
 
 ## ReShade install control
 
@@ -10,4 +10,4 @@
 
 ## Included downloads
 
-The release continues to provide the complete setup, web setup, portable package, NeuralScreen add-on, GTA community archive, GTA/FiveM plugin packs, Lossless Scaling, and ShaderGlass downloads.
+The release provides the complete setup, web setup, portable package, NeuralScreen add-on, GTA community archive, GTA/FiveM plugin packs, Lossless Scaling, and ShaderGlass downloads.
