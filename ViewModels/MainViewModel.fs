@@ -907,6 +907,35 @@ type MainViewModel() as this =
                   SortMode = sortMode
                   ShowNonGameApps = showNonGameApps }
 
+        // Discord: "Playing <game> with DLSS 5 SUITE" while a game SUITE put
+        // DLSS 5 into is running. The install manifests already record which
+        // games those are, so nothing extra is written into game folders. The
+        // process check runs off the UI thread; only the card list is read here.
+        let gameWatch = DispatcherTimer(Interval = TimeSpan.FromSeconds(10.0))
+        let watching = ref false
+        gameWatch.Tick.Add(fun _ ->
+            if not watching.Value then
+                watching.Value <- true
+                let games = [ for c in allGames -> c.Game ]
+                Threading.Tasks.Task.Run(fun () ->
+                    let playing =
+                        try
+                            games
+                            |> List.tryFind (fun g ->
+                                let modded =
+                                    ModInstaller.isInstalled g
+                                    || (not (String.IsNullOrEmpty g.TargetExecutablePath)
+                                        && GtaDlss5.isInstalled (IO.Path.GetDirectoryName g.TargetExecutablePath))
+                                modded && GameLauncher.isRunning g)
+                            |> Option.map (fun g -> g.Title)
+                        with ex ->
+                            AppLog.error "Checking for a running DLSS 5 game" ex
+                            None
+                    DiscordPresence.setPlaying playing
+                    watching.Value <- false)
+                |> ignore)
+        gameWatch.Start()
+
         // Only arm it when this build has not asked yet. A single tick, then
         // the timer stops for good.
         if supportPromptVersion <> UpdateChecker.CurrentVersion then

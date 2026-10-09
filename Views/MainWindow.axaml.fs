@@ -363,8 +363,33 @@ type MainWindow() as this =
             | :? MainViewModel as vm -> vm.IsWindowActive <- on
             | _ -> ()
 
-        this.Activated.Add(fun _ -> setMotion true)
-        this.Deactivated.Add(fun _ -> setMotion false)
+        // Coming back to the window restores focus to the last control clicked
+        // inside a list, and the ScrollViewer then jumps to bring it into view.
+        // Remember every list's position on the way out and put it back after
+        // that focus pass has run.
+        let scrollerNames = [ "GamesScrollViewer"; "SettingsScrollViewer"; "EmulatorsScrollViewer"; "CommunityScrollViewer" ]
+        let mutable savedOffsets: (ScrollViewer * Vector) list = []
+
+        this.Deactivated.Add(fun _ ->
+            setMotion false
+            savedOffsets <-
+                scrollerNames
+                |> List.choose (fun n ->
+                    match this.FindControl<ScrollViewer>(n) with
+                    | null -> None
+                    | sv -> Some(sv, sv.Offset)))
+
+        this.Activated.Add(fun _ ->
+            setMotion true
+            let saved = savedOffsets
+            let restore () =
+                for (sv, offset) in saved do
+                    if sv.Offset <> offset then sv.Offset <- offset
+                    if Object.ReferenceEquals(sv, activeScrollViewer) then
+                        scrollTargetY <- offset.Y
+                        scrollVelocity <- 0.0
+            restore ()
+            Dispatcher.UIThread.Post(restore, DispatcherPriority.Background))
 
         // One step per presented frame, easing by elapsed time rather than by
         // a fixed fraction - so the glide takes the same 90 ms to settle on a

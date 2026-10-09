@@ -75,12 +75,21 @@ module DiscordPresence =
         let length = BitConverter.ToInt32(header, 4)
         BitConverter.ToInt32(header, 0), Encoding.UTF8.GetString(readExactly stream length)
 
+    /// The game being played with DLSS 5 SUITE, and when it was first seen.
+    let mutable private playing: (string * int64) option = None
+
     let private activity () =
         let v = version ()
+        let details, state, since =
+            match playing with
+            | Some(title, since) -> "Playing " + title, "with DLSS 5 SUITE", since
+            | None -> "Using DLSS 5 SUITE", (if v = "" then "by Potatoes9411" else "Version " + v + " · by Potatoes9411"), startedAt
+        // Discord rejects a details line longer than 128 characters.
+        let details = if details.Length > 128 then details.Substring(0, 125) + "..." else details
         JsonObject(
-            [ Collections.Generic.KeyValuePair("details", JsonValue.Create("Using DLSS 5 SUITE") :> JsonNode)
-              Collections.Generic.KeyValuePair("state", JsonValue.Create(if v = "" then "by Potatoes9411" else "Version " + v + " · by Potatoes9411") :> JsonNode)
-              Collections.Generic.KeyValuePair("timestamps", JsonObject([ Collections.Generic.KeyValuePair("start", JsonValue.Create(startedAt) :> JsonNode) ]) :> JsonNode)
+            [ Collections.Generic.KeyValuePair("details", JsonValue.Create(details) :> JsonNode)
+              Collections.Generic.KeyValuePair("state", JsonValue.Create(state) :> JsonNode)
+              Collections.Generic.KeyValuePair("timestamps", JsonObject([ Collections.Generic.KeyValuePair("start", JsonValue.Create(since) :> JsonNode) ]) :> JsonNode)
               Collections.Generic.KeyValuePair(
                   "assets",
                   JsonObject(
@@ -93,11 +102,23 @@ module DiscordPresence =
                           [ Collections.Generic.KeyValuePair("label", JsonValue.Create("Download DLSS 5 SUITE") :> JsonNode)
                             Collections.Generic.KeyValuePair("url", JsonValue.Create(DownloadUrl) :> JsonNode) ]) :> JsonNode) :> JsonNode) ])
 
+    /// Sends the current activity. Writes are serialised: the game watcher can
+    /// call this from another thread while the session thread is reading.
+    let private sendActivity (p: Stream) =
+        let args = JsonObject()
+        args.["pid"] <- JsonValue.Create(Diagnostics.Process.GetCurrentProcess().Id)
+        args.["activity"] <- activity ()
+        let command = JsonObject()
+        command.["cmd"] <- JsonValue.Create("SET_ACTIVITY")
+        command.["args"] <- args
+        command.["nonce"] <- JsonValue.Create(Guid.NewGuid().ToString())
+        lock gate (fun () -> send p 1 command)
+
     /// Discord listens on the first free of discord-ipc-0 .. discord-ipc-9.
     let private connect () =
         [ 0 .. 9 ]
         |> List.tryPick (fun i ->
-            let p = new NamedPipeClientStream(".", sprintf "discord-ipc-%d" i, PipeDirection.InOut, PipeOptions.None)
+            let p = new NamedPipeClientStream(".", sprintf "discord-ipc-%d" i, PipeDirection.InOut, PipeOptions.Asynchronous)
             try
                 p.Connect(500)
                 Some p
@@ -117,14 +138,7 @@ module DiscordPresence =
                     let _, ready = receive p
                     if not (ready.Contains("\"READY\"")) then failwith ("Discord refused the handshake: " + ready)
 
-                    let args = JsonObject()
-                    args.["pid"] <- JsonValue.Create(Diagnostics.Process.GetCurrentProcess().Id)
-                    args.["activity"] <- activity ()
-                    let command = JsonObject()
-                    command.["cmd"] <- JsonValue.Create("SET_ACTIVITY")
-                    command.["args"] <- args
-                    command.["nonce"] <- JsonValue.Create(Guid.NewGuid().ToString())
-                    send p 1 command
+                    sendActivity p
                     let _, reply = receive p
                     if reply.Contains("\"evt\":\"ERROR\"") then failwith ("Discord rejected the activity: " + reply)
                     AppLog.info "Discord Rich Presence is showing"
@@ -133,7 +147,8 @@ module DiscordPresence =
                     while not token.IsCancellationRequested do
                         let opcode, text = receive p
                         // 3 is Discord's ping; answering keeps the link alive.
-                        if opcode = 3 then send p 4 (JsonNode.Parse(text))
+                        if opcode = 3 then lock gate (fun () -> send p 4 (JsonNode.Parse(text)))
+                        elif text.Contains("\"evt\":\"ERROR\"") then AppLog.warn ("Discord rejected an activity update: " + text)
                 with
                 | :? EndOfStreamException
                 | :? IOException
@@ -166,6 +181,20 @@ module DiscordPresence =
             // Closing the pipe both unblocks the reader and clears the activity.
             lock gate (fun () -> pipe |> Option.iter (fun p -> try p.Dispose() with _ -> ()))
         | None -> ()
+
+    /// Called by the game watcher: the title of a running game SUITE installed
+    /// DLSS 5 into, or None when there is none. Only a real change is sent.
+    let setPlaying (title: string option) =
+        let current = playing |> Option.map fst
+        if current <> title then
+            playing <- title |> Option.map (fun t -> t, DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            match title with
+            | Some t -> AppLog.info ("Discord Rich Presence: playing " + t)
+            | None -> ()
+            let open_ = lock gate (fun () -> pipe)
+            match open_ with
+            | Some p -> try sendActivity p with ex -> AppLog.error "Updating Discord Rich Presence" ex
+            | None -> ()
 
     let setEnabled (on: bool) =
         try
