@@ -42,7 +42,7 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - Automated Lossless Scaling setup using official LosslessProxy/LSP releases and the verified FeedKit route.
 - Need for Speed game-aware Feeder guidance, including the verified DXVK-to-Vulkan path for classic 32-bit D3D9 titles and appropriate D3D11/D3D12 profiles for newer games.
 - GTA V Legacy and FiveM profiles with separate single-player/FiveM guidance, launcher-aware notes, the FiveM Plugins route, streaming capture guidance, and an explicit Rockstar GTA Online exclusion.
-- GTA V Enhanced can download and install Script Hook V, Ultimate ASI Loader, Script Hook V .NET Enhanced, and DirectStorageFix directly from the game management sheet. Existing files are backed up automatically; disable BattlEye before launching. Rerun the fix after a game update or file verification if ReShade's files are restored.
+- GTA V Enhanced can download and install Script Hook V, Ultimate ASI Loader, Script Hook V .NET Enhanced, and DirectStorageFix directly from the game management sheet. Existing files are backed up automatically, and BattlEye is disabled through the game's commandline.txt (on the Rockstar Games Launcher, also untick it once in the launcher's settings if it still starts). Rerun the fix after a game update or file verification if ReShade's files are restored.
 - Automatic, browser-free application and compatibility-component updates with visible progress.
 - DLSS 5 over the whole desktop through two methods chosen by your card: the Screen Engine for RTX 50 series, and NeuralScreen for RTX 30/40 series with RTX 50 as an alternative. RTX 20 is marked unsupported, because that generation starts without processing the picture.
 - RobloxShadeHost is an optional third method for Roblox. It observes the Roblox window through Windows Graphics Capture, runs ReShade beside it, and never installs files into the Roblox folder. SUITE starts and stops the host from the same themed method window.
@@ -54,6 +54,8 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - Screen Engine changes tune a running session live when possible; source and capture changes restart only the part that needs restarting.
 - Game installs receive a motion-vector provider and the technique order DLSS 5 needs, so the overlay reports real motion vectors instead of none.
 - NeuralScreen ships as its own download. SUITE keeps the method locked until its zip is installed from the Screen Engine window.
+- Discord Rich Presence: shows **Playing DLSS 5 SUITE** with the app's icon, the version and elapsed time, plus a Download DLSS 5 SUITE button on your profile for others. Works automatically when Discord is open and can be switched off in Settings.
+- Warnings before installing into games that ship a known anti-cheat, and an optional DLSS 5 Feeder toggle for the ReShade routes.
 - DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
 
 Compatibility varies by game, graphics hardware, anti-cheat system and game update. The project does not promise that every title will work, and it does not bypass anti-cheat protections.
