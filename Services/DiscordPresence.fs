@@ -34,7 +34,7 @@ module DiscordPresence =
     let private IconUrl = "https://raw.githubusercontent.com/Potatoes9411/DLSS-5-SUITE/main/Assets/logo_square.png"
 
     [<Literal>]
-    let private DownloadUrl = "https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest"
+    let private DownloadUrl = "https://dlss5.potatoes-dev.com/"
 
     let private startedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
     let mutable private cancel: CancellationTokenSource option = None
