@@ -532,6 +532,26 @@
                                                               OnContent="" OffContent="" VerticalAlignment="Center" />
                                             </Grid>
                                         </Border>
+
+                                        <!-- Discord Rich Presence -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1A818CF8"
+                                                        BorderBrush="#33818CF8" BorderThickness="1" VerticalAlignment="Center">
+                                                    <PathIcon Data="M 4,5 H 20 V 16 H 9 L 5,20 V 16 H 4 Z"
+                                                              Width="14" Height="14" Foreground="#818CF8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="Discord Rich Presence" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                    <TextBlock Text="Shows Using DLSS 5 SUITE on your Discord profile, with a download button" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                                </StackPanel>
+
+                                                <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsDiscordPresenceOn, Mode=TwoWay}"
+                                                              OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
                                     </StackPanel>
                                 </Border>
 

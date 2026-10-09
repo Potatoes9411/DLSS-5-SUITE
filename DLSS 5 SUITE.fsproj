@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="Models\GameItem.fs" />
     <Compile Include="Services\AppLog.fs" />
+    <Compile Include="Services\DiscordPresence.fs" />
     <Compile Include="Services\DataMigration.fs" />
     <Compile Include="Services\Localization.fs" />
     <Compile Include="Services\ExtrasStore.fs" />
@@ -101,6 +102,7 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
     <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
     <PackageReference Include="SharpCompress" Version="0.50.4" />
@@ -128,8 +130,7 @@
     left no way to produce a build at all. The switch makes that a choice
     rather than a wall. Shipping builds should still run with it on.
   -->
-  <Target Name="ObfuscateRelease" AfterTargets="Build"
-          Condition="'$(Configuration)' == 'Release' And '$(SkipObfuscation)' != 'true'">
+  <Target Name="ObfuscateRelease" AfterTargets="Build" Condition="'$(Configuration)' == 'Release' And '$(SkipObfuscation)' != 'true'">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\obfuscate.ps1&quot; -Dir &quot;$(TargetDir.TrimEnd('\'))&quot; -Tool &quot;$(MSBuildProjectDirectory)\.obfuscar-tool\obfuscar.console.exe&quot;" />
   </Target>
 

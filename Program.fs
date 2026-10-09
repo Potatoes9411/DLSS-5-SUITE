@@ -52,4 +52,7 @@ module Program =
             DLSS_5_MANAGER.Services.AppLog.error "Unobserved task exception" e.Exception)
         // One-time import of the folder older builds used. See DataMigration.
         DLSS_5_MANAGER.Services.DataMigration.run ()
-        buildAvaloniaApp().StartWithClassicDesktopLifetime(argv)
+        DLSS_5_MANAGER.Services.DiscordPresence.start ()
+        let code = buildAvaloniaApp().StartWithClassicDesktopLifetime(argv)
+        DLSS_5_MANAGER.Services.DiscordPresence.stop ()
+        code

@@ -1129,6 +1129,13 @@ type MainViewModel() as this =
 
     /// Turns off the moving background and the card hover animation. The look
     /// is unchanged at rest; only the motion goes.
+    member this.IsDiscordPresenceOn
+        with get () = DiscordPresence.isEnabled ()
+        and set (value: bool) =
+            if value <> DiscordPresence.isEnabled () then
+                DiscordPresence.setEnabled value
+                this.RaisePropertyChanged("IsDiscordPresenceOn")
+
     member this.IsPerformanceMode
         with get () = isPerformanceMode
         and set value =
