@@ -31,7 +31,7 @@ module DiscordPresence =
     /// Discord accepts an HTTPS image URL in place of an uploaded art asset,
     /// so the icon comes straight from the repository.
     [<Literal>]
-    let private IconUrl = "https://raw.githubusercontent.com/Potatoes9411/DLSS-5-SUITE/main/Assets/logo.png"
+    let private IconUrl = "https://raw.githubusercontent.com/Potatoes9411/DLSS-5-SUITE/main/Assets/logo_square.png"
 
     [<Literal>]
     let private DownloadUrl = "https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest"
@@ -79,13 +79,13 @@ module DiscordPresence =
         let v = version ()
         JsonObject(
             [ Collections.Generic.KeyValuePair("details", JsonValue.Create("Using DLSS 5 SUITE") :> JsonNode)
-              Collections.Generic.KeyValuePair("state", JsonValue.Create(if v = "" then "DLSS 5 for every game" else "Version " + v) :> JsonNode)
+              Collections.Generic.KeyValuePair("state", JsonValue.Create(if v = "" then "by Potatoes9411" else "Version " + v + " · by Potatoes9411") :> JsonNode)
               Collections.Generic.KeyValuePair("timestamps", JsonObject([ Collections.Generic.KeyValuePair("start", JsonValue.Create(startedAt) :> JsonNode) ]) :> JsonNode)
               Collections.Generic.KeyValuePair(
                   "assets",
                   JsonObject(
                       [ Collections.Generic.KeyValuePair("large_image", JsonValue.Create(IconUrl) :> JsonNode)
-                        Collections.Generic.KeyValuePair("large_text", JsonValue.Create("DLSS 5 SUITE") :> JsonNode) ]) :> JsonNode)
+                        Collections.Generic.KeyValuePair("large_text", JsonValue.Create("DLSS 5 SUITE by Potatoes9411") :> JsonNode) ]) :> JsonNode)
               Collections.Generic.KeyValuePair(
                   "buttons",
                   JsonArray(
