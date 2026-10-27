@@ -374,6 +374,9 @@ type MainViewModel() as this =
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
+    let mutable videoStatus = ""
+    let mutable videoLink = ""
+    let mutable videoBusy = false
     /// The last "did it work?" answer per game, by AppId. Filled when the
     /// person asks and on its own when a modded game closes.
     let lastVerdicts = System.Collections.Generic.Dictionary<string, Diagnosis.Report>()
@@ -3120,6 +3123,89 @@ type MainViewModel() as this =
         autopilotCts |> Option.iter (fun c -> c.Cancel())
         autopilotStatus <- "Stopping..."
         this.RaiseVerdict()
+
+    // ---- Video, YouTube and webcam ---------------------------------------
+    member this.IsVideoReady = VideoPlayer.isSetUp () && ModInstaller.isInstalled (VideoPlayer.asGame ())
+    member this.IsVideoNotReady = not this.IsVideoReady
+    member this.VideoBusy = videoBusy
+    member this.VideoIdle = not videoBusy
+    member this.VideoStatus = videoStatus
+    member this.HasVideoStatus = videoStatus <> ""
+
+    member this.VideoLink
+        with get () = videoLink
+        and set (v: string) =
+            videoLink <- v
+            this.RaisePropertyChanged("VideoLink")
+
+    member private this.RaiseVideo() =
+        for n in [ "IsVideoReady"; "IsVideoNotReady"; "VideoBusy"; "VideoIdle"; "VideoStatus"; "HasVideoStatus" ] do
+            this.RaisePropertyChanged(n)
+
+    member private this.VideoSay(s: string) =
+        Dispatcher.UIThread.Post(fun () ->
+            videoStatus <- s
+            this.RaiseVideo())
+
+    member private this.VideoWork(work: unit -> string) =
+        if not videoBusy then
+            videoBusy <- true
+            this.RaiseVideo()
+            System.Threading.Tasks.Task.Run(fun () ->
+                let line = try work () with ex -> ex.Message
+                Dispatcher.UIThread.Post(fun () ->
+                    videoBusy <- false
+                    videoStatus <- line
+                    this.RaiseVideo()))
+            |> ignore
+
+    /// Downloads the player and puts the DX11 + Feeder install into it.
+    member this.SetUpVideoPlayer() =
+        let overlay = this.OverlayOptions
+        this.VideoWork(fun () ->
+            match VideoPlayer.prepare (VideoPlayer.folder ()) (fun s -> this.VideoSay s) with
+            | Error why -> "The player could not be set up: " + why
+            | Ok game ->
+                this.VideoSay "Installing DLSS 5 into the player..."
+                let o =
+                    ModInstaller.install game game.TargetExecutablePath None ModInstaller.Dx11 ModInstaller.Bit64 ModInstaller.OptiDx12 false true overlay (fun s _ -> this.VideoSay s)
+                if o.Success then "Ready. Paste a YouTube link or pick a file, or use the webcam or the screen. F6 switches the neural pass on and off."
+                else "The player is set up, but the DLSS 5 install did not finish: " + o.Message)
+
+    member this.PlayVideoLink() =
+        match VideoPlayer.play videoLink with
+        | Ok() -> this.VideoSay "Playing. F6 switches the neural pass; Home opens ReShade."
+        | Error why -> this.VideoSay why
+
+    member this.PlayVideoFile(path: string) =
+        match VideoPlayer.play path with
+        | Ok() -> this.VideoSay("Playing " + System.IO.Path.GetFileName(path) + ".")
+        | Error why -> this.VideoSay why
+
+    member this.StartWebcam() =
+        this.VideoWork(fun () ->
+            VideoPlayer.ensureFfmpeg (fun s -> this.VideoSay s)
+            match VideoPlayer.cameras () with
+            | [] -> "No webcam was found."
+            | cam :: _ ->
+                match VideoPlayer.startWebcam cam (fun s -> this.VideoSay s) with
+                | Ok() -> sprintf "Streaming %s into the player (about half a second behind)." cam
+                | Error why -> why)
+
+    member this.StartScreenFeed() =
+        this.VideoWork(fun () ->
+            match VideoPlayer.startScreen (fun s -> this.VideoSay s) with
+            | Ok() -> "Streaming the screen into the player. Move what you want to watch into the captured area."
+            | Error why -> "The screen could not be captured: " + why)
+
+    member this.StopVideoFeed() =
+        VideoPlayer.stopFeed ()
+        this.VideoSay "The feed is stopped."
+
+    member this.ToggleVideoNeural() =
+        match VideoPlayer.toggleNeural () with
+        | Ok() -> ()
+        | Error why -> this.VideoSay why
 
     member this.OpenManage(card: GameCardViewModel) =
         gtaFixInstalling <- false

@@ -832,6 +832,30 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.RemoveGtaDlss5()
         | _ -> ()
 
+    member private this.WithVm(f: MainViewModel -> unit) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> f vm
+        | _ -> ()
+
+    member this.OnVideoSetUpClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.SetUpVideoPlayer())
+    member this.OnVideoPlayLinkClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.PlayVideoLink())
+    member this.OnVideoWebcamClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.StartWebcam())
+    member this.OnVideoScreenClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.StartScreenFeed())
+    member this.OnVideoStopFeedClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.StopVideoFeed())
+    member this.OnVideoToggleClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.ToggleVideoNeural())
+
+    member this.OnVideoOpenFileClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let top = TopLevel.GetTopLevel(this)
+            let options = Avalonia.Platform.Storage.FilePickerOpenOptions(Title = "Pick a video", AllowMultiple = false)
+            let! files = top.StorageProvider.OpenFilePickerAsync(options) |> Async.AwaitTask
+            if files.Count > 0 then
+                let path = files.[0].TryGetLocalPath()
+                if not (String.IsNullOrEmpty path) then
+                    Avalonia.Threading.Dispatcher.UIThread.Post(fun () -> this.WithVm(fun vm -> vm.PlayVideoFile(path)))
+        }
+        |> Async.StartImmediate
+
     member this.OnManageCheckVerdictClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> vm.CheckManageVerdict()

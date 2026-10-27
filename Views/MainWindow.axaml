@@ -552,6 +552,40 @@
                                                               OnContent="" OffContent="" VerticalAlignment="Center" />
                                             </Grid>
                                         </Border>
+
+                                        <!-- Video, YouTube and webcam -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
+                                            <StackPanel Spacing="10">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                    <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1AF472B6"
+                                                            BorderBrush="#33F472B6" BorderThickness="1" VerticalAlignment="Center">
+                                                        <PathIcon Data="M 4,6 H 15 V 18 H 4 Z M 15,10 L 20,7 V 17 L 15,14 Z"
+                                                                  Width="14" Height="14" Foreground="#F472B6" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="Video, YouTube and webcam" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                        <TextBlock Text="DLSS 5 on any video, YouTube link, webcam or part of the screen, in a player SUITE sets up" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2" Classes="AppleSecondaryBtn" Click="OnVideoSetUpClicked" Cursor="Hand"
+                                                            IsEnabled="{Binding VideoIdle}" Content="Set up" IsVisible="{Binding IsVideoNotReady}" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <StackPanel Spacing="8" IsVisible="{Binding IsVideoReady}">
+                                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                                        <TextBox Grid.Column="0" Text="{Binding VideoLink, Mode=TwoWay}" Watermark="Paste a YouTube or video link" FontSize="12" />
+                                                        <Button Grid.Column="1" Classes="AppleSecondaryBtn" Click="OnVideoPlayLinkClicked" Cursor="Hand" Content="Play" />
+                                                        <Button Grid.Column="2" Classes="AppleSecondaryBtn" Click="OnVideoOpenFileClicked" Cursor="Hand" Content="Open file" />
+                                                    </Grid>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <Button Classes="AppleSecondaryBtn" Click="OnVideoWebcamClicked" Cursor="Hand" IsEnabled="{Binding VideoIdle}" Content="Webcam" />
+                                                        <Button Classes="AppleSecondaryBtn" Click="OnVideoScreenClicked" Cursor="Hand" IsEnabled="{Binding VideoIdle}" Content="Screen" />
+                                                        <Button Classes="AppleSecondaryBtn" Click="OnVideoStopFeedClicked" Cursor="Hand" Content="Stop feed" />
+                                                        <Button Classes="AppleSecondaryBtn" Click="OnVideoToggleClicked" Cursor="Hand" Content="DLSS on / off (F6)" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <TextBlock IsVisible="{Binding HasVideoStatus}" Text="{Binding VideoStatus}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
                                     </StackPanel>
                                 </Border>
 
