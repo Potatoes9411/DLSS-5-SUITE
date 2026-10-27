@@ -40,7 +40,10 @@ module Autopilot =
             { Mode = mode; Arch = arch; OptiApi = optiApi; Neural = neural; Feeder = feeder; Label = label }
         let opti = ModInstaller.OptiScalerMode
         match api with
-        | "vulkan"
+        | "vulkan" ->
+            [ r opti ModInstaller.OptiVulkan false false "OptiScaler (Vulkan)"
+              r ModInstaller.Dx11 ModInstaller.OptiDx12 false true "ReShade Vulkan layer + Feeder"
+              r opti ModInstaller.OptiNeural false false "OptiScaler Neural (Vulkan)" ]
         | "opengl" -> [ r opti ModInstaller.OptiVulkan false false "OptiScaler (Vulkan)" ]
         | "dx12" ->
             [ r opti ModInstaller.OptiDx12 false false "OptiScaler"

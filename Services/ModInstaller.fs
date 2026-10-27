@@ -2229,7 +2229,13 @@ module ModInstaller =
 
             // DX9 titles get ReShade on the d3d9 slot, because that is the only
             // one the game itself loads. It does not stay there - see step 1a.
-            let api = if isDx9 then "d3d9" else detectReShadeApi exePath
+            // A Vulkan game never loads dxgi.dll: ReShade goes in as a Vulkan
+            // layer instead, the way the emulator route has always done it.
+            let isVulkanGame = not isDx9 && GameAnalyzer.detectGraphicsApi exePath = "vulkan"
+            let api = if isDx9 then "d3d9" elif isVulkanGame then "vulkan" else detectReShadeApi exePath
+            let vulkanArtifacts = [ "vulkan-1.dll"; "ReShade64.json"; "ReShade64.dll"; "ReShade32.json"; "ReShade32.dll" ]
+            let vulkanBefore =
+                vulkanArtifacts |> List.filter (fun n -> File.Exists(Path.Combine(exeDir, n))) |> Set.ofList
             report (sprintf "Installing ReShade runtime (%s)..." api) 0.10
 
             let reshadeDll = Path.Combine(exeDir, api + ".dll")
@@ -2241,8 +2247,10 @@ module ModInstaller =
             let reShadeEnabled = ExtrasStore.isPayloadEnabled reShadeSetupKey
 
             let alreadyHasReShade =
-                GameAnalyzer.isReShadeInstalled exePath
-                || (isDx9 && isReShadeFile reshadeDll)
+                if isVulkanGame then File.Exists(Path.Combine(exeDir, "ReShade.ini")) && not vulkanBefore.IsEmpty
+                else
+                    GameAnalyzer.isReShadeInstalled exePath
+                    || (isDx9 && isReShadeFile reshadeDll)
 
             let reshadeExisted = File.Exists(reshadeDll)
 
@@ -2266,13 +2274,22 @@ module ModInstaller =
                 else
                     let (ok, err) = runReShadeSetup setupExe exePath api report
                     // The exit code is only a problem if the DLL really is absent.
-                    if ok || File.Exists(reshadeDll) || GameAnalyzer.isReShadeInstalled exePath then "" else err
+                    if ok || File.Exists(reshadeDll) || GameAnalyzer.isReShadeInstalled exePath then ""
+                    elif isVulkanGame && File.Exists(Path.Combine(exeDir, "ReShade.ini")) then ""
+                    else err
 
             if reshadeError <> "" then
                 { Success = false; Message = reshadeError }
             else
 
-            if reShadeEnabled && not alreadyHasReShade then
+            if reShadeEnabled && not alreadyHasReShade && isVulkanGame then
+                for name in vulkanArtifacts do
+                    let p = Path.Combine(exeDir, name)
+                    if File.Exists(p) && not (vulkanBefore.Contains(name)) then tracker.Record(p, false, "")
+                for extra in [ "ReShade.ini"; "ReShadePreset.ini"; "ReShade.log" ] do
+                    let p = Path.Combine(exeDir, extra)
+                    if File.Exists(p) then tracker.Record(p, false, "")
+            elif reShadeEnabled && not alreadyHasReShade then
                 tracker.Record(reshadeDll, reshadeExisted, reshadeBackup)
 
                 // ReShade also drops its configuration files; track them for a clean removal.
