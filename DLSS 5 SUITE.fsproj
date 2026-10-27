@@ -69,6 +69,7 @@
     <Compile Include="Services\NonGameAppClassifier.fs" />
     <Compile Include="Services\ShaderGlassDetector.fs" />
     <Compile Include="Services\EmulatorCatalog.fs" />
+    <Compile Include="Services\OptiForks.fs" />
     <Compile Include="Services\GameFixes.fs" />
     <Compile Include="Services\ModInstaller.fs" />
     <Compile Include="Services\GtaDlss5.fs" />

@@ -1873,9 +1873,24 @@ module ModInstaller =
                 let bundledOptiRoot = Path.Combine(modRoot, optiDirName)
                 // The DLSS-NR fork is a different codebase; the older/newer
                 // choice is only between the two builds of ordinary OptiScaler.
+                // A community fork, when one is chosen for this game, stands in
+                // for the bundled DLSS-NR payload; it comes from its author's
+                // GitHub releases. If it cannot be had, the bundled build is used.
+                let fork =
+                    if optiApi = OptiNeural then OptiForks.tryFind (OptiForks.choiceFor game) else None
+                let forkRoot =
+                    fork
+                    |> Option.bind (fun f ->
+                        try Some(OptiForks.ensure f (fun s -> report s 0.08))
+                        with ex ->
+                            AppLog.warn (sprintf "OptiScaler fork %s unavailable, using the bundled build: %s" f.Key ex.Message)
+                            report (sprintf "%s could not be downloaded - using SUITE's own DLSS-NR build." f.Label) 0.08
+                            None)
                 let optiRoot =
-                    if optiApi = OptiNeural then bundledOptiRoot
-                    else OptiScalerLegacy.preferredRoot bundledOptiRoot
+                    match forkRoot with
+                    | Some r -> r
+                    | None when optiApi = OptiNeural -> bundledOptiRoot
+                    | None -> OptiScalerLegacy.preferredRoot bundledOptiRoot
                 let usingLegacyOpti = optiRoot <> bundledOptiRoot
 
                 if not (Directory.Exists(optiRoot)) then
@@ -1934,6 +1949,9 @@ module ModInstaller =
                     try
                         setIniKeyInSection optiIni "Log" "LogToFile" "true"
                         setIniKeyInSection optiIni "Log" "LogLevel" "2"
+                        if forkRoot.IsSome then
+                            for (section, key, value) in fork.Value.Ini do
+                                setIniKeyInSection optiIni section key value
                     with ex ->
                         AppLog.warn ("OptiScaler logging could not be switched on: " + ex.Message)
 

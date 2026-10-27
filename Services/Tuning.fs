@@ -149,9 +149,13 @@ module Tuning =
 
     // ------------------------------------------------------------ RTX 40 MFG
 
-    let isRtx40 () =
-        let gpu = (try (SystemSpecs.detect ()).Gpu with _ -> "").ToUpperInvariant()
-        Regex.IsMatch(gpu, @"RTX\s*40\d\d") || gpu.Contains "RTX 2000 ADA"
+    let private rtx40 =
+        lazy
+            (let gpu = (try (SystemSpecs.detect ()).Gpu with _ -> "").ToUpperInvariant()
+             Regex.IsMatch(gpu, @"RTX\s*40\d\d") || gpu.Contains "RTX 2000 ADA")
+
+    /// Read once: the card does not change while SUITE runs.
+    let isRtx40 () = rtx40.Value
 
     let hasGameFrameGen (game: GameItem) =
         try

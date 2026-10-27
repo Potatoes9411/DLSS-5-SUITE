@@ -2508,6 +2508,16 @@
                                     </Border>
                                 </Grid>
 
+                                <!-- Which DLSS-NR build: SUITE's own or a community fork -->
+                                <Border IsVisible="{Binding IsOptiNeural}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,11">
+                                    <StackPanel Spacing="7">
+                                        <TextBlock Text="DLSS-NR BUILD" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                        <ComboBox ItemsSource="{Binding OptiForkLabels}" SelectedIndex="{Binding SelectedOptiForkIndex, Mode=TwoWay}"
+                                                  IsEnabled="{Binding IsManageReady}" HorizontalAlignment="Stretch" FontSize="12" />
+                                        <TextBlock Text="{Binding OptiForkDetail}" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" LineHeight="16" />
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- OptiScaler on RTX 20/30: NODIX found the current build
                                      less stable there than the last one before it. -->
                                 <Border IsVisible="{Binding OptiScalerLegacyOfferVisible}" Background="#180EA5E9" BorderBrush="#4267E8F9" BorderThickness="1" CornerRadius="14" Padding="14,11">

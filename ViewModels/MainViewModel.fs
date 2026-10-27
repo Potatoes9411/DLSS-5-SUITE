@@ -2286,6 +2286,37 @@ type MainViewModel() as this =
     member this.IsOptiVulkan = (optiApi = ModInstaller.OptiVulkan)
     member this.IsOptiNeural = (optiApi = ModInstaller.OptiNeural)
 
+    /// The DLSS-NR builds offered: SUITE's own first, then the community
+    /// forks that fit this card.
+    member this.OptiForkChoices =
+        let rtx40 = Tuning.isRtx40 ()
+        ("", "SUITE's own DLSS-NR build", "The bundled build - works offline.")
+        :: (OptiForks.forks
+            |> List.filter (fun f -> f.Gpu = "" || (f.Gpu = "rtx40" && rtx40))
+            |> List.map (fun f -> f.Key, f.Label, f.Detail))
+
+    member this.OptiForkLabels = this.OptiForkChoices |> List.map (fun (_, l, _) -> l) |> Array.ofList
+
+    member this.SelectedOptiForkIndex
+        with get () =
+            match manageCard with
+            | Some c ->
+                let key = OptiForks.choiceFor c.Game
+                this.OptiForkChoices |> List.tryFindIndex (fun (k, _, _) -> k = key) |> Option.defaultValue 0
+            | None -> 0
+        and set (i: int) =
+            match manageCard with
+            | Some c when i >= 0 && i < this.OptiForkChoices.Length ->
+                let (k, _, _) = this.OptiForkChoices.[i]
+                OptiForks.setChoice c.Game k
+                this.RaisePropertyChanged("SelectedOptiForkIndex")
+                this.RaisePropertyChanged("OptiForkDetail")
+            | _ -> ()
+
+    member this.OptiForkDetail =
+        let (_, _, d) = this.OptiForkChoices.[min this.SelectedOptiForkIndex (this.OptiForkChoices.Length - 1)]
+        d + " Downloaded from its author's GitHub the first time it is installed; reinstall to switch."
+
     member this.SetOptiApi(api: ModInstaller.OptiScalerApi) =
         if optiApi <> api then
             optiApi <- api
@@ -3374,6 +3405,8 @@ type MainViewModel() as this =
         manageTuningStatus <- ""
         manageComparePath <- ""
         this.RaiseTuning()
+        this.RaisePropertyChanged("SelectedOptiForkIndex")
+        this.RaisePropertyChanged("OptiForkDetail")
         manageDlssFiles <- []
         manageDlssText <- ""
         manageDlssStatus <- ""
