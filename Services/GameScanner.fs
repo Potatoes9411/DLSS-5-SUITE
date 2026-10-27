@@ -811,6 +811,150 @@ module GameScanner =
         with _ -> ()
         results |> Seq.toList
 
+    // =========================================================================
+    // OTHER LAUNCHERS: EA, Ubisoft, Battle.net, Rockstar, Amazon, itch,
+    // Heroic and Xbox / Game Pass. Each only says where a game lives; the exe,
+    // artwork and upscaler reading are the same as for every other source.
+    // =========================================================================
+    let private itemFor (launcher: string) (idPrefix: string) (title: string) (folder: string) : GameItem option =
+        try
+            if String.IsNullOrWhiteSpace(folder) || not (Directory.Exists(folder)) then None
+            else
+                let title = if String.IsNullOrWhiteSpace(title) then DirectoryInfo(folder).Name else title.Trim()
+                let (exe, size) = resolvePrimaryExecutable folder title
+                if String.IsNullOrWhiteSpace(exe) then None
+                else
+                    let (upscaleStatus, dlss, fsr, xess) = detectUpscalingFeatures folder exe
+                    Some
+                        { AppId = sprintf "%s_%s" idPrefix (folder.ToLowerInvariant().GetHashCode().ToString("X"))
+                          Title = title
+                          LauncherTypeName = launcher
+                          InstallDirectory = folder
+                          TargetExecutablePath = exe
+                          TargetExecutableSize = size
+                          LocalBannerPath = resolveArtwork "" None title exe
+                          LastManifestTimestamp = DateTime.UtcNow.Ticks
+                          UpscaleStatus = upscaleStatus
+                          DlssVersion = dlss
+                          FsrVersion = fsr
+                          XessVersion = xess }
+        with _ -> None
+
+    /// Every subkey of a registry path, with one value read from each.
+    let private regValues (hive: RegistryKey) (path: string) (valueName: string) : (string * string) list =
+        try
+            use k = hive.OpenSubKey(path)
+            if isNull k then []
+            else
+                [ for name in k.GetSubKeyNames() do
+                      let v =
+                          try
+                              use sk = k.OpenSubKey(name)
+                              if isNull sk then "" else string (sk.GetValue(valueName, ""))
+                          with _ -> ""
+                      if not (String.IsNullOrWhiteSpace v) then yield name, v ]
+        with _ -> []
+
+    let private subfolders (root: string) =
+        try
+            if Directory.Exists(root) then
+                Directory.GetDirectories(root)
+                |> Array.filter (fun d -> let n = Path.GetFileName(d) in not (n.StartsWith(".")) && not (n.StartsWith("$")))
+                |> Array.toList
+            else []
+        with _ -> []
+
+    let private fixedDrives () =
+        try
+            DriveInfo.GetDrives()
+            |> Array.filter (fun d -> d.IsReady && d.DriveType = DriveType.Fixed)
+            |> Array.map (fun d -> d.RootDirectory.FullName)
+            |> Array.toList
+        with _ -> []
+
+    let private scanOtherLaunchers () : GameItem list =
+        let found = List<GameItem>()
+        let add launcher prefix title folder = itemFor launcher prefix title folder |> Option.iter found.Add
+        let lm = Registry.LocalMachine
+        let cu = Registry.CurrentUser
+
+        // EA app / Origin.
+        for path in [ @"SOFTWARE\WOW6432Node\Electronic Arts"; @"SOFTWARE\Electronic Arts" ] do
+            for (_, dir) in regValues lm path "Install Dir" do add "EA" "ea" "" dir
+        for root in [ @"C:\Program Files\EA Games"; @"C:\Program Files (x86)\EA Games" ] do
+            for d in subfolders root do add "EA" "ea" "" d
+
+        // Ubisoft Connect.
+        for (_, dir) in regValues lm @"SOFTWARE\WOW6432Node\Ubisoft\Launcher\Installs" "InstallDir" do add "UBISOFT" "ubi" "" dir
+
+        // Battle.net games register an uninstall entry of their own.
+        for hive in [ lm; cu ] do
+            try
+                use k = hive.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall")
+                if not (isNull k) then
+                    for name in k.GetSubKeyNames() do
+                        if name.ToLowerInvariant().Contains("battle.net") then
+                            try
+                                use sk = k.OpenSubKey(name)
+                                let dir = string (sk.GetValue("InstallLocation", ""))
+                                let title = string (sk.GetValue("DisplayName", ""))
+                                if title.ToLowerInvariant() <> "battle.net" then add "BATTLE.NET" "bnet" title dir
+                            with _ -> ()
+            with _ -> ()
+
+        // Rockstar Games Launcher; the launcher itself is not a game.
+        let rockstarSkip = set [ "launcher"; "rockstar games launcher"; "rockstar games social club"; "social club" ]
+        for path in [ @"SOFTWARE\WOW6432Node\Rockstar Games"; @"SOFTWARE\Rockstar Games" ] do
+            for (name, dir) in regValues lm path "InstallFolder" do
+                if not (rockstarSkip.Contains(name.ToLowerInvariant())) then add "ROCKSTAR" "rockstar" name dir
+
+        // Amazon Games.
+        let local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+        let roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+        let amazonRoots =
+            Path.Combine(local, "Amazon Games", "Library")
+            :: (fixedDrives () |> List.map (fun d -> Path.Combine(d, "Amazon Games", "Library")))
+        for root in amazonRoots do
+            for d in subfolders root do add "AMAZON" "amazon" "" d
+
+        // itch.
+        for d in subfolders (Path.Combine(roaming, "itch", "apps")) do add "ITCH" "itch" "" d
+
+        // Heroic (Epic, GOG and Amazon through one launcher).
+        for rel in [ @"legendaryConfig\legendary\installed.json"; @"gog_store\installed.json"; @"nile_config\nile\installed.json" ] do
+            try
+                let file = Path.Combine(roaming, "heroic", rel)
+                if File.Exists(file) then
+                    use doc = JsonDocument.Parse(File.ReadAllText(file))
+                    let entries =
+                        match doc.RootElement.ValueKind with
+                        | JsonValueKind.Object -> [ for p in doc.RootElement.EnumerateObject() -> p.Value ]
+                        | JsonValueKind.Array -> [ for e in doc.RootElement.EnumerateArray() -> e ]
+                        | _ -> []
+                    let str (e: JsonElement) (names: string list) =
+                        names
+                        |> List.tryPick (fun n ->
+                            match e.TryGetProperty(n) with
+                            | true, v when v.ValueKind = JsonValueKind.String -> Some(v.GetString())
+                            | _ -> None)
+                        |> Option.defaultValue ""
+                    for e in entries do
+                        if e.ValueKind = JsonValueKind.Object then
+                            add "HEROIC" "heroic" (str e [ "title"; "app_name" ]) (str e [ "install_path"; "path" ])
+            with _ -> ()
+
+        // Xbox / Game Pass. Only games whose exe can actually be read are
+        // listed; locked WindowsApps installs have nothing to install into.
+        for drive in fixedDrives () do
+            for root in [ Path.Combine(drive, "XboxGames"); Path.Combine(drive, "Program Files", "ModifiableWindowsApps") ] do
+                for d in subfolders root do
+                    let n = Path.GetFileName(d).ToLowerInvariant()
+                    if n <> "gamesave" && n <> "minecraft launcher" then
+                        let content = Path.Combine(d, "Content")
+                        add "XBOX" "xbox" (Path.GetFileName(d)) (if Directory.Exists(content) then content else d)
+
+        found |> Seq.toList
+
     let createCustomGameItem (title: string) (folderPath: string) (exePath: string) : GameItem =
         let exeSize = try FileInfo(exePath).Length with _ -> 0L
         let banner = resolveArtwork "" None title exePath
@@ -1136,6 +1280,9 @@ module GameScanner =
             do! Async.Sleep 250
             let gogGames = scanGogGames ()
 
+            onProgress "Scanning EA, Ubisoft, Battle.net, Rockstar, Xbox and more..."
+            let otherGames = scanOtherLaunchers ()
+
             onProgress "Scanning Repacks & Custom drives..."
             do! Async.Sleep 400
             let repackGames = scanRepackAndStandaloneGames ()
@@ -1146,6 +1293,7 @@ module GameScanner =
                 list.AddRange(steamGames)
                 list.AddRange(epicGames)
                 list.AddRange(gogGames)
+                list.AddRange(otherGames)
                 list.AddRange(repackGames)
                 list |> Seq.toList
 

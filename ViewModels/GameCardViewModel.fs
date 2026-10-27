@@ -357,6 +357,14 @@ type GameCardViewModel(game: GameItem) =
         | "EPIC GAMES" -> "#1E293B"
         | "GOG GALAXY" -> "#581C87"
         | "REPACK" -> "#831843"
+        | "EA" -> "#9F1239"
+        | "UBISOFT" -> "#1D4ED8"
+        | "BATTLE.NET" -> "#0369A1"
+        | "ROCKSTAR" -> "#B45309"
+        | "XBOX" -> "#15803D"
+        | "AMAZON" -> "#C2410C"
+        | "ITCH" -> "#BE123C"
+        | "HEROIC" -> "#6D28D9"
         | _ -> "#334155"
 
     member this.HasUpscaleStatus: bool =
