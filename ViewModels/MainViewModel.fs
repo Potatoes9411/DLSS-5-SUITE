@@ -374,6 +374,7 @@ type MainViewModel() as this =
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
+    let mutable manageSharedText = ""
     let mutable manageTuningStatus = ""
     let mutable manageComparePath = ""
     let mutable manageRemixText = ""
@@ -3063,6 +3064,31 @@ type MainViewModel() as this =
         | _ -> ""
 
     member this.HasManageVerdictFindings = this.ManageVerdictFindings <> ""
+    member this.ManageSharedText = manageSharedText
+    member this.HasManageSharedText = manageSharedText <> ""
+    member this.ManageShowOwnFg = manageCard |> Option.exists (fun c -> ModInstaller.isInstalled c.Game) && not (Tuning.isRtx40 ())
+    member this.ManageOwnFgOn = manageCard |> Option.exists (fun c -> OwnFrameGen.isInstalled c.Game)
+    member this.ManageOwnFgOff = not this.ManageOwnFgOn
+
+    member this.InstallOwnFrameGen(files: string list) =
+        match manageCard with
+        | Some c ->
+            manageTuningStatus <- (match OwnFrameGen.install c.Game files with Ok s -> s | Error why -> why)
+            this.RaisePropertyChanged("ManageTuningStatus")
+            this.RaisePropertyChanged("HasManageTuningStatus")
+            this.RaisePropertyChanged("ManageOwnFgOn")
+            this.RaisePropertyChanged("ManageOwnFgOff")
+        | None -> ()
+
+    member this.RemoveOwnFrameGen() =
+        match manageCard with
+        | Some c ->
+            manageTuningStatus <- (match OwnFrameGen.remove c.Game with Ok s -> s | Error why -> why)
+            this.RaisePropertyChanged("ManageTuningStatus")
+            this.RaisePropertyChanged("HasManageTuningStatus")
+            this.RaisePropertyChanged("ManageOwnFgOn")
+            this.RaisePropertyChanged("ManageOwnFgOff")
+        | None -> ()
 
     member this.ManageVerdictBrush =
         match manageCard with
@@ -3281,6 +3307,7 @@ type MainViewModel() as this =
                 let m = RtxRemix.modFor game
                 let fl = runtime |> Option.map RtxRemix.flavour
                 let xr = OpenXrLayer.usesOpenXr game
+                let shared = SharedResults.forGame game |> Option.map SharedResults.summary |> Option.defaultValue ""
                 let text =
                     match runtime, fl, m with
                     | Some _, _, _ when RtxRemix.isEnabled game -> "DLSS 5 is on inside the Remix runtime. " + RtxRemix.verdict game
@@ -3295,6 +3322,10 @@ type MainViewModel() as this =
                         manageRemixMod <- m
                         manageRemixText <- text
                         manageVrOpenXr <- xr
+                        manageSharedText <- shared
+                        this.RaisePropertyChanged("ManageSharedText")
+                        this.RaisePropertyChanged("HasManageSharedText")
+                        this.RaisePropertyChanged("ManageAutopilotRoutes")
                         this.RaiseExtras()))
             |> ignore
 
@@ -3399,6 +3430,10 @@ type MainViewModel() as this =
         manageRemixMod <- None
         manageRemixText <- ""
         manageVrOpenXr <- false
+        manageSharedText <- ""
+        this.RaisePropertyChanged("ManageSharedText")
+        this.RaisePropertyChanged("HasManageSharedText")
+        for n in [ "ManageShowOwnFg"; "ManageOwnFgOn"; "ManageOwnFgOff" ] do this.RaisePropertyChanged(n)
         manageExtrasStatus <- ""
         this.RaiseExtras()
         this.RefreshManageExtras()

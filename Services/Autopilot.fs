@@ -58,6 +58,18 @@ module Autopilot =
         | _ ->
             [ r ModInstaller.Dx11 ModInstaller.OptiDx12 false true "ReShade + Feeder"
               r opti ModInstaller.OptiDx12 false false "OptiScaler" ]
+        |> fun routes ->
+            // What worked for other people in this game goes first.
+            let best = SharedResults.forGameCached game |> Option.bind SharedResults.bestRoute
+            let keyOf (r: Route) =
+                match r.Mode with
+                | ModInstaller.OptiScalerMode -> "optiscaler"
+                | ModInstaller.Dx12Auto when not r.Feeder -> "dx12"
+                | _ when r.Feeder -> "feeder"
+                | _ -> ""
+            match best with
+            | Some b -> (routes |> List.filter (fun r -> keyOf r = b)) @ (routes |> List.filter (fun r -> keyOf r <> b))
+            | None -> routes
         |> List.truncate MaxAttempts
 
     /// Why autopilot will not run on this game, or None.

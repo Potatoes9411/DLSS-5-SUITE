@@ -845,6 +845,20 @@ type MainWindow() as this =
     member this.OnManageCompareClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.MakeManageComparison())
     member this.OnManageOpenCompareClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.OpenManageComparison())
     member this.OnManageMfgClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.ToggleManageMfg())
+    member this.OnManageOwnFgRemoveClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.RemoveOwnFrameGen())
+
+    member this.OnManageOwnFgPickClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let top = TopLevel.GetTopLevel(this)
+            let options = Avalonia.Platform.Storage.FilePickerOpenOptions(Title = "Pick your frame generation files", AllowMultiple = true)
+            let! files = top.StorageProvider.OpenFilePickerAsync(options) |> Async.AwaitTask
+            let paths = [ for f in files do
+                              let p = f.TryGetLocalPath()
+                              if not (String.IsNullOrEmpty p) then yield p ]
+            if not paths.IsEmpty then
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () -> this.WithVm(fun vm -> vm.InstallOwnFrameGen(paths)))
+        }
+        |> Async.StartImmediate
     member this.OnRemixInstallModClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.InstallRemixMod())
     member this.OnRemixEnableClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.EnableRemix())
     member this.OnRemixRemoveClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.RemoveRemix())
