@@ -70,6 +70,7 @@
     <Compile Include="Services\ModInstaller.fs" />
     <Compile Include="Services\GtaDlss5.fs" />
     <Compile Include="Services\DlssUpdater.fs" />
+    <Compile Include="Services\Diagnosis.fs" />
     <Compile Include="Services\ScreenEngine.fs" />
     <Compile Include="Services\NeuralScreen.fs" />
     <Compile Include="Services\RobloxShadeHost.fs" />

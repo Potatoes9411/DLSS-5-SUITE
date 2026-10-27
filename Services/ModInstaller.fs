@@ -967,6 +967,22 @@ module ModInstaller =
 
     let installedMode (game: GameItem) : string = fst (installedRouteAndArch game)
 
+    /// The whole install record, and when it was written. None when this app
+    /// did not install into the game.
+    let readManifest (game: GameItem) : (InstallManifest * DateTime) option =
+        try
+            let path = manifestPath game
+
+            if File.Exists(path) then
+                let options = JsonSerializerOptions()
+                options.PropertyNameCaseInsensitive <- true
+                let m = JsonSerializer.Deserialize<InstallManifest>(File.ReadAllText(path), options)
+                if isNull (box m) then None else Some(m, File.GetLastWriteTimeUtc(path))
+            else
+                None
+        with _ ->
+            None
+
     /// Every file a managed install put into the game, by full path. Empty
     /// when this app did not install into it.
     let installedTargets (game: GameItem) : string list =
@@ -1911,6 +1927,16 @@ module ModInstaller =
                     && (match GameAnalyzer.detectGraphicsApi exePath with
                         | "dx11" | "dx10" -> true
                         | _ -> false)
+                // OptiScaler's own log is what "did it work?" reads on this
+                // route, and it ships switched off.
+                let optiIni = Path.Combine(exeDir, "OptiScaler.ini")
+                if File.Exists(optiIni) then
+                    try
+                        setIniKeyInSection optiIni "Log" "LogToFile" "true"
+                        setIniKeyInSection optiIni "Log" "LogLevel" "2"
+                    with ex ->
+                        AppLog.warn ("OptiScaler logging could not be switched on: " + ex.Message)
+
                 if optiApi = OptiNeural then
                     let ini = Path.Combine(exeDir, "OptiScaler.ini")
                     if File.Exists(ini) then
