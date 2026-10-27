@@ -838,6 +838,13 @@ type MainWindow() as this =
         | _ -> ()
 
     member this.OnVideoSetUpClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.SetUpVideoPlayer())
+    member this.OnManagePresetClicked(sender: obj, e: RoutedEventArgs) =
+        match sender with
+        | :? Button as b -> this.WithVm(fun vm -> vm.ApplyManagePreset(string b.Tag))
+        | _ -> ()
+    member this.OnManageCompareClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.MakeManageComparison())
+    member this.OnManageOpenCompareClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.OpenManageComparison())
+    member this.OnManageMfgClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.ToggleManageMfg())
     member this.OnRemixInstallModClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.InstallRemixMod())
     member this.OnRemixEnableClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.EnableRemix())
     member this.OnRemixRemoveClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.RemoveRemix())

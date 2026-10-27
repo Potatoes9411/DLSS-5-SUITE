@@ -2286,6 +2286,44 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Tuning: quality presets, before/after, RTX 40 MFG -->
+                        <Border IsVisible="{Binding ManageCanTune}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <StackPanel Grid.Column="0" Spacing="3">
+                                        <TextBlock Text="QUALITY" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                        <TextBlock Text="{Binding ManagePresetLine}" FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManagePresetClicked" Tag="Quality" Cursor="Hand" Content="Quality" />
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManagePresetClicked" Tag="Balanced" Cursor="Hand" Content="Balanced" />
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManagePresetClicked" Tag="Performance" Cursor="Hand" Content="Performance" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <StackPanel Grid.Column="0" Spacing="3">
+                                        <TextBlock Text="BEFORE / AFTER" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                        <TextBlock Text="In the game: F6, Print Screen, F6, Print Screen. Then this puts the two shots side by side." FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageCompareClicked" Cursor="Hand" Content="Make image" />
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageOpenCompareClicked" Cursor="Hand" IsVisible="{Binding HasManageComparison}" Content="Open" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" IsVisible="{Binding ManageShowMfg}">
+                                    <StackPanel Grid.Column="0" Spacing="3">
+                                        <TextBlock Text="RTX 40 MULTI-FRAME GENERATION" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                        <TextBlock Text="3x-4x frame generation on RTX 40, for games with DLSS Frame Generation (RTX40MFG-Unlock)." FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageMfgClicked" Cursor="Hand" IsVisible="{Binding ManageMfgOff}" Content="Add" />
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageMfgClicked" Cursor="Hand" IsVisible="{Binding ManageMfgOn}" Content="Remove" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock IsVisible="{Binding HasManageTuningStatus}" Text="{Binding ManageTuningStatus}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
                         <!-- RTX Remix and VR -->
                         <Border IsVisible="{Binding IsGameTarget}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
                             <StackPanel Spacing="10">

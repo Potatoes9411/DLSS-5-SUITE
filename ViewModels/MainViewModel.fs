@@ -374,6 +374,8 @@ type MainViewModel() as this =
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
+    let mutable manageTuningStatus = ""
+    let mutable manageComparePath = ""
     let mutable manageRemixText = ""
     let mutable manageRemixHasRuntime = false
     let mutable manageRemixMod: RtxRemix.RemixMod option = None
@@ -3288,6 +3290,69 @@ type MainViewModel() as this =
     member this.EnableVr() = this.ExtrasWork(fun g _ -> OpenXrLayer.enable g)
     member this.DisableVr() = this.ExtrasWork(fun g _ -> Ok(OpenXrLayer.disable g))
 
+    // ---- Tuning: presets, before/after, RTX 40 MFG ----------------------
+    member this.ManagePresetLine =
+        match manageCard |> Option.bind (fun c -> Tuning.currentPreset c.Game) with
+        | Some p -> sprintf "Now on %A. Quality works on the whole picture; Performance on 70%% of it, for more fps." p
+        | None -> "Quality works on the whole picture; Balanced on 85%; Performance on 70%, for more fps."
+    member this.ManageCanTune = manageCard |> Option.exists (fun c -> ModInstaller.isInstalled c.Game)
+    member this.ManageShowMfg = manageCard |> Option.exists (fun c -> ModInstaller.isInstalled c.Game) && Tuning.isRtx40 ()
+    member this.ManageMfgOn = manageCard |> Option.exists (fun c -> Tuning.isMfgInstalled c.Game)
+    member this.ManageMfgOff = not this.ManageMfgOn
+    member this.ManageTuningStatus = manageTuningStatus
+    member this.HasManageTuningStatus = manageTuningStatus <> ""
+    member this.HasManageComparison = manageComparePath <> "" && System.IO.File.Exists manageComparePath
+
+    member private this.RaiseTuning() =
+        for n in [ "ManagePresetLine"; "ManageCanTune"; "ManageShowMfg"; "ManageMfgOn"; "ManageMfgOff"; "ManageTuningStatus"; "HasManageTuningStatus"; "HasManageComparison" ] do
+            this.RaisePropertyChanged(n)
+
+    member this.ApplyManagePreset(name: string) =
+        match manageCard with
+        | Some c ->
+            let p =
+                match name with
+                | "Balanced" -> Tuning.Balanced
+                | "Performance" -> Tuning.Performance
+                | _ -> Tuning.Quality
+            manageTuningStatus <- (match Tuning.applyPreset c.Game p with Ok s -> s | Error why -> why)
+            this.RaiseTuning()
+        | None -> ()
+
+    member this.MakeManageComparison() =
+        match manageCard with
+        | Some c ->
+            match Tuning.exportComparison c.Game with
+            | Ok path ->
+                manageComparePath <- path
+                manageTuningStatus <- "Saved " + System.IO.Path.GetFileName(path) + " in the game folder."
+            | Error why -> manageTuningStatus <- why
+            this.RaiseTuning()
+        | None -> ()
+
+    member this.OpenManageComparison() =
+        if this.HasManageComparison then
+            try
+                System.Diagnostics.Process.Start(System.Diagnostics.ProcessStartInfo(manageComparePath, UseShellExecute = true)) |> ignore
+            with _ -> ()
+
+    member this.ToggleManageMfg() =
+        match manageCard with
+        | Some c ->
+            let game = c.Game
+            let installing = not (Tuning.isMfgInstalled game)
+            manageTuningStatus <- (if installing then "Installing RTX 40 multi-frame generation..." else "Removing...")
+            this.RaiseTuning()
+            System.Threading.Tasks.Task.Run(fun () ->
+                let r =
+                    if installing then Tuning.installMfg game (fun s -> Dispatcher.UIThread.Post(fun () -> manageTuningStatus <- s; this.RaiseTuning()))
+                    else Tuning.removeMfg game
+                Dispatcher.UIThread.Post(fun () ->
+                    manageTuningStatus <- (match r with Ok s -> s | Error why -> why)
+                    this.RaiseTuning()))
+            |> ignore
+        | None -> ()
+
     member this.OpenManage(card: GameCardViewModel) =
         gtaFixInstalling <- false
         gtaFixStatus <- ""
@@ -3306,6 +3371,9 @@ type MainViewModel() as this =
         manageExtrasStatus <- ""
         this.RaiseExtras()
         this.RefreshManageExtras()
+        manageTuningStatus <- ""
+        manageComparePath <- ""
+        this.RaiseTuning()
         manageDlssFiles <- []
         manageDlssText <- ""
         manageDlssStatus <- ""
