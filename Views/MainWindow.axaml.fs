@@ -845,6 +845,8 @@ type MainWindow() as this =
     member this.OnManageCompareClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.MakeManageComparison())
     member this.OnManageOpenCompareClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.OpenManageComparison())
     member this.OnManageMfgClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.ToggleManageMfg())
+    member this.OnShareWorkedClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.ShareManageResult(true))
+    member this.OnShareFailedClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.ShareManageResult(false))
     member this.OnManageOwnFgRemoveClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.RemoveOwnFrameGen())
 
     member this.OnManageOwnFgPickClicked(sender: obj, e: RoutedEventArgs) =

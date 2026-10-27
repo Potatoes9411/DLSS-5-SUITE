@@ -88,6 +88,7 @@
     <Compile Include="Services\UpdateChecker.fs" />
     <Compile Include="Services\SystemSpecs.fs" />
     <Compile Include="Services\Tuning.fs" />
+    <Compile Include="Services\ResultReporter.fs" />
     <Compile Include="Services\CommunityApi.fs" />
     <Compile Include="ViewModels\ViewModelBase.fs" />
     <Compile Include="ViewModels\GameCardViewModel.fs" />

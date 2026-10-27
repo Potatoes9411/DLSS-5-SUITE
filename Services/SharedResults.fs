@@ -15,6 +15,10 @@ module SharedResults =
     [<Literal>]
     let private FeedUrl = "https://raw.githubusercontent.com/Kizzuwatnaa/DLSS5-Autopilot/main/docs/compatibility.json"
 
+    /// SUITE's own shared results, from its site; same file shape.
+    [<Literal>]
+    let private SuiteFeedUrl = "https://dlss5.potatoes-dev.com/api/compatibility.json"
+
     /// Below this many reports for a game, nothing is said about it.
     [<Literal>]
     let MinReports = 5
@@ -39,10 +43,14 @@ module SharedResults =
         | "native" -> Some("dx12", "ReShade + RenoDX")
         | "feeder" -> Some("feeder", "ReShade + Feeder")
         | "upstream" -> Some("upstream", "Neural upstream add-on")
+        | "dx11" -> Some("dx11", "ReShade + RenoDX (DX11)")
+        | "dx12" -> Some("dx12", "ReShade + RenoDX")
+        | "dx9" -> Some("dx9", "ReShade (DX9)")
+        | "emulator" -> Some("emulator", "Emulator route")
         | _ -> None
 
-    let private cachePath () =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite", "Cache", "shared-results.json")
+    let private cachePath (name: string) =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite", "Cache", name)
 
     let private http =
         lazy
@@ -51,14 +59,14 @@ module SharedResults =
              h)
 
     /// The feed, fresh for six hours; the last good copy when offline.
-    let private feed (network: bool) : string =
-        let path = cachePath ()
+    let private feedFrom (url: string) (cacheName: string) (network: bool) : string =
+        let path = cachePath cacheName
         let fresh = File.Exists path && File.GetLastWriteTimeUtc path > DateTime.UtcNow.AddHours(-6.0)
         if fresh || (not network && File.Exists path) then File.ReadAllText path
         elif not network then ""
         else
             try
-                let text = http.Value.GetStringAsync(FeedUrl).Result
+                let text = http.Value.GetStringAsync(url).Result
                 use _ = JsonDocument.Parse(text)
                 Directory.CreateDirectory(Path.GetDirectoryName path) |> ignore
                 File.WriteAllText(path, text)
@@ -70,42 +78,54 @@ module SharedResults =
         n "worked", n "failed"
 
     /// Results for the game's executable, when enough people reported it.
-    let private lookup (network: bool) (game: GameItem) : GameResults option =
+    /// One feed's entry for an exe: (name, route tallies, driver tallies).
+    let private entry (text: string) (exe: string) =
         try
-            let text = feed network
-            if text = "" || String.IsNullOrWhiteSpace game.TargetExecutablePath then None
+            if text = "" then None
             else
                 use doc = JsonDocument.Parse(text)
-                let exe = Path.GetFileName(game.TargetExecutablePath).ToLowerInvariant()
                 match doc.RootElement.GetProperty("games").TryGetProperty(exe) with
                 | true, g ->
-                    let routes =
-                        match g.TryGetProperty("routes") with
-                        | true, rs ->
-                            [ for p in rs.EnumerateObject() do
-                                  match suiteRoute p.Name with
-                                  | Some(key, label) ->
-                                      let w, f = tally p.Value
-                                      yield { Route = key; Label = label; Worked = w; Failed = f }
-                                  | None -> () ]
+                    let read (prop: string) =
+                        match g.TryGetProperty(prop) with
+                        | true, xs -> [ for p in xs.EnumerateObject() -> p.Name, tally p.Value ]
                         | _ -> []
-                    let total = routes |> List.sumBy (fun r -> r.Worked + r.Failed)
-                    if total < MinReports then None
-                    else
-                        let bad =
-                            match g.TryGetProperty("drivers") with
-                            | true, ds ->
-                                [ for p in ds.EnumerateObject() do
-                                      let w, f = tally p.Value
-                                      if f >= 5 && f > 2 * w then yield p.Name ]
-                            | _ -> []
-                        let name = match g.TryGetProperty("name") with | true, v -> v.GetString() | _ -> game.Title
-                        Some
-                            { Name = name
-                              Routes = routes |> List.sortByDescending (fun r -> float r.Worked / float (max 1 (r.Worked + r.Failed)), r.Worked)
-                              BadDrivers = bad }
+                    let name = match g.TryGetProperty("name") with | true, v -> v.GetString() | _ -> ""
+                    Some(name, read "routes", read "drivers")
                 | _ -> None
         with _ -> None
+
+    /// Autopilot's results and SUITE's own, added up.
+    let private lookup (network: bool) (game: GameItem) : GameResults option =
+        if String.IsNullOrWhiteSpace game.TargetExecutablePath then None
+        else
+            let exe = Path.GetFileName(game.TargetExecutablePath).ToLowerInvariant()
+            let found =
+                [ entry (feedFrom FeedUrl "shared-results.json" network) exe
+                  entry (feedFrom SuiteFeedUrl "shared-results-suite.json" network) exe ]
+                |> List.choose id
+            if found.IsEmpty then None
+            else
+                let sumUp (pairs: (string * (int * int)) list) =
+                    pairs |> List.groupBy fst |> List.map (fun (k, xs) -> k, (xs |> List.sumBy (snd >> fst), xs |> List.sumBy (snd >> snd)))
+                let routes =
+                    found
+                    |> List.collect (fun (_, rs, _) -> rs |> List.choose (fun (r, t) -> suiteRoute r |> Option.map (fun (k, l) -> (k + "|" + l), t)))
+                    |> sumUp
+                    |> List.map (fun (kl, (w, f)) ->
+                        let parts = kl.Split('|')
+                        { Route = parts.[0]; Label = parts.[1]; Worked = w; Failed = f })
+                let total = routes |> List.sumBy (fun r -> r.Worked + r.Failed)
+                if total < MinReports then None
+                else
+                    let bad =
+                        found |> List.collect (fun (_, _, ds) -> ds) |> sumUp
+                        |> List.filter (fun (_, (w, f)) -> f >= 5 && f > 2 * w) |> List.map fst
+                    let name = found |> List.map (fun (n, _, _) -> n) |> List.tryFind (fun n -> n <> "") |> Option.defaultValue game.Title
+                    Some
+                        { Name = name
+                          Routes = routes |> List.sortByDescending (fun r -> float r.Worked / float (max 1 (r.Worked + r.Failed)), r.Worked)
+                          BadDrivers = bad }
 
     /// Downloads the feed when the saved copy is old - call off the UI thread.
     let forGame (game: GameItem) = lookup true game

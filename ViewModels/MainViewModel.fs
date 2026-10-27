@@ -3064,6 +3064,31 @@ type MainViewModel() as this =
         | _ -> ""
 
     member this.HasManageVerdictFindings = this.ManageVerdictFindings <> ""
+    member this.ManageCanShare = manageCard |> Option.exists (fun c -> ModInstaller.isInstalled c.Game)
+
+    member this.IsAutoSharingResults
+        with get () = ResultReporter.isAutoSharing ()
+        and set (v: bool) =
+            ResultReporter.setAutoSharing v
+            this.RaisePropertyChanged("IsAutoSharingResults")
+
+    /// The person's own answer, shared with everyone through the site.
+    member this.ShareManageResult(worked: bool) =
+        match manageCard with
+        | Some c ->
+            let game = c.Game
+            autopilotStatus <- "Sharing..."
+            this.RaiseVerdict()
+            System.Threading.Tasks.Task.Run(fun () ->
+                let line =
+                    match ResultReporter.send game worked true with
+                    | Ok() -> "Shared - thanks. It helps the next person pick a route for this game."
+                    | Error why -> why
+                Dispatcher.UIThread.Post(fun () ->
+                    autopilotStatus <- line
+                    this.RaiseVerdict()))
+            |> ignore
+        | None -> ()
     member this.ManageSharedText = manageSharedText
     member this.HasManageSharedText = manageSharedText <> ""
     member this.ManageShowOwnFg = manageCard |> Option.exists (fun c -> ModInstaller.isInstalled c.Game) && not (Tuning.isRtx40 ())
@@ -3143,6 +3168,11 @@ type MainViewModel() as this =
             let report = try Some(Diagnosis.analyse game) with _ -> None
             report |> Option.iter (fun r ->
                 AppLog.info (sprintf "After closing %s: %s" game.Title r.Verdict)
+                // Only answers that settle it are shared, and only when the
+                // person switched automatic sharing on.
+                if ResultReporter.isAutoSharing () then
+                    if Diagnosis.isWorking r.Verdict then ResultReporter.send game true false |> ignore
+                    elif r.Ran && Diagnosis.routeFailed r.Verdict then ResultReporter.send game false false |> ignore
                 Dispatcher.UIThread.Post(fun () ->
                     lastVerdicts.[game.AppId] <- r
                     this.RaiseVerdict())))

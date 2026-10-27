@@ -553,6 +553,24 @@
                                             </Grid>
                                         </Border>
 
+                                        <!-- Shared results -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1A35D22B"
+                                                        BorderBrush="#3335D22B" BorderThickness="1" VerticalAlignment="Center">
+                                                    <PathIcon Data="M 5,19 V 11 M 12,19 V 5 M 19,19 V 14"
+                                                              Width="14" Height="14" Foreground="#35D22B" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="Share results automatically" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                    <TextBlock Text="When a game closes and Did it work? is sure of the answer, send it to the shared results (exe name, route, card, driver - nothing personal)" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsAutoSharingResults, Mode=TwoWay}"
+                                                              OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+
                                         <!-- Video, YouTube and webcam -->
                                         <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
                                                 Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
@@ -2284,6 +2302,12 @@
                                 <TextBlock IsVisible="{Binding HasManageVerdictFindings}" Text="{Binding ManageVerdictFindings}" FontSize="11" Foreground="#CBD5E1" TextWrapping="Wrap" LineHeight="17" />
                                 <TextBlock IsVisible="{Binding HasAutopilotStatus}" Text="{Binding AutopilotStatus}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
                                 <TextBlock IsVisible="{Binding HasManageSharedText}" Text="{Binding ManageSharedText}" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" LineHeight="16" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ManageCanShare}">
+                                    <TextBlock Text="Share how it went:" FontSize="11" Foreground="#A3AEC0" VerticalAlignment="Center" />
+                                    <Button Classes="AppleSecondaryBtn" Click="OnShareWorkedClicked" Cursor="Hand" Content="It worked"
+                                            ToolTip.Tip="Sends the game's exe name, the route, your card and driver - no paths, no name, no account." />
+                                    <Button Classes="AppleSecondaryBtn" Click="OnShareFailedClicked" Cursor="Hand" Content="It didn't" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
