@@ -67,6 +67,7 @@ module EmulatorCatalog =
           emu [| "pcsx2-qt.exe"; "pcsx2x64-avx2.exe"; "pcsx2x64.exe"; "pcsx2.exe" |] "PCSX2" "PlayStation 2" vulkanApi
           emu [| "rpcs3.exe" |] "RPCS3" "PlayStation 3" vulkanApi
           emu [| "shadPS4.exe"; "shadps4-qt.exe" |] "shadPS4" "PlayStation 4" vulkanApi
+          emuHinted [| "Play.exe" |] "Play!" "PlayStation 2" [| "play!"; "play-"; "purei" |]
           emu [| "fpPS4.exe" |] "fpPS4" "PlayStation 4" vulkanApi
           emu [| "PPSSPPWindows64.exe"; "PPSSPPWindows.exe"; "PPSSPPQt.exe" |] "PPSSPP" "PSP" vulkanApi
           emu [| "Vita3K.exe" |] "Vita3K" "PS Vita" vulkanApi
@@ -80,6 +81,9 @@ module EmulatorCatalog =
               dx12Api
           emu [| "suyu.exe" |] "Suyu" "Nintendo Switch" vulkanApi
           emu [| "sudachi.exe" |] "Sudachi" "Nintendo Switch" vulkanApi
+          emu [| "eden.exe" |] "Eden" "Nintendo Switch" vulkanApi
+          emu [| "citron.exe" |] "Citron" "Nintendo Switch" vulkanApi
+          emu [| "azahar.exe" |] "Azahar" "Nintendo 3DS" vulkanApi
           emu [| "yuzu.exe" |] "Yuzu" "Nintendo Switch" vulkanApi
           emu [| "Dolphin.exe"; "DolphinQt.exe"; "DolphinWx.exe" |] "Dolphin" "Wii / GameCube" vulkanApi
           emu [| "Cemu.exe" |] "Cemu" "Wii U" vulkanApi
