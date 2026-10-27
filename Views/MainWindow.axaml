@@ -2228,6 +2228,26 @@
                             </Grid>
                         </Border>
 
+                        <!-- The game's own NVIDIA DLSS files, kept current from NVIDIA's SDK -->
+                        <Border IsVisible="{Binding HasManageDlssFiles}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <StackPanel Grid.Column="0" Spacing="3">
+                                        <TextBlock Text="NVIDIA DLSS FILES" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                        <TextBlock Text="{Binding ManageDlssFilesText}" FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" LineHeight="18" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageDlssUpdateClicked" Cursor="Hand"
+                                                IsEnabled="{Binding ManageDlssCanUpdate}" Content="Update"
+                                                ToolTip.Tip="Puts NVIDIA's newest DLSS build in this game. The game's own file is kept beside it." />
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageDlssRestoreClicked" Cursor="Hand"
+                                                IsEnabled="{Binding ManageDlssCanRestore}" Content="Restore original" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="{Binding ManageDlssStatus}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
                         <!-- Launching: how this game starts from its card, and with what -->
                         <Border IsVisible="{Binding IsGameTarget}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
                             <StackPanel Spacing="10">

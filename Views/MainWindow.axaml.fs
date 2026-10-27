@@ -832,6 +832,16 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.RemoveGtaDlss5()
         | _ -> ()
 
+    member this.OnManageDlssUpdateClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.UpdateManageDlss()
+        | _ -> ()
+
+    member this.OnManageDlssRestoreClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.RestoreManageDlss()
+        | _ -> ()
+
     member this.OnManageResetLaunchRouteClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm ->

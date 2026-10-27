@@ -374,6 +374,11 @@ type MainViewModel() as this =
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
+    let mutable manageDlssFiles: DlssUpdater.DlssFile list = []
+    let mutable manageDlssText = ""
+    let mutable manageDlssStatus = ""
+    let mutable manageDlssOutdated = false
+    let mutable manageDlssBusy = false
     let mutable manageAnalysis: AnalysisStore.GameAnalysis option = None
     let mutable manageTitle = ""
     // Informational only. Detection never blocks an install: it gives people
@@ -2879,6 +2884,96 @@ type MainViewModel() as this =
                     this.IsAnalyzing <- false))
             |> ignore
 
+    // ---- NVIDIA DLSS files: keep the game's own DLSS current ------------
+    member this.ManageDlssFilesText = manageDlssText
+    member this.ManageDlssStatus = manageDlssStatus
+    member this.HasManageDlssFiles = not manageDlssFiles.IsEmpty
+    member this.ManageDlssCanUpdate = not manageDlssBusy && manageDlssOutdated
+    member this.ManageDlssCanRestore =
+        not manageDlssBusy
+        && (manageDlssFiles |> List.exists (fun f -> System.IO.File.Exists(f.Path + DlssUpdater.OriginalSuffix)))
+
+    member private this.RaiseDlss() =
+        for n in [ "ManageDlssFilesText"; "ManageDlssStatus"; "HasManageDlssFiles"; "ManageDlssCanUpdate"; "ManageDlssCanRestore" ] do
+            this.RaisePropertyChanged(n)
+
+    /// Reads the game's DLSS files off the UI thread, then asks NVIDIA for
+    /// its newest build (once per run). keepStatus leaves the line saying
+    /// what an update or restore just did.
+    member this.RefreshManageDlss(keepStatus: bool) =
+        match manageCard with
+        | None -> ()
+        | Some card ->
+            let game = card.Game
+            async {
+                let files = try DlssUpdater.scan game with _ -> []
+                let! newest = if files.IsEmpty then async { return Map.empty } else DlssUpdater.newest false
+                let lines =
+                    files
+                    |> List.map (fun f ->
+                        let state =
+                            match f.State with
+                            | DlssUpdater.Original -> "game's own"
+                            | DlssUpdater.Updated ->
+                                sprintf "updated, original %s kept" (if f.OriginalVersion = "" then "copy" else f.OriginalVersion)
+                            | DlssUpdater.ByInstall -> "placed by the DLSS 5 install"
+                            | DlssUpdater.Missing -> "missing, original saved"
+                        let newer =
+                            match newest.TryFind f.Family.Key with
+                            | Some n when DlssUpdater.isOutdated newest f -> sprintf "  ->  %s available" n.Version
+                            | _ -> ""
+                        sprintf "%s  %s  (%s)%s" f.Family.Label (if f.Version = "" then "-" else f.Version) state newer)
+                let outdated = files |> List.exists (DlssUpdater.isOutdated newest)
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                    if manageCard |> Option.exists (fun c -> Object.ReferenceEquals(c, card)) then
+                        manageDlssFiles <- files
+                        manageDlssOutdated <- outdated
+                        manageDlssText <- String.Join("\n", lines)
+                        if not keepStatus then
+                            manageDlssStatus <-
+                                if files.IsEmpty then ""
+                                elif newest.IsEmpty then "NVIDIA's newest build could not be checked right now."
+                                elif outdated then "A newer NVIDIA build is available."
+                                else "Already NVIDIA's newest."
+                        this.RaiseDlss())
+            }
+            |> Async.Start
+
+    member this.UpdateManageDlss() =
+        match manageCard with
+        | Some card when not manageDlssBusy ->
+            manageDlssBusy <- true
+            manageDlssStatus <- "Updating..."
+            this.RaiseDlss()
+            let report (s: string) =
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                    manageDlssStatus <- s
+                    this.RaiseDlss())
+            async {
+                let! result = DlssUpdater.update card.Game false report
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () ->
+                    manageDlssBusy <- false
+                    manageDlssStatus <-
+                        match result with
+                        | Ok lines -> String.Join("  ·  ", lines)
+                        | Error why -> why
+                    this.RaiseDlss()
+                    this.RefreshManageDlss(true))
+            }
+            |> Async.Start
+        | _ -> ()
+
+    member this.RestoreManageDlss() =
+        match manageCard with
+        | Some card when not manageDlssBusy ->
+            manageDlssStatus <-
+                match DlssUpdater.restore card.Game with
+                | Ok lines -> String.Join("  ·  ", lines)
+                | Error why -> why
+            this.RaiseDlss()
+            this.RefreshManageDlss(true)
+        | _ -> ()
+
     member this.OpenManage(card: GameCardViewModel) =
         gtaFixInstalling <- false
         gtaFixStatus <- ""
@@ -2888,6 +2983,12 @@ type MainViewModel() as this =
         manageTitle <- card.Title
         manageAntiCheat <- None
         this.RaisePropertyChanged("HasManageAntiCheat")
+        manageDlssFiles <- []
+        manageDlssText <- ""
+        manageDlssStatus <- ""
+        manageDlssOutdated <- false
+        this.RaiseDlss()
+        this.RefreshManageDlss(false)
         this.RaisePropertyChanged("ManageAntiCheatText")
         manageExePath <- card.ExecutablePath
         this.RefreshManageLaunch()

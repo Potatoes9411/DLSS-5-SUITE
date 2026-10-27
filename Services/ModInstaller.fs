@@ -967,6 +967,22 @@ module ModInstaller =
 
     let installedMode (game: GameItem) : string = fst (installedRouteAndArch game)
 
+    /// Every file a managed install put into the game, by full path. Empty
+    /// when this app did not install into it.
+    let installedTargets (game: GameItem) : string list =
+        try
+            let path = manifestPath game
+
+            if File.Exists(path) then
+                let options = JsonSerializerOptions()
+                options.PropertyNameCaseInsensitive <- true
+                let m = JsonSerializer.Deserialize<InstallManifest>(File.ReadAllText(path), options)
+                if isNull m.Files then [] else [ for f in m.Files -> f.TargetPath ]
+            else
+                []
+        with _ ->
+            []
+
     /// The API an OptiScaler install was set up for. "" when unknown, which an
     /// older manifest reads back as - those were all DirectX 12.
     let installedOptiApi (game: GameItem) : string =
