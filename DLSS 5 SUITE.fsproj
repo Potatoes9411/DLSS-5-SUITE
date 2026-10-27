@@ -74,6 +74,8 @@
     <Compile Include="Services\Diagnosis.fs" />
     <Compile Include="Services\Autopilot.fs" />
     <Compile Include="Services\VideoPlayer.fs" />
+    <Compile Include="Services\RtxRemix.fs" />
+    <Compile Include="Services\OpenXrLayer.fs" />
     <Compile Include="Services\ScreenEngine.fs" />
     <Compile Include="Services\NeuralScreen.fs" />
     <Compile Include="Services\RobloxShadeHost.fs" />

@@ -374,6 +374,12 @@ type MainViewModel() as this =
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
+    let mutable manageRemixText = ""
+    let mutable manageRemixHasRuntime = false
+    let mutable manageRemixMod: RtxRemix.RemixMod option = None
+    let mutable manageVrOpenXr = false
+    let mutable manageExtrasStatus = ""
+    let mutable manageExtrasBusy = false
     let mutable videoStatus = ""
     let mutable videoLink = ""
     let mutable videoBusy = false
@@ -3207,6 +3213,81 @@ type MainViewModel() as this =
         | Ok() -> ()
         | Error why -> this.VideoSay why
 
+    // ---- RTX Remix and VR ---------------------------------------------
+    member this.HasManageRemix = manageRemixHasRuntime || manageRemixMod.IsSome
+    member this.ManageRemixText = manageRemixText
+    member this.ManageRemixCanInstallMod =
+        not manageExtrasBusy && not manageRemixHasRuntime && (manageRemixMod |> Option.exists (fun m -> m.Installable))
+    member this.ManageRemixCanEnable =
+        not manageExtrasBusy && manageRemixHasRuntime && not (manageCard |> Option.exists (fun c -> RtxRemix.isEnabled c.Game))
+    member this.ManageRemixCanRemove =
+        not manageExtrasBusy && (manageCard |> Option.exists (fun c -> RtxRemix.isEnabled c.Game || (manageRemixHasRuntime && manageRemixMod |> Option.exists (fun m -> m.Installable))))
+    member this.ManageVrText =
+        match manageCard with
+        | Some c when OpenXrLayer.isEnabled c.Game -> "On - the headset gets the neural pass through ReShade's OpenXR layer."
+        | _ when manageVrOpenXr -> "This game uses OpenXR. Turn this on to put DLSS 5 in the headset, not only the desktop mirror."
+        | _ -> "For OpenXR VR games. SteamVR-only games are not reachable this way."
+    member this.ManageVrOn = manageCard |> Option.exists (fun c -> OpenXrLayer.isEnabled c.Game)
+    member this.ManageVrOff = not this.ManageVrOn
+    member this.ManageCanVr = not manageExtrasBusy && (manageCard |> Option.exists (fun c -> ModInstaller.isInstalled c.Game))
+    member this.ManageExtrasStatus = manageExtrasStatus
+    member this.HasManageExtrasStatus = manageExtrasStatus <> ""
+
+    member private this.RaiseExtras() =
+        for n in [ "HasManageRemix"; "ManageRemixText"; "ManageRemixCanInstallMod"; "ManageRemixCanEnable"; "ManageRemixCanRemove"
+                   "ManageVrText"; "ManageVrOn"; "ManageVrOff"; "ManageCanVr"; "ManageExtrasStatus"; "HasManageExtrasStatus" ] do
+            this.RaisePropertyChanged(n)
+
+    member this.RefreshManageExtras() =
+        match manageCard with
+        | None -> ()
+        | Some card ->
+            let game = card.Game
+            System.Threading.Tasks.Task.Run(fun () ->
+                let runtime = try RtxRemix.findRuntime game.InstallDirectory with _ -> None
+                let m = RtxRemix.modFor game
+                let fl = runtime |> Option.map RtxRemix.flavour
+                let xr = OpenXrLayer.usesOpenXr game
+                let text =
+                    match runtime, fl, m with
+                    | Some _, _, _ when RtxRemix.isEnabled game -> "DLSS 5 is on inside the Remix runtime. " + RtxRemix.verdict game
+                    | Some _, Some "neural", _ | Some _, Some "uplift", _ -> "This game's Remix runtime has a neural stage. Turn DLSS 5 on in it."
+                    | Some _, _, _ -> "This game's Remix runtime has no neural stage; SUITE swaps in one that has, and keeps the original."
+                    | None, _, Some mm when mm.Installable -> sprintf "There is an RTX Remix mod for %s. SUITE can install it, then DLSS 5 inside it." mm.Game
+                    | None, _, Some mm -> sprintf "There is an RTX Remix mod for %s: %s - install it, then come back here." mm.Game mm.Url
+                    | _ -> ""
+                Dispatcher.UIThread.Post(fun () ->
+                    if manageCard |> Option.exists (fun c -> Object.ReferenceEquals(c, card)) then
+                        manageRemixHasRuntime <- runtime.IsSome
+                        manageRemixMod <- m
+                        manageRemixText <- text
+                        manageVrOpenXr <- xr
+                        this.RaiseExtras()))
+            |> ignore
+
+    member private this.ExtrasWork(work: GameItem -> (string -> unit) -> Result<string, string>) =
+        match manageCard with
+        | Some card when not manageExtrasBusy ->
+            manageExtrasBusy <- true
+            manageExtrasStatus <- "Working..."
+            this.RaiseExtras()
+            let say (s: string) = Dispatcher.UIThread.Post(fun () -> manageExtrasStatus <- s; this.RaiseExtras())
+            System.Threading.Tasks.Task.Run(fun () ->
+                let r = try work card.Game say with ex -> Error ex.Message
+                Dispatcher.UIThread.Post(fun () ->
+                    manageExtrasBusy <- false
+                    manageExtrasStatus <- (match r with Ok s -> s | Error why -> why)
+                    this.RaiseExtras()
+                    this.RefreshManageExtras()))
+            |> ignore
+        | _ -> ()
+
+    member this.InstallRemixMod() = this.ExtrasWork(fun g say -> RtxRemix.installMod g say)
+    member this.EnableRemix() = this.ExtrasWork(fun g say -> RtxRemix.enable g true say)
+    member this.RemoveRemix() = this.ExtrasWork(fun g _ -> RtxRemix.remove g)
+    member this.EnableVr() = this.ExtrasWork(fun g _ -> OpenXrLayer.enable g)
+    member this.DisableVr() = this.ExtrasWork(fun g _ -> Ok(OpenXrLayer.disable g))
+
     member this.OpenManage(card: GameCardViewModel) =
         gtaFixInstalling <- false
         gtaFixStatus <- ""
@@ -3218,6 +3299,13 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("HasManageAntiCheat")
         autopilotStatus <- (if autopilotCts.IsSome then autopilotStatus else "")
         this.RaiseVerdict()
+        manageRemixHasRuntime <- false
+        manageRemixMod <- None
+        manageRemixText <- ""
+        manageVrOpenXr <- false
+        manageExtrasStatus <- ""
+        this.RaiseExtras()
+        this.RefreshManageExtras()
         manageDlssFiles <- []
         manageDlssText <- ""
         manageDlssStatus <- ""
@@ -3450,7 +3538,9 @@ type MainViewModel() as this =
                             if isInstallAction then
                                 ModInstaller.install game exePath plan installMode installArch optiApi useNeuralAddon useFeeder this.OverlayOptions report
                             else
-                                ModInstaller.uninstall game exePath plan report
+                                let o = ModInstaller.uninstall game exePath plan report
+                                if o.Success && OpenXrLayer.isEnabled game then OpenXrLayer.disable game |> ignore
+                                o
 
                         (outcome.Success, outcome.Message)
                     with ex ->

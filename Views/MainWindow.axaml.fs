@@ -838,6 +838,11 @@ type MainWindow() as this =
         | _ -> ()
 
     member this.OnVideoSetUpClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.SetUpVideoPlayer())
+    member this.OnRemixInstallModClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.InstallRemixMod())
+    member this.OnRemixEnableClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.EnableRemix())
+    member this.OnRemixRemoveClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.RemoveRemix())
+    member this.OnVrEnableClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.EnableVr())
+    member this.OnVrDisableClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.DisableVr())
     member this.OnVideoPlayLinkClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.PlayVideoLink())
     member this.OnVideoWebcamClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.StartWebcam())
     member this.OnVideoScreenClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.StartScreenFeed())
