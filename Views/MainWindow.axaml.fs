@@ -832,6 +832,21 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.RemoveGtaDlss5()
         | _ -> ()
 
+    member this.OnManageCheckVerdictClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.CheckManageVerdict()
+        | _ -> ()
+
+    member this.OnManageAutopilotClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.StartAutopilot()
+        | _ -> ()
+
+    member this.OnManageStopAutopilotClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.StopAutopilot()
+        | _ -> ()
+
     member this.OnManageDlssUpdateClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> vm.UpdateManageDlss()

@@ -2228,6 +2228,30 @@
                             </Grid>
                         </Border>
 
+                        <!-- Did it work? and autopilot -->
+                        <Border IsVisible="{Binding IsGameTarget}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="DID IT WORK?" FontSize="9.5" FontWeight="Bold" Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                        <TextBlock Text="{Binding ManageVerdict}" FontSize="12.5" FontWeight="SemiBold" Foreground="{Binding ManageVerdictBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageCheckVerdictClicked" Cursor="Hand"
+                                                IsEnabled="{Binding ManageCanCheck}" Content="Did it work?"
+                                                ToolTip.Tip="Reads the logs the last session left and Windows' crash record. It also answers by itself when the game closes." />
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageAutopilotClicked" Cursor="Hand"
+                                                IsVisible="{Binding IsAutopilotIdle}" IsEnabled="{Binding IsManageReady}" Content="Autopilot"
+                                                ToolTip.Tip="{Binding ManageAutopilotRoutes}" />
+                                        <Button Classes="AppleSecondaryBtn" Click="OnManageStopAutopilotClicked" Cursor="Hand"
+                                                IsVisible="{Binding IsAutopilotRunning}" Content="Stop" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock IsVisible="{Binding HasManageVerdictFindings}" Text="{Binding ManageVerdictFindings}" FontSize="11" Foreground="#CBD5E1" TextWrapping="Wrap" LineHeight="17" />
+                                <TextBlock IsVisible="{Binding HasAutopilotStatus}" Text="{Binding AutopilotStatus}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
                         <!-- The game's own NVIDIA DLSS files, kept current from NVIDIA's SDK -->
                         <Border IsVisible="{Binding HasManageDlssFiles}" Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,13">
                             <StackPanel Spacing="8">

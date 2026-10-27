@@ -374,6 +374,12 @@ type MainViewModel() as this =
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
+    /// The last "did it work?" answer per game, by AppId. Filled when the
+    /// person asks and on its own when a modded game closes.
+    let lastVerdicts = System.Collections.Generic.Dictionary<string, Diagnosis.Report>()
+    let mutable manageVerdictBusy = false
+    let mutable autopilotCts: System.Threading.CancellationTokenSource option = None
+    let mutable autopilotStatus = ""
     let mutable manageDlssFiles: DlssUpdater.DlssFile list = []
     let mutable manageDlssText = ""
     let mutable manageDlssStatus = ""
@@ -918,11 +924,25 @@ type MainViewModel() as this =
         // process check runs off the UI thread; only the card list is read here.
         let gameWatch = DispatcherTimer(Interval = TimeSpan.FromSeconds(10.0))
         let watching = ref false
+        let wasRunning = ref Set.empty<string>
         gameWatch.Tick.Add(fun _ ->
             if not watching.Value then
                 watching.Value <- true
                 let games = [ for c in allGames -> c.Game ]
                 Threading.Tasks.Task.Run(fun () ->
+                    // A modded game that was running and is not any more has
+                    // just closed: "did it work?" answers by itself.
+                    let nowRunning =
+                        try
+                            games
+                            |> List.filter (fun g -> ModInstaller.isInstalled g && GameLauncher.isRunning g)
+                            |> List.map (fun g -> g.AppId)
+                            |> set
+                        with _ -> Set.empty
+                    for g in games do
+                        if wasRunning.Value.Contains g.AppId && not (nowRunning.Contains g.AppId) && autopilotCts.IsNone then
+                            this.VerdictAfterClose(g)
+                    wasRunning.Value <- nowRunning
                     let playing =
                         try
                             games
@@ -2974,6 +2994,133 @@ type MainViewModel() as this =
             this.RefreshManageDlss(true)
         | _ -> ()
 
+    // ---- Did it work? and autopilot --------------------------------------
+    member this.ManageVerdict =
+        match manageCard with
+        | Some c when lastVerdicts.ContainsKey c.Game.AppId -> lastVerdicts.[c.Game.AppId].Verdict
+        | Some c when ModInstaller.isInstalled c.Game -> "Not checked yet - play once, then press Did it work?"
+        | _ -> "Install DLSS 5 first, or let autopilot pick the route."
+
+    member this.ManageVerdictFindings =
+        match manageCard with
+        | Some c when lastVerdicts.ContainsKey c.Game.AppId ->
+            let r = lastVerdicts.[c.Game.AppId]
+            r.Findings
+            |> List.filter (fun f -> f.Level <> Diagnosis.Info || not (String.IsNullOrEmpty f.Title))
+            |> List.truncate 8
+            |> List.map (fun f ->
+                let mark =
+                    match f.Level with
+                    | Diagnosis.Ok -> "✓"
+                    | Diagnosis.Warn -> "!"
+                    | Diagnosis.Bad -> "✕"
+                    | Diagnosis.Info -> "·"
+                if String.IsNullOrWhiteSpace f.Detail then sprintf "%s  %s" mark f.Title
+                else sprintf "%s  %s  %s" mark f.Title f.Detail)
+            |> fun lines -> String.Join("\n", lines)
+        | _ -> ""
+
+    member this.HasManageVerdictFindings = this.ManageVerdictFindings <> ""
+
+    member this.ManageVerdictBrush =
+        match manageCard with
+        | Some c when lastVerdicts.ContainsKey c.Game.AppId ->
+            let v = lastVerdicts.[c.Game.AppId].Verdict
+            if Diagnosis.isWorking v then "#35D22B"
+            elif Diagnosis.stage v = 6 || Diagnosis.stage v = 7 then "#FCD34D"
+            else "#F87171"
+        | _ -> "#CBD5E1"
+
+    member this.ManageCanCheck = not manageVerdictBusy && autopilotCts.IsNone && (manageCard |> Option.exists (fun c -> ModInstaller.isInstalled c.Game))
+    member this.IsAutopilotRunning = autopilotCts.IsSome
+    member this.IsAutopilotIdle = autopilotCts.IsNone
+    member this.AutopilotStatus = autopilotStatus
+    member this.HasAutopilotStatus = autopilotStatus <> ""
+
+    member this.ManageAutopilotRoutes =
+        match manageCard with
+        | Some c ->
+            let routes = Autopilot.plan c.Game
+            "Tries, in order: " + String.Join("  ->  ", routes |> List.map (fun r -> r.Label))
+        | None -> ""
+
+    member private this.RaiseVerdict() =
+        for n in [ "ManageVerdict"; "ManageVerdictFindings"; "HasManageVerdictFindings"; "ManageVerdictBrush"; "ManageCanCheck"
+                   "IsAutopilotRunning"; "IsAutopilotIdle"; "AutopilotStatus"; "HasAutopilotStatus"; "ManageAutopilotRoutes" ] do
+            this.RaisePropertyChanged(n)
+
+    /// Reads the logs off the UI thread and shows the answer.
+    member this.CheckManageVerdict() =
+        match manageCard with
+        | Some card when not manageVerdictBusy ->
+            manageVerdictBusy <- true
+            this.RaiseVerdict()
+            let game = card.Game
+            System.Threading.Tasks.Task.Run(fun () ->
+                let report = try Diagnosis.analyse game with ex -> { Diagnosis.Report.Ran = false; Verdict = "The check failed: " + ex.Message; Route = ""; Findings = []; LogTime = None; NeverRan = false }
+                AppLog.info (sprintf "Did it work? %s: %s" game.Title report.Verdict)
+                Dispatcher.UIThread.Post(fun () ->
+                    lastVerdicts.[game.AppId] <- report
+                    manageVerdictBusy <- false
+                    this.RaiseVerdict()))
+            |> ignore
+        | _ -> ()
+
+    /// A modded game just closed: answer on its own, the way the person
+    /// would by pressing the button.
+    member this.VerdictAfterClose(game: GameItem) =
+        System.Threading.Tasks.Task.Run(fun () ->
+            // Give the game a moment to finish writing its logs.
+            System.Threading.Thread.Sleep(3000)
+            let report = try Some(Diagnosis.analyse game) with _ -> None
+            report |> Option.iter (fun r ->
+                AppLog.info (sprintf "After closing %s: %s" game.Title r.Verdict)
+                Dispatcher.UIThread.Post(fun () ->
+                    lastVerdicts.[game.AppId] <- r
+                    this.RaiseVerdict())))
+        |> ignore
+
+    member this.StartAutopilot() =
+        match manageCard with
+        | Some card when autopilotCts.IsNone ->
+            let game = card.Game
+            match Autopilot.refusal game with
+            | Some why ->
+                autopilotStatus <- why
+                this.RaiseVerdict()
+            | None ->
+                let cts = new System.Threading.CancellationTokenSource()
+                autopilotCts <- Some cts
+                autopilotStatus <- "Starting..."
+                this.IsInstalling <- true
+                this.RaiseVerdict()
+                let routes = Autopilot.plan game
+                let overlay = this.OverlayOptions
+                let report (s: string) =
+                    Dispatcher.UIThread.Post(fun () ->
+                        autopilotStatus <- s
+                        this.RaiseVerdict())
+                System.Threading.Tasks.Task.Run(fun () ->
+                    let outcome =
+                        try Autopilot.run game routes overlay report cts.Token
+                        with ex -> { Autopilot.Outcome.Worked = false; Summary = "Autopilot stopped with an error: " + ex.Message; Installed = None }
+                    AppLog.info (sprintf "Autopilot %s: %s" game.Title outcome.Summary)
+                    Dispatcher.UIThread.Post(fun () ->
+                        autopilotCts <- None
+                        cts.Dispose()
+                        autopilotStatus <- outcome.Summary
+                        this.IsInstalling <- false
+                        card.RefreshModBadge()
+                        this.RaiseVerdict()
+                        this.AnalyzeManageTarget()))
+                |> ignore
+        | _ -> ()
+
+    member this.StopAutopilot() =
+        autopilotCts |> Option.iter (fun c -> c.Cancel())
+        autopilotStatus <- "Stopping..."
+        this.RaiseVerdict()
+
     member this.OpenManage(card: GameCardViewModel) =
         gtaFixInstalling <- false
         gtaFixStatus <- ""
@@ -2983,6 +3130,8 @@ type MainViewModel() as this =
         manageTitle <- card.Title
         manageAntiCheat <- None
         this.RaisePropertyChanged("HasManageAntiCheat")
+        autopilotStatus <- (if autopilotCts.IsSome then autopilotStatus else "")
+        this.RaiseVerdict()
         manageDlssFiles <- []
         manageDlssText <- ""
         manageDlssStatus <- ""
