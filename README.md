@@ -56,6 +56,15 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - NeuralScreen ships as its own download. SUITE keeps the method locked until its zip is installed from the Screen Engine window.
 - Discord Rich Presence: shows **Playing DLSS 5 SUITE** with the app's icon, the version and elapsed time, plus a Download DLSS 5 SUITE button on your profile for others. Works automatically when Discord is open and can be switched off in Settings.
 - Warnings before installing into games that ship a known anti-cheat, and an optional DLSS 5 Feeder toggle for the ReShade routes.
+- **Did it work?** reads what the install left behind after you play (ReShade's, the Feeder's and OptiScaler's logs, Windows' own crash record, and the DLLs the running game actually loaded) and says in one line whether the neural pass ran, and if not, which part stopped and what to do. It also answers on its own when a modded game closes.
+- **Autopilot** installs a route, starts the game, checks what loaded, and moves to the next route that fits the game when it did not. It tries up to three routes and never runs on a game with an anti-cheat.
+- **NVIDIA DLSS files** in the Manage sheet keep a game's own DLSS Super Resolution, Frame Generation and Ray Reconstruction on NVIDIA's newest SDK build, straight from NVIDIA's repository, with **Restore original** always one click away.
+- **Video, YouTube and webcam**: SUITE sets up a portable MPC-HC player and installs DLSS 5 into it, so any video file, YouTube link, webcam or part of the screen gets the neural pass. F6 switches it on and off.
+- **RTX Remix**: DLSS 5 inside Remix runtimes, swapping in a runtime with a neural stage when the mod's has none (the original is kept), and installing the GTA IV and Need for Speed Underground 2 Remix mods directly.
+- **VR headset (OpenXR)**, experimental: ReShade's OpenXR layer puts the neural pass in the headset, not only the desktop mirror.
+- **Quality / Balanced / Performance** presets, a **before / after** image from two screenshots, and **RTX 40 multi-frame generation** (RTX40MFG-Unlock) for RTX 40 cards.
+- Automatic per-game fixes: hybrid-graphics laptops start the game on the NVIDIA GPU, and RE Engine games get REFramework so ReShade's add-ons can load. Uninstall takes both back out.
+- The library also finds EA, Ubisoft, Battle.net, Rockstar, Amazon, itch, Heroic and Xbox / Game Pass games, and more emulators (Eden, Citron, Azahar, Play!).
 - DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
 
 Compatibility varies by game, graphics hardware, anti-cheat system and game update. The project does not promise that every title will work, and it does not bypass anti-cheat protections.
