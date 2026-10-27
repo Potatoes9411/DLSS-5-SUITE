@@ -1744,7 +1744,7 @@ module ModInstaller =
     /// `mode` mirrors the switch in the Manage sheet. OptiScaler is its own
     /// self-contained route and never shares a folder with the ReShade ones;
     /// DX12 and DX11 differ only by the extra effect payload DX11 receives.
-    let install
+    let private installCore
         (game: GameItem)
         (exePath: string)
         (plan: InstallPlan option)
@@ -2584,7 +2584,7 @@ module ModInstaller =
         with ex ->
             { Success = false; Message = "Removal failed: " + ex.Message }
 
-    let uninstall (game: GameItem) (exePath: string) (plan: InstallPlan option) (report: Progress) : InstallOutcome =
+    let private uninstallCore (game: GameItem) (exePath: string) (plan: InstallPlan option) (report: Progress) : InstallOutcome =
         try
             let path = manifestPath game
 
@@ -2823,3 +2823,34 @@ module ModInstaller =
                         let text = JsonSerializer.Serialize(m2, JsonSerializerOptions(WriteIndented = true))
                         File.WriteAllText(path, text)
                 with _ -> ()
+
+    /// Installs, then applies the per-game fixes (NVIDIA GPU on hybrid
+    /// laptops, REFramework in RE Engine games).
+    let install
+        (game: GameItem)
+        (exePath: string)
+        (plan: InstallPlan option)
+        (mode: InstallMode)
+        (arch: InstallArch)
+        (optiApi: OptiScalerApi)
+        (neural: bool)
+        (feeder: bool)
+        (overlay: OverlayOptions)
+        (report: Progress)
+        : InstallOutcome =
+        let outcome = installCore game exePath plan mode arch optiApi neural feeder overlay report
+        if not outcome.Success then outcome
+        else
+            let notes =
+                try GameFixes.afterInstall game exePath (mode <> OptiScalerMode) (fun s -> report s 0.97)
+                with ex ->
+                    AppLog.error "Game fixes after install" ex
+                    []
+            if notes.IsEmpty then outcome
+            else { outcome with Message = outcome.Message + " " + String.Join(" ", notes) }
+
+    let uninstall (game: GameItem) (exePath: string) (plan: InstallPlan option) (report: Progress) : InstallOutcome =
+        let outcome = uninstallCore game exePath plan report
+        if outcome.Success then
+            try GameFixes.afterUninstall game with ex -> AppLog.error "Game fixes after uninstall" ex
+        outcome
