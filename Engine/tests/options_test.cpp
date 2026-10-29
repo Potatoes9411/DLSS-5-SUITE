@@ -91,6 +91,27 @@ constexpr std::array<std::wstring_view, 12> kVocabulary{ L"--monitor", L"all",  
     return !ParseOptions(zero).has_value();
 }
 
+[[nodiscard]] bool FrameGenAcceptsOneToSix(infra::RngState& rng) noexcept
+{
+    const std::uint32_t multiplier = proptest::DrawBetween(rng, 1, 6);
+    const std::wstring joined = L"--frame-gen=" + std::to_wstring(multiplier);
+    const std::array<std::wstring_view, 1> real{ joined };
+    const auto parsed = ParseOptions(real);
+    return parsed.has_value() && parsed->frameGen.Get() == multiplier;
+}
+
+// Off unless asked for, and nothing outside one to six.
+[[nodiscard]] bool FrameGenRefusesZeroAndSeven(infra::RngState&) noexcept
+{
+    const std::array<std::wstring_view, 1> zero{ L"--frame-gen=0" };
+    const std::array<std::wstring_view, 1> seven{ L"--frame-gen=7" };
+    const auto zeroParsed = ParseOptions(zero);
+    const auto sevenParsed = ParseOptions(seven);
+    const bool outOfRange =
+        !zeroParsed.has_value() && zeroParsed.error().kind == OptionsErrorKind::ValueOutOfRange && !sevenParsed.has_value() && sevenParsed.error().kind == OptionsErrorKind::ValueOutOfRange;
+    return outOfRange && DefaultOptions().frameGen.Get() == 1 && DefaultLive(DefaultOptions()).frameGen.Get() == 1;
+}
+
 // The strengths have no such end, and every finite value is the operator's to choose.
 [[nodiscard]] bool StrengthAcceptsEveryFiniteValue(infra::RngState& rng) noexcept
 {
@@ -266,6 +287,8 @@ std::uint32_t OptionsSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("--nr-intensity refuses what is outside it", seed, 1, IntensityRefusesWhatIsOutsideIt));
     failures += Failures(proptest::ForAll("--nr-passes accepts any count from one", seed, 100, PassesAcceptAnyCountFromOne));
     failures += Failures(proptest::ForAll("--nr-passes refuses zero", seed, 1, PassesRefuseZero));
+    failures += Failures(proptest::ForAll("--frame-gen accepts one to six", seed, 60, FrameGenAcceptsOneToSix));
+    failures += Failures(proptest::ForAll("--frame-gen refuses zero and seven", seed, 1, FrameGenRefusesZeroAndSeven));
     failures += Failures(proptest::ForAll("--nr-local-tone accepts every finite value", seed, 300, StrengthAcceptsEveryFiniteValue));
     failures += Failures(proptest::ForAll("--nr-intensity refuses what is not a number", seed, 1, IntensityRefusesWhatIsNotANumber));
     failures += Failures(proptest::ForAll("--mv-scale-x accepts every finite value", seed, 300, MotionScaleAcceptsEveryFiniteValue));

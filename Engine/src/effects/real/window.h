@@ -60,6 +60,7 @@ enum class TuneField : std::uint8_t {
     AutoMask = 6,
     Passes = 7,
     NeuralRendering = 8,
+    FrameGen = 9,
 };
 
 [[nodiscard]] constexpr TuneField FieldOfTune(std::uint64_t word) noexcept { return static_cast<TuneField>(static_cast<std::uint8_t>(word >> kTuneFieldShift)); }

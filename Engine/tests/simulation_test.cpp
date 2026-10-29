@@ -43,7 +43,8 @@ using namespace interior;
                         ColorFormat::Rgba8,
                         DisplayMode::Processed,
                         false,
-                        true };
+                        true,
+                        *FrameGenTag::Parse(1 + proptest::DrawBelow(rng, kMaxFrameGen)) };
 }
 
 [[nodiscard]] bool SessionEndsCleanlyUnderInjectedFailures(infra::RngState& rng) noexcept

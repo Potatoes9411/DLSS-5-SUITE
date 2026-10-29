@@ -25,6 +25,7 @@ enum class ResourceKind : std::uint8_t {
     StatsReadback,
     Luma,
     Flow,
+    History,
 };
 
 enum class ResourceState : std::uint8_t { CopyDest, CopySource, ShaderRead, UnorderedAccess, RenderTarget, Present, Common, GenericRead };
@@ -39,7 +40,7 @@ struct ResourceId
     [[nodiscard]] friend constexpr bool operator==(const ResourceId&, const ResourceId&) noexcept = default;
 };
 
-constexpr std::size_t kSlotCount = 40;
+constexpr std::size_t kSlotCount = 41;
 using StateTable = std::array<ResourceState, kSlotCount>;
 
 [[nodiscard]] ResourceId SimpleId(ResourceKind kind) noexcept;
@@ -137,6 +138,9 @@ struct Draw
     ResourceId target;
     DisplayMode mode;
     Fraction split;
+    std::optional<ResourceId> history; // the picture before the processed one, when this one is drawn between the two
+    std::optional<ResourceId> motion;  // the motion from the processed picture back to the one before, with the history
+    Fraction blend;                    // where between the picture before (0) and the processed one (1) this one is drawn
     [[nodiscard]] friend constexpr bool operator==(const Draw&, const Draw&) noexcept = default;
 };
 
@@ -175,6 +179,8 @@ struct FrameState
     ResourceKind displaySource;
     Fraction split;
     LiveSettings controls;
+    std::optional<Microseconds> captureInterval; // between the last two captures, when they were close enough to belong together
+    bool hasHistory;                             // the history holds the processed picture before the current one
     [[nodiscard]] friend constexpr bool operator==(const FrameState&, const FrameState&) noexcept = default;
 };
 
@@ -214,6 +220,10 @@ constexpr std::uint64_t kPauseResetMicroseconds = 1000000;
 [[nodiscard]] Fraction NextSplit(Fraction current, const std::optional<Fraction>& request) noexcept;
 [[nodiscard]] LiveSettings NextControls(const LiveSettings& current, const std::optional<LiveSettings>& request) noexcept;
 [[nodiscard]] bool IsLongPause(const FrameState& state, Instant now) noexcept;
+// Where between the processed picture before and the current one a frame shown now is drawn: the time since the
+// last capture as a share of the interval between the last two, rounded up to the next of the multiplier's
+// steps. One, the current picture as it is, whenever there is nothing to draw between.
+[[nodiscard]] Fraction BlendPoint(std::optional<Instant> lastCapture, std::optional<Microseconds> interval, Instant now, FrameGen multiplier) noexcept;
 [[nodiscard]] bool ExceedsThreshold(std::optional<Fraction> unmatched, Fraction threshold) noexcept;
 [[nodiscard]] std::string_view Describe(PlanFrameError error) noexcept;
 

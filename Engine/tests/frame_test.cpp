@@ -6,6 +6,7 @@
 #include "tests/test_registry.h"
 
 #include <algorithm>
+#include <cmath>
 #include <ranges>
 #include <variant>
 #include <vector>
@@ -76,7 +77,8 @@ struct Replay
 
 [[nodiscard]] Replay Apply(const Replay& r, const Draw& d) noexcept
 {
-    const bool ok = Readable(r.states, d.processed) && Readable(r.states, d.original) && StateOf(r.states, d.target) == ResourceState::RenderTarget;
+    const bool ok = Readable(r.states, d.processed) && Readable(r.states, d.original) && Readable(r.states, d.history) && Readable(r.states, d.motion) &&
+                    StateOf(r.states, d.target) == ResourceState::RenderTarget && d.history.has_value() == d.motion.has_value();
     return Replay{ r.states, r.valid && ok, r.submits, r.presents };
 }
 
@@ -146,7 +148,8 @@ struct Replay
                         ColorFormat::Rgba8,
                         DisplayMode::Processed,
                         false,
-                        true };
+                        true,
+                        *FrameGenTag::Parse(1 + proptest::DrawBelow(rng, kMaxFrameGen)) };
 }
 
 [[nodiscard]] FrameInput RandomInput(infra::RngState& rng, std::uint64_t clock, std::uint32_t backBuffer) noexcept
@@ -280,8 +283,8 @@ struct Replay
 
 [[nodiscard]] FrameState WithLastCapture(const FrameState& s, Instant at) noexcept
 {
-    return FrameState{ s.number, s.currentSet, s.states,     s.hasOutput,    s.hasPrevious,   s.resetPending, s.zeroMotionWritten,
-                       at,       s.display,    s.slotFences, s.statsPending, s.displaySource, s.split,        s.controls };
+    return FrameState{ s.number,  s.currentSet, s.states,       s.hasOutput,     s.hasPrevious, s.resetPending, s.zeroMotionWritten, at,
+                       s.display, s.slotFences, s.statsPending, s.displaySource, s.split,       s.controls,     s.captureInterval,   s.hasHistory };
 }
 
 [[nodiscard]] bool LongPauseNeedsACaptureAndMoreThanTheLimit(infra::RngState& rng) noexcept
@@ -319,6 +322,7 @@ struct Replay
         slots.push_back(SlotOf(FlowId(*LevelIndexTag::Parse(level))));
     for (std::uint32_t set = 0; set < 2; ++set)
         slots.push_back(SlotOf(NrPassId(*SetIndexTag::Parse(set))));
+    slots.push_back(SlotOf(SimpleId(ResourceKind::History)));
     return slots;
 }
 
@@ -387,8 +391,8 @@ struct Replay
 
 [[nodiscard]] FrameState WithSplitPosition(const FrameState& s, Fraction split) noexcept
 {
-    return FrameState{ s.number,      s.currentSet, s.states,     s.hasOutput,    s.hasPrevious,   s.resetPending, s.zeroMotionWritten,
-                       s.lastCapture, s.display,    s.slotFences, s.statsPending, s.displaySource, split,          s.controls };
+    return FrameState{ s.number,  s.currentSet, s.states,       s.hasOutput,     s.hasPrevious, s.resetPending, s.zeroMotionWritten, s.lastCapture,
+                       s.display, s.slotFences, s.statsPending, s.displaySource, split,         s.controls,     s.captureInterval,   s.hasHistory };
 }
 
 [[nodiscard]] const Draw* DrawIn(const StepList& steps) noexcept
@@ -419,7 +423,7 @@ struct Replay
 
 [[nodiscard]] LiveSettings LiveOf(const SessionPlan& plan, bool neuralRendering, const NrTuning& tuning) noexcept
 {
-    return LiveSettings{ neuralRendering, tuning, plan.passes, plan.depthInverted, plan.mvScaleX, plan.mvScaleY, plan.vsync, plan.resetThreshold, plan.depth };
+    return LiveSettings{ neuralRendering, tuning, plan.passes, plan.depthInverted, plan.mvScaleX, plan.mvScaleY, plan.vsync, plan.resetThreshold, plan.depth, plan.frameGen };
 }
 
 [[nodiscard]] NrTuning WithIntensity(const NrTuning& t, NrIntensity intensity) noexcept
@@ -536,6 +540,142 @@ struct Replay
     return draw != nullptr && draw->split == held && framePlan->next.split == held;
 }
 
+[[nodiscard]] SessionPlan WithFrameGen(const SessionPlan& p, std::uint32_t multiplier) noexcept
+{
+    SessionPlan plan = p; // WAIVER(R2): a test fixture, copied and adjusted before use.
+    plan.frameGen = *FrameGenTag::Parse(multiplier);
+    return plan;
+}
+
+[[nodiscard]] FrameInput CaptureAt(std::uint64_t at, bool fresh) noexcept
+{
+    return FrameInput{ fresh, *BackBufferIndexTag::Parse(0), std::nullopt, InstantTag::Parse(at), false, false, std::nullopt, std::nullopt, std::nullopt, false };
+}
+
+[[nodiscard]] bool IsHistory(const ResourceId& id) noexcept
+{
+    return id.kind == ResourceKind::History;
+}
+
+[[nodiscard]] bool TouchesHistory(const Step& step) noexcept
+{
+    return std::visit(infra::Overloaded{ [](const Transition& t) { return IsHistory(t.resource); }, [](const Draw& d) { return IsHistory(d.target) || d.history.has_value() || d.motion.has_value(); },
+                                         [](const auto&) { return false; } },
+                      step);
+}
+
+[[nodiscard]] bool DrawsTheProcessedPictureAsItIs(const Step& step) noexcept
+{
+    const Draw* draw = std::get_if<Draw>(&step);
+    return draw == nullptr || (!draw->history.has_value() && !draw->motion.has_value() && draw->blend.Get() == 1.0f);
+}
+
+[[nodiscard]] std::vector<Draw> DrawsOf(const StepList& steps) noexcept
+{
+    std::vector<Draw> draws;
+    for (const Step& step : steps.Items()) // WAIVER(R2): a test collects the emitted draws in order.
+        if (const Draw* draw = std::get_if<Draw>(&step); draw != nullptr)
+            draws.push_back(*draw);
+    return draws;
+}
+
+// One picture shown per one made is the plan as it was before frame generation: nothing moves into, out of or
+// through the history, and every draw shows the processed picture as it is, once a frame.
+[[nodiscard]] bool OneTimesNeverTouchesTheHistory(infra::RngState& rng) noexcept
+{
+    const SessionPlan plan = WithFrameGen(RandomPlan(rng), 1);
+    FrameState state = InitialFrameState(plan);
+    std::uint64_t clock = 0;
+    for (std::uint32_t i = 0; i < 12; ++i) // WAIVER(R2): test drives a sequence of frames.
+    {
+        clock += proptest::DrawBelow(rng, 60000);
+        const auto framePlan = PlanFrame(plan, state, RandomInput(rng, clock, i));
+        if (!framePlan.has_value())
+            return false;
+        const bool untouched = std::ranges::none_of(framePlan->steps.Items(), TouchesHistory);
+        const bool asItIs = std::ranges::all_of(framePlan->steps.Items(), DrawsTheProcessedPictureAsItIs);
+        if (!untouched || !asItIs || Draws(framePlan->steps) + Clears(framePlan->steps) != 1 || framePlan->next.hasHistory)
+            return false;
+        state = framePlan->next;
+    }
+    return true;
+}
+
+[[nodiscard]] Fraction PointAt(std::uint64_t now, std::uint64_t interval, std::uint32_t multiplier) noexcept
+{
+    return BlendPoint(InstantTag::Parse(1000), MicrosecondsTag::Parse(interval), InstantTag::Parse(now), *FrameGenTag::Parse(multiplier));
+}
+
+// Worked examples, a capture at 1000 and the one before it an interval earlier.
+[[nodiscard]] bool BlendPointExamples(infra::RngState&) noexcept
+{
+    const bool halves = PointAt(1000, 1000, 2).Get() == 0.0f && PointAt(1001, 1000, 2).Get() == 0.5f && PointAt(1500, 1000, 2).Get() == 0.5f && PointAt(1501, 1000, 2).Get() == 1.0f;
+    const bool thirds = PointAt(1333, 1000, 3).Get() == 1.0f / 3.0f && PointAt(1334, 1000, 3).Get() == 2.0f / 3.0f && PointAt(2000, 1000, 3).Get() == 1.0f;
+    const bool held = PointAt(9000, 1000, 4).Get() == 1.0f && PointAt(500, 1000, 4).Get() == 0.0f;
+    const bool off = PointAt(1001, 1000, 1).Get() == 1.0f && PointAt(1001, 0, 4).Get() == 1.0f;
+    const FrameGen four = *FrameGenTag::Parse(4);
+    const bool untimed =
+        BlendPoint(std::nullopt, MicrosecondsTag::Parse(1000), InstantTag::Parse(10), four).Get() == 1.0f && BlendPoint(InstantTag::Parse(0), std::nullopt, InstantTag::Parse(10), four).Get() == 1.0f;
+    return halves && thirds && held && off && untimed;
+}
+
+// Against the definition: the point is the first of the multiplier's steps at or past the share of the
+// interval gone, that share held to the interval.
+[[nodiscard]] bool BlendPointIsTheFirstStepAtOrPastTheShareGone(infra::RngState& rng) noexcept
+{
+    const std::uint32_t multiplier = proptest::DrawBetween(rng, 2, 6);
+    const std::uint64_t interval = proptest::DrawBetween(rng, 1, 1000000);
+    const std::uint64_t elapsed = proptest::DrawBelow(rng, 2000000);
+    const double share = std::min(1.0, static_cast<double>(elapsed) / static_cast<double>(interval));
+    const double steps = static_cast<double>(PointAt(1000 + elapsed, interval, multiplier).Get()) * multiplier;
+    const double whole = std::round(steps);
+    return std::abs(steps - whole) < 1e-4 && whole >= share * multiplier - 1e-9 && whole - 1.0 < share * multiplier && whole <= multiplier;
+}
+
+// Two captures an interval apart and a frame shown partway to the next: the second capture copies the picture
+// shown so far into the history before it makes its own and shows the one before (the delay frame generation
+// costs); the frame partway is drawn from both at the step the time has reached.
+[[nodiscard]] bool AFrameBetweenCapturesIsDrawnFromTheHistory(infra::RngState& rng) noexcept
+{
+    const std::uint32_t multiplier = proptest::DrawBetween(rng, 2, 6);
+    const SessionPlan plan = WithFrameGen(RandomPlan(rng), multiplier);
+    const std::uint64_t interval = proptest::DrawBetween(rng, 1000, 100000);
+    const std::uint64_t partway = proptest::DrawBetween(rng, 1, static_cast<std::uint32_t>(interval * (multiplier - 1) / multiplier)); // short of the last step
+    const auto first = PlanFrame(plan, InitialFrameState(plan), CaptureAt(0, true));
+    const auto second = first.has_value() ? PlanFrame(plan, first->next, CaptureAt(interval, true)) : first;
+    const auto between = second.has_value() ? PlanFrame(plan, second->next, CaptureAt(interval + partway, false)) : second;
+    if (!between.has_value())
+        return false;
+    const std::vector<Draw> firstDraws = DrawsOf(first->steps);
+    const std::vector<Draw> secondDraws = DrawsOf(second->steps);
+    const std::vector<Draw> betweenDraws = DrawsOf(between->steps);
+    const bool firstPlain = firstDraws.size() == 1 && !firstDraws[0].history.has_value();
+    const bool copied = secondDraws.size() == 2 && IsHistory(secondDraws[0].target) && !secondDraws[0].history.has_value() && secondDraws[0].blend.Get() == 1.0f;
+    const bool showsBefore = copied && secondDraws[1].history.has_value() && secondDraws[1].motion.has_value() && secondDraws[1].blend.Get() == 0.0f;
+    const float expected = PointAt(1000 + partway, interval, multiplier).Get();
+    const bool drawnBetween = betweenDraws.size() == 1 && betweenDraws[0].history.has_value() && betweenDraws[0].motion->kind == ResourceKind::MotionVectors && betweenDraws[0].blend.Get() == expected;
+    const bool valid = ReplayPlan(first->next.states, *second).valid && ReplayPlan(second->next.states, *between).valid;
+    return firstPlain && showsBefore && drawnBetween && valid && expected > 0.0f && expected < 1.0f;
+}
+
+// A history from before a reset is not one to draw from: the frames after such a capture show the processed
+// picture as it is until a capture without one.
+[[nodiscard]] bool AResetLeavesNothingToDrawBetween(infra::RngState& rng) noexcept
+{
+    const SessionPlan plan = WithFrameGen(RandomPlan(rng), proptest::DrawBetween(rng, 2, 6));
+    const auto first = PlanFrame(plan, InitialFrameState(plan), CaptureAt(0, true));
+    if (!first.has_value())
+        return false;
+    FrameState flagged = first->next; // WAIVER(R2): a test fixture, copied and adjusted before use.
+    flagged.resetPending = true;
+    const auto second = PlanFrame(plan, flagged, CaptureAt(20000, true));
+    const auto between = second.has_value() ? PlanFrame(plan, second->next, CaptureAt(25000, false)) : second;
+    if (!between.has_value())
+        return false;
+    const bool plain = std::ranges::all_of(between->steps.Items(), DrawsTheProcessedPictureAsItIs) && DrawsOf(second->steps).back().blend.Get() == 1.0f;
+    return plain && !second->next.hasHistory;
+}
+
 } // namespace
 
 std::uint32_t FrameSuite(std::uint64_t seed) noexcept
@@ -562,6 +702,11 @@ std::uint32_t FrameSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("switching the model off drops its step", seed, 200, SwitchingTheModelOffDropsItsStep));
     failures += Failures(proptest::ForAll("retuning reprocesses a still screen", seed, 200, RetuningReprocessesAStillScreen));
     failures += Failures(proptest::ForAll("a still screen without a change only presents", seed, 200, AStillScreenWithoutAChangeOnlyPresents));
+    failures += Failures(proptest::ForAll("one times frame generation never touches the history", seed, 300, OneTimesNeverTouchesTheHistory));
+    failures += Failures(proptest::ForAll("the blend point examples hold", seed, 1, BlendPointExamples));
+    failures += Failures(proptest::ForAll("the blend point is the first step at or past the share gone", seed, 2000, BlendPointIsTheFirstStepAtOrPastTheShareGone));
+    failures += Failures(proptest::ForAll("a frame between captures is drawn from the history", seed, 300, AFrameBetweenCapturesIsDrawnFromTheHistory));
+    failures += Failures(proptest::ForAll("a reset leaves nothing to draw between", seed, 200, AResetLeavesNothingToDrawBetween));
     return failures;
 }
 

@@ -1495,7 +1495,8 @@ void ShowOnly(const ControlPanel& panel, Page chosen) noexcept
                                    scale(Field::MvScaleY, current.mvScaleY),
                                    IsOn(panel, Toggle::Vsync),
                                    interior::FractionTag::Parse(SettledValue(panel, Field::ResetThreshold)).value_or(current.resetThreshold),
-                                   interior::DepthValueTag::Parse(SettledValue(panel, Field::DepthValue)).value_or(current.depth) };
+                                   interior::DepthValueTag::Parse(SettledValue(panel, Field::DepthValue)).value_or(current.depth),
+                                   current.frameGen };
 }
 
 // --- the resets --------------------------------------------------------------------------------------

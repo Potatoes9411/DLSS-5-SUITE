@@ -11,6 +11,8 @@ namespace real {
 constexpr DXGI_FORMAT kSwapChainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 constexpr std::uint64_t kFrameWaitMicroseconds = 2000000;
 constexpr std::uint32_t kDepthRtvSlot = interior::kBackBufferCount;
+constexpr std::uint32_t kHistoryRtvSlot = kDepthRtvSlot + 1;
+static_assert(kHistoryRtvSlot < kRtvSlots);
 
 using BackBuffers = std::array<Com<ID3D12Resource>, interior::kBackBufferCount>;
 

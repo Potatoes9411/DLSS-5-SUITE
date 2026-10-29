@@ -85,7 +85,7 @@ std::optional<SrQuality> ChooseQuality(const QualityTable& table, const Extent& 
 
 LiveSettings StartingLive(const SessionPlan& plan) noexcept
 {
-    return LiveSettings{ plan.neuralRendering, plan.tuning, plan.passes, plan.depthInverted, plan.mvScaleX, plan.mvScaleY, plan.vsync, plan.resetThreshold, plan.depth };
+    return LiveSettings{ plan.neuralRendering, plan.tuning, plan.passes, plan.depthInverted, plan.mvScaleX, plan.mvScaleY, plan.vsync, plan.resetThreshold, plan.depth, plan.frameGen };
 }
 
 DisplayMode InitialDisplay(CompareMode compare) noexcept
@@ -166,7 +166,8 @@ Result<SessionPlan, PlanError> PlanSession(const Options& options, const Geometr
                                 o.format,
                                 InitialDisplay(o.compare),
                                 WantsCursor(o, g),
-                                o.vsync };
+                                o.vsync,
+                                o.frameGen };
         };
         return ScaleBetween(work.width, g.sourceExtent.width).and_then([&](Scale scaleX) {
             return ScaleBetween(work.height, g.sourceExtent.height).transform([&](Scale scaleY) { return Assemble(o, g, sr, work, flow, scaleX, scaleY); });

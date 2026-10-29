@@ -219,7 +219,7 @@ struct ModelCheck
 
 [[nodiscard]] bool AreDrawSourcesReadable(const StateTable& s, const interior::Draw& d) noexcept
 {
-    return IsReadable(s, d.processed) && IsReadable(s, d.original);
+    return IsReadable(s, d.processed) && IsReadable(s, d.original) && IsBoundReadable(s, d.history) && IsBoundReadable(s, d.motion);
 }
 
 [[nodiscard]] Result<SimWorld, SimError> CheckDrawTarget(const SimWorld& w, const interior::Draw& d) noexcept
@@ -298,7 +298,7 @@ struct ModelCheck
         base.passes,        (value % 3u) == 0u,
         base.mvScaleX,      base.mvScaleY,
         (value % 5u) != 0u, base.resetThreshold,
-        base.depth
+        base.depth,         FrameGenTag::Parse(1u + static_cast<std::uint32_t>(value % kMaxFrameGen)).value_or(base.frameGen)
     };
 }
 

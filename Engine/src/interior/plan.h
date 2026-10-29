@@ -54,6 +54,7 @@ struct SessionPlan
     DisplayMode initialDisplay;
     bool captureCursor;
     bool vsync;
+    FrameGen frameGen;
     [[nodiscard]] friend constexpr bool operator==(const SessionPlan&, const SessionPlan&) noexcept = default;
 };
 

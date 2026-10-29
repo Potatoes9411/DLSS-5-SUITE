@@ -60,6 +60,7 @@ type ScreenEngineViewModel() as this =
     let applyTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds(600.0))
 
     let styles = [ Standard, "Standard"; Natural, "Natural"; Cinematic, "Cinematic" ]
+    let frameGens = [ 1, "Off"; 2, "2x"; 3, "3x"; 4, "4x"; 5, "5x"; 6, "6x" ]
     let superResolutions = [ SrAuto, "Automatic"; SrDlaa, "DLAA (native resolution)"; SrOff, "Off" ]
     let compares = [ CompareOff, "Off"; CompareSplit, "Split view"; CompareOriginal, "Original only" ]
     let motionBackends = [ "cpu", "CPU (works everywhere)"; "nvofa", "NVIDIA Optical Flow" ]
@@ -605,6 +606,17 @@ type ScreenEngineViewModel() as this =
                 this.RaisePropertyChanged("SelectedStyleIndex")
             | _ -> ()
 
+    member _.FrameGenOptions = frameGens |> List.map snd
+
+    member _.SelectedFrameGenIndex
+        with get () = indexIn frameGens settings.FrameGen
+        and set (value: int) =
+            match valueAt frameGens value with
+            | Some m when m <> settings.FrameGen ->
+                this.Change { settings with FrameGen = m }
+                this.RaisePropertyChanged("SelectedFrameGenIndex")
+            | _ -> ()
+
     // ----- output -----
     member _.SuperResolutionOptions = superResolutions |> List.map snd
 
@@ -1097,7 +1109,7 @@ type ScreenEngineViewModel() as this =
         for name in
             [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "SelectedWindowIndex"; "CaptureFolder"; "ModelFolder"; "NeuralRendering"
               "Intensity"; "IntensityText"; "LocalStructure"; "LocalStructureText"; "LocalTone"; "LocalToneText"
-              "Passes"; "PassesText"; "PassesSlider"; "LocalStructureSlider"; "LocalToneSlider"; "NrPresetSlider"; "NrPresetText"; "SrPresetText"; "MvLevelText"; "ResetThresholdText"; "SkinStrengthSlider"; "SkinStrengthText"; "AutoMask"; "SelectedStyleIndex"; "SelectedSuperResolutionIndex"
+              "Passes"; "PassesText"; "PassesSlider"; "LocalStructureSlider"; "LocalToneSlider"; "NrPresetSlider"; "NrPresetText"; "SrPresetText"; "MvLevelText"; "ResetThresholdText"; "SkinStrengthSlider"; "SkinStrengthText"; "AutoMask"; "SelectedStyleIndex"; "SelectedFrameGenIndex"; "SelectedSuperResolutionIndex"
               "SelectedCompareIndex"; "VSync"; "ShowPanel"; "NrPreset"; "SrPreset"; "MvLevel"
               "ResetThreshold"; "MvScaleAuto"; "UseManualMvScale"; "MvScaleX"; "MvScaleY"
               "CaptureBorder"; "Affinity"; "Topmost"; "ClickThrough"; "ExcludeOwnWindows"

@@ -228,6 +228,13 @@
                                 </Grid>
                             </StackPanel>
 
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsScreenEngine}"
+                                        ToolTip.Tip="Draws extra in-between frames from the motion between processed frames. Smoother, adds about one frame of delay. Output can't exceed your monitor's refresh rate.">
+                                <TextBlock Text="Frame generation" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" Width="110" />
+                                <ComboBox Classes="GlassComboBox" ItemsSource="{Binding FrameGenOptions}"
+                                          SelectedIndex="{Binding SelectedFrameGenIndex, Mode=TwoWay}" MinWidth="150" Height="34" />
+                            </StackPanel>
+
                             <Border Height="1" Background="#24FFFFFF" Margin="0,3" IsVisible="{Binding IsNeuralScreen}" />
 
                             <!-- Everything NeuralScreen has that the Screen Engine does not.

@@ -59,6 +59,8 @@ module ScreenEngine =
         let TunePasses = 7
         [<Literal>]
         let TuneNeuralRendering = 8
+        [<Literal>]
+        let TuneFrameGen = 9
 
         [<DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)>]
         extern nativeint FindWindowW(string className, string windowName)
@@ -225,6 +227,9 @@ module ScreenEngine =
           AutoMask: bool
           /// Runs the model on its own output this many times a frame; at least 1.
           Passes: int
+          /// Pictures shown for each processed one, 1 (off) to 6. The ones
+          /// between are interpolated from the motion between processed frames.
+          FrameGen: int
           SuperResolution: SuperResolution
           Motion: Motion
           Cursor: Cursor
@@ -244,6 +249,7 @@ module ScreenEngine =
             Skin = after.Skin
             AutoMask = after.AutoMask
             Passes = after.Passes
+            FrameGen = after.FrameGen
             NeuralRendering = after.NeuralRendering } = after
 
     /// The engine's own defaults, so a fresh install behaves like the engine
@@ -260,6 +266,7 @@ module ScreenEngine =
           Skin = FollowStructure
           AutoMask = true
           Passes = 1
+          FrameGen = 1
           SuperResolution = SrAuto
           Motion = BuiltIn
           Cursor = CursorAuto
@@ -345,6 +352,8 @@ module ScreenEngine =
                 | SkinStrength _ -> FollowStructure
                 | FollowStructure -> FollowStructure
             Passes = max 1 s.Passes
+            // The engine refuses to start on anything outside 1 to 6.
+            FrameGen = Math.Clamp(s.FrameGen, 1, 6)
             Advanced = normalizeAdvanced s.Advanced }
 
     // =====================================================================
@@ -415,6 +424,7 @@ module ScreenEngine =
               )
           yield opt "nr-automask" (onOff s.AutoMask)
           yield opt "nr-passes" (string s.Passes)
+          yield opt "frame-gen" (string s.FrameGen)
           yield opt "nr-preset" (string a.NrPreset)
           yield opt "nr-ui-correction" (onOff a.UiCorrection)
 
@@ -704,6 +714,7 @@ module ScreenEngine =
           Skin: float
           AutoMask: bool
           Passes: int
+          FrameGen: int
           SuperResolution: string
           Motion: string
           Cursor: string
@@ -730,6 +741,7 @@ module ScreenEngine =
           Skin = (match s.Skin with SkinStrength v -> v | FollowStructure -> 0.0)
           AutoMask = s.AutoMask
           Passes = s.Passes
+          FrameGen = s.FrameGen
           SuperResolution = (match s.SuperResolution with SrAuto -> "auto" | SrDlaa -> "dlaa" | SrOff -> "off")
           Motion = (match s.Motion with BuiltIn -> "builtin" | NvidiaOpticalFlow -> "nvof" | NoMotion -> "none")
           Cursor = (match s.Cursor with CursorAuto -> "auto" | CursorOn -> "on" | CursorOff -> "off")
@@ -758,6 +770,7 @@ module ScreenEngine =
               Skin = (if d.SkinFollowsStructure then FollowStructure else SkinStrength d.Skin)
               AutoMask = d.AutoMask
               Passes = d.Passes
+              FrameGen = d.FrameGen
               SuperResolution = pick d.SuperResolution [ "auto", SrAuto; "dlaa", SrDlaa; "off", SrOff ] SrAuto
               Motion = pick d.Motion [ "builtin", BuiltIn; "nvof", NvidiaOpticalFlow; "none", NoMotion ] BuiltIn
               Cursor = pick d.Cursor [ "auto", CursorAuto; "on", CursorOn; "off", CursorOff ] CursorAuto
@@ -898,6 +911,7 @@ module ScreenEngine =
                       if before.Style <> after.Style then yield SuiteControl.postTuneRaw SuiteControl.TuneStyle (styleCode after.Style)
                       if before.AutoMask <> after.AutoMask then yield SuiteControl.postTuneRaw SuiteControl.TuneAutoMask (if after.AutoMask then 1 else 0)
                       if before.Passes <> after.Passes then yield SuiteControl.postTuneRaw SuiteControl.TunePasses after.Passes
+                      if before.FrameGen <> after.FrameGen then yield SuiteControl.postTuneRaw SuiteControl.TuneFrameGen after.FrameGen
                       if before.NeuralRendering <> after.NeuralRendering then yield SuiteControl.postTuneRaw SuiteControl.TuneNeuralRendering (if after.NeuralRendering then 1 else 0) ]
                 not (List.contains false sent)
 

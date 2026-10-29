@@ -26,6 +26,7 @@ enum class UnitError : std::uint8_t {
     LevelOutOfRange,
     LevelCountOutOfRange,
     PassCountZero,
+    FrameGenOutOfRange,
     PresetOutOfRange,
     SlotOutOfRange,
     BackBufferOutOfRange,
@@ -43,6 +44,7 @@ constexpr std::uint32_t kMaxSrPreset = 15;
 constexpr std::uint32_t kDescriptorsPerFrame = 512;
 constexpr std::uint32_t kBackBufferCount = 3;
 constexpr std::uint32_t kFrameSlotCount = 2;
+constexpr std::uint32_t kMaxFrameGen = 6;
 constexpr float kMaxScale = 64.0f;
 constexpr float kFloatMax = 3.402823466e+38f;
 
@@ -211,6 +213,18 @@ using PassCount = infra::Strong<std::uint32_t, PassCountTag>;
 struct PassCountTag
 {
     [[nodiscard]] static constexpr Result<PassCount, UnitError> Parse(std::uint32_t raw) noexcept;
+};
+
+// How many pictures are shown for each one the model makes: one is the model's pictures as they are, and
+// each further one is drawn between two of them from the motion that joins them.
+struct FrameGenTag;
+using FrameGen = infra::Strong<std::uint32_t, FrameGenTag>;
+struct FrameGenTag
+{
+    [[nodiscard]] static constexpr Result<FrameGen, UnitError> Parse(std::uint32_t raw) noexcept;
+
+private:
+    [[nodiscard]] static constexpr Result<FrameGen, UnitError> ParseNonZero(std::uint32_t raw) noexcept;
 };
 
 struct NgxPresetTag;
@@ -510,6 +524,20 @@ constexpr Result<PassCount, UnitError> PassCountTag::Parse(std::uint32_t raw) no
     if (IsZero(raw))
         return infra::Fail(UnitError::PassCountZero);
     return PassCount(raw);
+}
+
+constexpr Result<FrameGen, UnitError> FrameGenTag::ParseNonZero(std::uint32_t raw) noexcept
+{
+    if (raw > kMaxFrameGen)
+        return infra::Fail(UnitError::FrameGenOutOfRange);
+    return FrameGen(raw);
+}
+
+constexpr Result<FrameGen, UnitError> FrameGenTag::Parse(std::uint32_t raw) noexcept
+{
+    if (IsZero(raw))
+        return infra::Fail(UnitError::FrameGenOutOfRange);
+    return ParseNonZero(raw);
 }
 
 // The model resolves a preset it does not carry to the one it ships with and says so in its log, so a

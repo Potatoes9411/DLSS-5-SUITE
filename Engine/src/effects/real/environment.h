@@ -26,6 +26,7 @@ struct Statistics
     interior::Instant lastReport;
     std::uint32_t processed;
     std::uint32_t presented;
+    interior::FrameGen frameGen; // the multiplier last reported, so a change is logged once
 };
 
 struct Begun

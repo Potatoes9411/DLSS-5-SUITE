@@ -7,7 +7,7 @@ namespace real {
 constexpr std::uint32_t kComputeSrvCount = 4;
 constexpr std::uint32_t kComputeUavCount = 2;
 constexpr std::uint32_t kRootConstantCount = 16;
-constexpr std::uint32_t kBlitSrvCount = 2;
+constexpr std::uint32_t kBlitSrvCount = 4; // processed, original, history, motion
 
 struct Pipelines
 {

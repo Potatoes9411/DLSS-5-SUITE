@@ -76,6 +76,8 @@ Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameCont
 
         static constexpr auto IsBackBuffer = [] [[nodiscard]] (const ResourceId& id) noexcept -> bool { return id.kind == interior::ResourceKind::BackBuffer; };
 
+        static constexpr auto IsHistory = [] [[nodiscard]] (const ResourceId& id) noexcept -> bool { return id.kind == interior::ResourceKind::History; };
+
         static constexpr auto WriteView = [] [[nodiscard]] (const Gpu& gpu, ViewKind kind, const std::optional<ResourceId>& id, std::uint32_t heapIndex) noexcept -> Status<Error> {
             static constexpr auto CreateNullView = [](const GpuDevice& device, ViewKind kind, D3D12_CPU_DESCRIPTOR_HANDLE handle) noexcept -> void {
                 switch (kind)
@@ -256,14 +258,20 @@ Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameCont
                         gpu.list->RSSetViewports(1, &viewport);
                         gpu.list->RSSetScissorRects(1, &scissor);
                     };
-                    REQUIRE(IsBackBuffer(d.target));
-                    const D3D12_CPU_DESCRIPTOR_HANDLE rtv = RtvHandle(gpu.device, d.target.buffer.Get());
+                    // A draw lands in a back buffer, or in the history that frame generation draws the picture before from.
+                    static constexpr auto RtvSlotOf = [] [[nodiscard]] (const ResourceId& target) noexcept -> std::uint32_t {
+                        static constexpr auto IsDrawTarget = [] [[nodiscard]] (const ResourceId& target) noexcept -> bool { return IsBackBuffer(target) || IsHistory(target); };
+                        REQUIRE(IsDrawTarget(target));
+                        return IsHistory(target) ? kHistoryRtvSlot : target.buffer.Get();
+                    };
+                    const D3D12_CPU_DESCRIPTOR_HANDLE rtv = RtvHandle(gpu.device, RtvSlotOf(d.target));
                     gpu.list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
                     SetViewport(gpu);
                 };
 
                 static constexpr auto SetBlitPipeline = [](const Gpu& gpu, const interior::Draw& d, std::uint32_t base) noexcept -> void {
-                    static constexpr auto BlitConstants = [] [[nodiscard]] (interior::DisplayMode mode, interior::Fraction split) noexcept -> std::array<std::uint32_t, 4> {
+                    // Mode, divider, blend point and whether there is a history to blend from, in Blit.hlsl's cbuffer order.
+                    static constexpr auto BlitConstants = [] [[nodiscard]] (const interior::Draw& d) noexcept -> std::array<std::uint32_t, 4> {
                         static constexpr auto ModeCode = [] [[nodiscard]] (interior::DisplayMode mode) noexcept -> std::uint32_t {
                             switch (mode)
                             {
@@ -273,9 +281,10 @@ Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameCont
                             }
                             return 0;
                         };
-                        return { ModeCode(mode), std::bit_cast<std::uint32_t>(split.Get()), 0u, 0u };
+                        static constexpr auto HistoryFlag = [] [[nodiscard]] (const interior::Draw& d) noexcept -> std::uint32_t { return d.history.has_value() ? 1u : 0u; };
+                        return { ModeCode(d.mode), std::bit_cast<std::uint32_t>(d.split.Get()), std::bit_cast<std::uint32_t>(d.blend.Get()), HistoryFlag(d) };
                     };
-                    const std::array<std::uint32_t, 4> constants = BlitConstants(d.mode, d.split);
+                    const std::array<std::uint32_t, 4> constants = BlitConstants(d);
                     gpu.list->SetGraphicsRootSignature(gpu.pipelines.blitRoot.Get());
                     gpu.list->SetPipelineState(gpu.pipelines.blit.Get());
                     gpu.list->SetGraphicsRoot32BitConstants(0, static_cast<UINT>(constants.size()), constants.data(), 0);
@@ -291,6 +300,8 @@ Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameCont
             return RequireBudget(c, kBlitSrvCount)
                 .and_then([&] { return WriteView(gpu, ViewKind::Srv, d.processed, base); })
                 .and_then([&] { return WriteView(gpu, ViewKind::Srv, d.original, base + 1); })
+                .and_then([&] { return WriteView(gpu, ViewKind::Srv, d.history, base + 2); })
+                .and_then([&] { return WriteView(gpu, ViewKind::Srv, d.motion, base + 3); })
                 .transform([&] { return Drawn(gpu, d, base, c); });
         };
 

@@ -83,6 +83,17 @@ let ``passes never drop below one`` () =
     Assert.Equal(Some "1", valueOf "--nr-passes" (args { defaults with Passes = 0 }))
 
 [<Fact>]
+let ``frame generation is written as the engine's multiplier and kept within one to six`` () =
+    Assert.Equal(Some "1", valueOf "--frame-gen" (args defaults))
+    Assert.Equal(Some "4", valueOf "--frame-gen" (args { defaults with FrameGen = 4 }))
+    Assert.Equal(Some "1", valueOf "--frame-gen" (args { defaults with FrameGen = 0 }))
+    Assert.Equal(Some "6", valueOf "--frame-gen" (args { defaults with FrameGen = 7 }))
+
+[<Fact>]
+let ``frame generation is a live setting`` () =
+    Assert.True(liveFieldsOnly defaults { defaults with FrameGen = 3 })
+
+[<Fact>]
 let ``a target is dropped when every monitor is the source`` () =
     // The engine refuses --target together with --monitor all.
     let a = args { defaults with Source = AllMonitors; Target = Some 1 }
@@ -128,6 +139,7 @@ let ``settings survive being saved and loaded`` () =
             LocalStructure = 7.5
             Skin = SkinStrength 0.4
             Passes = 2
+            FrameGen = 3
             Motion = NoMotion }
     Assert.Equal(original, deserialize (serialize original))
 
@@ -282,6 +294,8 @@ let ``a settings file from before the advanced options keeps their defaults`` ()
     Assert.Equal(AllMonitors, loaded.Source)
     Assert.Equal(0.5, loaded.Intensity)
     Assert.Equal(advancedDefaults, loaded.Advanced)
+    // Frame generation came later still: off, not a multiplier of 0 the engine refuses.
+    Assert.Equal(1, loaded.FrameGen)
 
 [<Fact>]
 let ``a settings file with some advanced options keeps the rest at their defaults`` () =

@@ -71,6 +71,7 @@ enum class OptionId : std::uint8_t {
     ShowInert,
     ExcludeOwnWindows,
     ExclusionLog,
+    FrameGen,
 };
 
 enum class ValueKind : std::uint8_t {
@@ -103,7 +104,7 @@ struct OptionSpec
     ValueKind kind;
 };
 
-constexpr std::array<OptionSpec, 52> kSpecs{ {
+constexpr std::array<OptionSpec, 53> kSpecs{ {
     { L"help", OptionId::Help, ValueKind::Flag },
     { L"list-monitors", OptionId::ListMonitors, ValueKind::Flag },
     { L"monitor", OptionId::Monitor, ValueKind::MonitorSel },
@@ -123,6 +124,7 @@ constexpr std::array<OptionSpec, 52> kSpecs{ {
     { L"mv", OptionId::Mv, ValueKind::Motion },
     { L"mv-level", OptionId::MvLevel, ValueKind::UInt },
     { L"nr-passes", OptionId::NrPasses, ValueKind::UInt },
+    { L"frame-gen", OptionId::FrameGen, ValueKind::UInt },
     { L"nvof-grid", OptionId::NvofGrid, ValueKind::Grid },
     { L"nvof-perf", OptionId::NvofPerf, ValueKind::Perf },
     { L"depth-value", OptionId::DepthValue, ValueKind::Float },
@@ -323,6 +325,7 @@ struct ValidatedNumbers
     Fraction threshold;
     std::optional<MotionScale> mvScaleX;
     std::optional<MotionScale> mvScaleY;
+    FrameGen frameGen;
 };
 
 struct ValidatedScales
@@ -340,11 +343,12 @@ constexpr auto kDefaultPreset = NgxPresetTag::Parse(kShippedNgxPreset); // askin
 constexpr auto kDefaultSrPreset = SrPresetTag::Parse(0);
 constexpr auto kDefaultLevel = LevelIndexTag::Parse(1);
 constexpr auto kDefaultPasses = PassCountTag::Parse(1);
+constexpr auto kDefaultFrameGen = FrameGenTag::Parse(1); // one picture shown for each one made: frame generation off
 constexpr auto kDefaultProjectId = ProjectIdText::Parse("5e9b2a44-7c31-4d0e-9f2b-8d3c1a6e7f10");
 static_assert(kDefaultIntensity.has_value() && kDefaultStrength.has_value() && kDefaultSkin.has_value());
 static_assert(kDefaultDepth.has_value() && kDefaultThreshold.has_value());
 static_assert(kDefaultPreset.has_value() && kDefaultSrPreset.has_value());
-static_assert(kDefaultLevel.has_value() && kDefaultProjectId.has_value() && kDefaultPasses.has_value());
+static_assert(kDefaultLevel.has_value() && kDefaultProjectId.has_value() && kDefaultPasses.has_value() && kDefaultFrameGen.has_value());
 
 } // namespace
 
@@ -352,7 +356,7 @@ LiveSettings DefaultLive(const Options& o) noexcept
 {
     const Result<MotionScale, UnitError> one = MotionScaleTag::Parse(1.0f);
     ENSURE(one.has_value());
-    return LiveSettings{ o.neuralRendering, o.tuning, o.nrPasses, o.depthInverted, o.mvScaleX.value_or(*one), o.mvScaleY.value_or(*one), o.vsync, o.resetThreshold, o.depthValue };
+    return LiveSettings{ o.neuralRendering, o.tuning, o.nrPasses, o.depthInverted, o.mvScaleX.value_or(*one), o.mvScaleY.value_or(*one), o.vsync, o.resetThreshold, o.depthValue, o.frameGen };
 }
 
 Options DefaultOptions() noexcept
@@ -403,6 +407,7 @@ Options DefaultOptions() noexcept
         false,
         true,
         false,
+        *kDefaultFrameGen,
     };
 }
 
@@ -479,7 +484,11 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                     return Validated(list, OptionId::NrPasses, d.nrPasses, PassCountTag::Parse).and_then([&](PassCount passes) {
                         return Validated(list, OptionId::DepthValue, d.depthValue, DepthValueTag::Parse).and_then([&](DepthValue depth) {
                             return Validated(list, OptionId::ResetThreshold, d.resetThreshold, FractionTag::Parse).and_then([&](Fraction threshold) {
-                                return ScalesOf(list).transform([&](const ValidatedScales& scales) { return ValidatedNumbers{ srPreset, level, passes, depth, threshold, scales.x, scales.y }; });
+                                return ScalesOf(list).and_then([&](const ValidatedScales& scales) {
+                                    return Validated(list, OptionId::FrameGen, d.frameGen, FrameGenTag::Parse).transform([&](FrameGen frameGen) {
+                                        return ValidatedNumbers{ srPreset, level, passes, depth, threshold, scales.x, scales.y, frameGen };
+                                    });
+                                });
                             });
                         });
                     });
@@ -549,6 +558,7 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                 ValueOr(list, OptionId::ShowInert, d.showInert),
                 ValueOr(list, OptionId::ExcludeOwnWindows, d.excludeOwnWindows),
                 ValueOr(list, OptionId::ExclusionLog, d.exclusionLog),
+                n.frameGen,
             };
         };
         const Options d = DefaultOptions();

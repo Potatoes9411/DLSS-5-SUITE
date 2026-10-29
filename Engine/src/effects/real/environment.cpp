@@ -254,6 +254,7 @@ constexpr std::uint64_t kSweepFieldMask = (1ULL << kSweepFieldBits) - 1ULL;
     case TuneField::None:
     case TuneField::Passes:
     case TuneField::NeuralRendering:
+    case TuneField::FrameGen:
     default: return t;
     }
 }
@@ -264,16 +265,24 @@ constexpr std::uint64_t kSweepFieldMask = (1ULL << kSweepFieldBits) - 1ULL;
         if (raw <= 0)
             return live;
         const interior::PassCount passes = interior::PassCountTag::Parse(static_cast<std::uint32_t>(raw)).value_or(live.passes);
-        return interior::LiveSettings{ live.neuralRendering, live.tuning,        passes,           live.depthInverted, live.mvScaleX,
-                                       live.mvScaleY,        live.vsync,         live.resetThreshold, live.depth };
+        return interior::LiveSettings{ live.neuralRendering, live.tuning, passes, live.depthInverted, live.mvScaleX, live.mvScaleY, live.vsync, live.resetThreshold, live.depth, live.frameGen };
+    };
+    // One to six pictures shown for each one made; a number outside that leaves the multiplier as it is, as a bad
+    // pass count does.
+    static constexpr auto WithFrameGen = [] [[nodiscard]] (const interior::LiveSettings& live, std::int32_t raw) noexcept -> interior::LiveSettings {
+        if (raw <= 0)
+            return live;
+        const interior::FrameGen frameGen = interior::FrameGenTag::Parse(static_cast<std::uint32_t>(raw)).value_or(live.frameGen);
+        return interior::LiveSettings{ live.neuralRendering, live.tuning, live.passes, live.depthInverted, live.mvScaleX, live.mvScaleY, live.vsync, live.resetThreshold, live.depth, frameGen };
     };
     if (FieldOfTune(word) == TuneField::Passes)
         return WithPasses(live, RawOfTune(word));
+    if (FieldOfTune(word) == TuneField::FrameGen)
+        return WithFrameGen(live, RawOfTune(word));
     if (FieldOfTune(word) == TuneField::NeuralRendering)
-        return interior::LiveSettings{ RawOfTune(word) != 0, live.tuning,   live.passes,         live.depthInverted, live.mvScaleX,
-                                       live.mvScaleY,        live.vsync,    live.resetThreshold, live.depth };
-    return interior::LiveSettings{ live.neuralRendering, TunedBy(live.tuning, word), live.passes,         live.depthInverted, live.mvScaleX,
-                                   live.mvScaleY,        live.vsync,                 live.resetThreshold, live.depth };
+        return interior::LiveSettings{ RawOfTune(word) != 0, live.tuning, live.passes, live.depthInverted, live.mvScaleX, live.mvScaleY, live.vsync, live.resetThreshold, live.depth, live.frameGen };
+    return interior::LiveSettings{ live.neuralRendering, TunedBy(live.tuning, word), live.passes, live.depthInverted, live.mvScaleX, live.mvScaleY,
+                                   live.vsync,           live.resetThreshold,        live.depth,  live.frameGen };
 }
 
 // Every change SUITE asked for this frame, in the order it asked.
@@ -332,9 +341,9 @@ constexpr std::uint64_t kSweepFieldMask = (1ULL << kSweepFieldBits) - 1ULL;
 RealEnvironment::RealEnvironment(HeldFiles held, Gpu gpu, const SessionPlan& plan, OutputWindow window, const ControlPanel* panel, const Console& console, const EnvironmentSettings& settings,
                                  const interior::Options& options, std::uint32_t finestPixels, interior::FenceValue fence, interior::Instant start) noexcept
     : held_(std::move(held)), gpu_(std::move(gpu)), plan_(plan), window_(std::move(window)), panel_(panel), console_(console), finestPixels_(finestPixels),
-      frame_{ interior::FrameNumberTag::Parse(0), *kZeroSlot, *kZeroSet, false, fence }, stats_{ start, 0, 0 }, applied_(settings), clearedDepth_(plan.depth), restartWanted_(false), resized_(false),
-      pending_(plan.source), since_(start), options_(options), built_(ShapeOf(panel)), wanted_(built_), asked_(start), abandoned_(false), snapshot_(std::nullopt), recording_(std::nullopt),
-      comparison_(std::nullopt), cursor_(std::nullopt), writer_(std::make_unique<PngWriter>()), now_(start)
+      frame_{ interior::FrameNumberTag::Parse(0), *kZeroSlot, *kZeroSet, false, fence }, stats_{ start, 0, 0, interior::StartingLive(plan).frameGen }, applied_(settings), clearedDepth_(plan.depth),
+      restartWanted_(false), resized_(false), pending_(plan.source), since_(start), options_(options), built_(ShapeOf(panel)), wanted_(built_), asked_(start), abandoned_(false),
+      snapshot_(std::nullopt), recording_(std::nullopt), comparison_(std::nullopt), cursor_(std::nullopt), writer_(std::make_unique<PngWriter>()), now_(start)
 {
 }
 
@@ -674,10 +683,10 @@ Result<FrameStart, Error> RealEnvironment::Accept(const Begun& begun) noexcept
 
         static constexpr auto Counted = [] [[nodiscard]] (const Statistics& s, bool fresh) noexcept -> Statistics {
             static constexpr auto CountOf = [] [[nodiscard]] (bool flag) noexcept -> std::uint32_t { return flag ? 1u : 0u; };
-            return Statistics{ s.lastReport, s.processed + CountOf(fresh), s.presented };
+            return Statistics{ s.lastReport, s.processed + CountOf(fresh), s.presented, s.frameGen };
         };
 
-        static constexpr auto Restarted = [] [[nodiscard]] (interior::Instant now) noexcept -> Statistics { return Statistics{ now, 0, 0 }; };
+        static constexpr auto Restarted = [] [[nodiscard]] (const Statistics& s, interior::Instant now) noexcept -> Statistics { return Statistics{ now, 0, 0, s.frameGen }; };
 
         static constexpr auto LogThroughput = [] [[nodiscard]] (const Console& console, const Statistics& s, interior::Instant now) noexcept -> Status<Error> {
             const double seconds = static_cast<double>(now.Get() - s.lastReport.Get()) / 1000000.0;
@@ -685,9 +694,28 @@ Result<FrameStart, Error> RealEnvironment::Accept(const Begun& begun) noexcept
         };
         if (!IsReportDue(s, input.now))
             return Counted(s, input.freshCapture);
-        return LogThroughput(console, s, input.now).transform([&] { return Counted(Restarted(input.now), input.freshCapture); });
+        return LogThroughput(console, s, input.now).transform([&] { return Counted(Restarted(s, input.now), input.freshCapture); });
     };
-    const Result<Statistics, Error> stats = Reported(console_, stats_, begun.input);
+
+    // The frame-generation multiplier is logged once when it changes, beside the throughput it changes.
+    static constexpr auto FrameGenReported = [] [[nodiscard]] (const Console& console, const Statistics& s, const interior::FrameInput& input) noexcept -> Result<Statistics, Error> {
+        static constexpr auto RequestedFrameGen = [] [[nodiscard]] (const Statistics& s, const interior::FrameInput& input) noexcept -> interior::FrameGen {
+            return input.controlRequest.has_value() ? input.controlRequest->frameGen : s.frameGen;
+        };
+
+        static constexpr auto LogFrameGen = [] [[nodiscard]] (const Console& console, interior::FrameGen frameGen) noexcept -> Status<Error> {
+            return Log(console, interior::LogLevel::Info, infra::Formatted<120>("frame generation {}x ({} pictures shown for each one processed)", frameGen.Get(), frameGen.Get()).Get());
+        };
+
+        static constexpr auto WithFrameGen = [] [[nodiscard]] (const Statistics& s, interior::FrameGen frameGen) noexcept -> Statistics {
+            return Statistics{ s.lastReport, s.processed, s.presented, frameGen };
+        };
+        const interior::FrameGen requested = RequestedFrameGen(s, input);
+        if (requested == s.frameGen)
+            return s;
+        return LogFrameGen(console, requested).transform([&] { return WithFrameGen(s, requested); });
+    };
+    const Result<Statistics, Error> stats = Reported(console_, stats_, begun.input).and_then([&](const Statistics& s) { return FrameGenReported(console_, s, begun.input); });
     if (!stats.has_value())
         return Fail(stats.error());
     frame_ = begun.frame; // WAIVER(R2): the frame context is the effect layer's state, replaced whole per frame.
@@ -962,7 +990,7 @@ Result<ExecutionReport, Error> RealEnvironment::Retuned(const interior::LiveSett
 
 Result<ExecutionReport, Error> RealEnvironment::Ran(const interior::FramePlan& plan) noexcept
 {
-    static constexpr auto Presented = [] [[nodiscard]] (const Statistics& s) noexcept -> Statistics { return Statistics{ s.lastReport, s.processed, s.presented + 1 }; };
+    static constexpr auto Presented = [] [[nodiscard]] (const Statistics& s) noexcept -> Statistics { return Statistics{ s.lastReport, s.processed, s.presented + 1, s.frameGen }; };
     const Result<interior::FenceValue, Error> fence = ExecuteSteps(gpu_, frame_, plan.steps);
     if (!fence.has_value())
         return Fail(fence.error());
@@ -1247,9 +1275,24 @@ Result<RealEnvironment, Error> CreateEnvironment(HeldFiles held, GpuDevice devic
                     };
                     return WithLuma(t, d, extents, LumaLevels(plan)).and_then([&](const ResourceTable& n) { return WithPyramid(n, d, extents, Pyramid{ LevelKind::Flow, 0, FlowLevels(plan) }); });
                 };
+                // The picture shown before the current one, kept at the size and in the format of the back buffers so frame
+                // generation can draw the frames between the two. It exists in every session, so the multiplier can change
+                // while one runs without a texture being made.
+                static constexpr auto WithHistory = [] [[nodiscard]] (const ResourceTable& t, const GpuDevice& d, const SessionPlan& plan) noexcept -> TableResult {
+                    static constexpr auto HistoryRequest = [] [[nodiscard]] (const SessionPlan& plan) noexcept -> TextureRequest {
+                        return TextureRequest{ plan.target, kSwapChainFormat, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, ToD3D(interior::ResourceState::ShaderRead), L"Frame generation history" };
+                    };
+
+                    static constexpr auto WithView = [] [[nodiscard]] (const ResourceTable& t, const GpuDevice& d, const Texture& texture) noexcept -> ResourceTable {
+                        CreateRtv(d, texture.resource.Get(), kSwapChainFormat, RtvHandle(d, kHistoryRtvSlot));
+                        return WithResource(t, SimpleId(ResourceKind::History), texture.resource);
+                    };
+                    return CreateTexture(d, HistoryRequest(plan)).transform([&](const Texture& texture) { return WithView(t, d, texture); });
+                };
                 const DXGI_FORMAT model = ModelFormatOf(plan.format);
                 return CoreTextures(WithBackBuffers(ResourceTable{}, presenter), d, plan, model, canvas)
                     .and_then([&](const ResourceTable& n) { return ModelOutputs(n, d, plan, model); })
+                    .and_then([&](const ResourceTable& n) { return WithHistory(n, d, plan); })
                     .and_then([&](const ResourceTable& n) { return Buffers(n, d); })
                     .and_then([&](const ResourceTable& n) { return Pyramids(n, d, plan, extents); });
             };

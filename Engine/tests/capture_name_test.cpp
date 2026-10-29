@@ -63,8 +63,16 @@ using namespace interior;
                            SkinStrengthTag::Parse(skin).value_or(t.skinStructure),
                            proptest::DrawBool(rng),
                            t.uiCorrection };
-    return LiveSettings{ base.neuralRendering, tuning,    PassCountTag::Parse(proptest::DrawBetween(rng, 1, 6)).value_or(base.passes), base.depthInverted, base.mvScaleX, base.mvScaleY, base.vsync,
-                         base.resetThreshold,  base.depth };
+    return LiveSettings{ base.neuralRendering,
+                         tuning,
+                         PassCountTag::Parse(proptest::DrawBetween(rng, 1, 6)).value_or(base.passes),
+                         base.depthInverted,
+                         base.mvScaleX,
+                         base.mvScaleY,
+                         base.vsync,
+                         base.resetThreshold,
+                         base.depth,
+                         base.frameGen };
 }
 
 [[nodiscard]] CaptureMoment RandomMoment(infra::RngState& rng) noexcept

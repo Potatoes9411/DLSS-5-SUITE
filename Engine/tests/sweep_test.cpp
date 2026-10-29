@@ -37,8 +37,16 @@ constexpr float kTolerance = 1e-5f;
                            SkinStrengthTag::Parse(skin).value_or(t.skinStructure),
                            proptest::DrawBool(rng),
                            t.uiCorrection };
-    return LiveSettings{ proptest::DrawBool(rng), tuning, PassCountTag::Parse(proptest::DrawBetween(rng, 1, 6)).value_or(d.passes), d.depthInverted, d.mvScaleX, d.mvScaleY, d.vsync,
-                         d.resetThreshold,        d.depth };
+    return LiveSettings{ proptest::DrawBool(rng),
+                         tuning,
+                         PassCountTag::Parse(proptest::DrawBetween(rng, 1, 6)).value_or(d.passes),
+                         d.depthInverted,
+                         d.mvScaleX,
+                         d.mvScaleY,
+                         d.vsync,
+                         d.resetThreshold,
+                         d.depth,
+                         d.frameGen };
 }
 
 // Any spec at all, counts past either end included, so the clamping is exercised.
