@@ -160,6 +160,21 @@ std::string_view Describe(ApiCall call) noexcept
     case ApiCall::MfWriteSample: return "IMFSinkWriter::WriteSample";
     case ApiCall::MfFinalize: return "IMFSinkWriter::Finalize";
     case ApiCall::PngWriteTimeout: return "the picture writer took longer than a minute over one picture, so it is taken to be stuck";
+    case ApiCall::OpenStreamlineFile: return "opening sl.interposer.dll beside the program to check its signature";
+    case ApiCall::StreamlineNotSigned: return "ERROR: sl.interposer.dll has no signature Windows trusts. It is not the correct file.";
+    case ApiCall::StreamlineNotFromNvidia: return "ERROR: sl.interposer.dll is signed, but none of its signers is NVIDIA. It is not the correct file.";
+    case ApiCall::StreamlineRootNotTrusted:
+        return "ERROR: sl.interposer.dll is signed as NVIDIA Corporation, but the signature's chain does not reach a root on Microsoft's own trusted root list. It is not the correct file.";
+    case ApiCall::LoadStreamline: return "loading sl.interposer.dll, NVIDIA Streamline, from beside the program";
+    case ApiCall::StreamlineInit: return "slInit";
+    case ApiCall::StreamlineDevice: return "slSetD3DDevice";
+    case ApiCall::FrameGenerationUnsupported: return "NVIDIA DLSS Frame Generation is not supported on this GPU, driver or Windows setup (slIsFeatureSupported)";
+    case ApiCall::StreamlineUpgrade: return "slUpgradeInterface";
+    case ApiCall::StreamlineFocus: return "sl.common.dll does not import GetForegroundWindow, so the overlay cannot be counted as in front";
+    case ApiCall::StreamlineFrame: return "handing a frame to NVIDIA DLSS Frame Generation";
+    case ApiCall::StreamlineState: return "slDLSSGGetState";
+    case ApiCall::CreateSwapChainForHwnd: return "IDXGIFactory2::CreateSwapChainForHwnd";
+    case ApiCall::WaitForCompositor: return "DwmFlush, waiting for the compositor's next frame";
     }
     return "unknown call";
 }

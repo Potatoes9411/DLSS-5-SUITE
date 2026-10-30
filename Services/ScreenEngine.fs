@@ -230,6 +230,10 @@ module ScreenEngine =
           /// Pictures shown for each processed one, 1 (off) to 6. The ones
           /// between are interpolated from the motion between processed frames.
           FrameGen: int
+          /// The pictures between are made by NVIDIA DLSS Frame Generation (RTX 40
+          /// and 50) instead of the engine's own blend. The engine falls back to its
+          /// own, and says so in its log, when Streamline cannot start.
+          NvidiaFrameGen: bool
           SuperResolution: SuperResolution
           Motion: Motion
           Cursor: Cursor
@@ -267,6 +271,7 @@ module ScreenEngine =
           AutoMask = true
           Passes = 1
           FrameGen = 1
+          NvidiaFrameGen = false
           SuperResolution = SrAuto
           Motion = BuiltIn
           Cursor = CursorAuto
@@ -425,6 +430,7 @@ module ScreenEngine =
           yield opt "nr-automask" (onOff s.AutoMask)
           yield opt "nr-passes" (string s.Passes)
           yield opt "frame-gen" (string s.FrameGen)
+          yield opt "nvidia-frame-gen" (onOff s.NvidiaFrameGen)
           yield opt "nr-preset" (string a.NrPreset)
           yield opt "nr-ui-correction" (onOff a.UiCorrection)
 
@@ -715,6 +721,7 @@ module ScreenEngine =
           AutoMask: bool
           Passes: int
           FrameGen: int
+          NvidiaFrameGen: bool
           SuperResolution: string
           Motion: string
           Cursor: string
@@ -742,6 +749,7 @@ module ScreenEngine =
           AutoMask = s.AutoMask
           Passes = s.Passes
           FrameGen = s.FrameGen
+          NvidiaFrameGen = s.NvidiaFrameGen
           SuperResolution = (match s.SuperResolution with SrAuto -> "auto" | SrDlaa -> "dlaa" | SrOff -> "off")
           Motion = (match s.Motion with BuiltIn -> "builtin" | NvidiaOpticalFlow -> "nvof" | NoMotion -> "none")
           Cursor = (match s.Cursor with CursorAuto -> "auto" | CursorOn -> "on" | CursorOff -> "off")
@@ -771,6 +779,7 @@ module ScreenEngine =
               AutoMask = d.AutoMask
               Passes = d.Passes
               FrameGen = d.FrameGen
+              NvidiaFrameGen = d.NvidiaFrameGen
               SuperResolution = pick d.SuperResolution [ "auto", SrAuto; "dlaa", SrDlaa; "off", SrOff ] SrAuto
               Motion = pick d.Motion [ "builtin", BuiltIn; "nvof", NvidiaOpticalFlow; "none", NoMotion ] BuiltIn
               Cursor = pick d.Cursor [ "auto", CursorAuto; "on", CursorOn; "off", CursorOff ] CursorAuto

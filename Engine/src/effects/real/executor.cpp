@@ -325,7 +325,23 @@ Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameCont
         };
 
         static constexpr auto RecordPresent = [] [[nodiscard]] (const Gpu& gpu, const interior::Present& present, const Cursor& c) noexcept -> StepResult {
-            return PresentFrame(gpu.presenter, present.vsync).and_then([&] { return SignalFence(gpu.device, c.fence); }).transform([&c](interior::FenceValue v) { return WithFence(c, v); });
+            // A picture handed to DLSS Frame Generation goes with the motion vectors and depth plane the plan left
+            // readable for it. The plan hands one over only when the session was built with Streamline on the device.
+            static constexpr auto Shown = [] [[nodiscard]] (const Gpu& gpu, const interior::Present& present) noexcept -> Status<Error> {
+                static constexpr auto Generated = [] [[nodiscard]] (const Gpu& gpu, const interior::Generation& generation, bool vsync) noexcept -> Status<Error> {
+                    if (!gpu.device.streamline.has_value())
+                        return Fail(Error{ ApiCall::StreamlineFrame, 0 });
+                    return Lookup(gpu.resources, interior::SimpleId(interior::ResourceKind::MotionVectors)).and_then([&](ID3D12Resource* motion) {
+                        return Lookup(gpu.resources, interior::SimpleId(interior::ResourceKind::Depth)).and_then([&](ID3D12Resource* depth) {
+                            return PresentGenerated(*gpu.device.streamline, gpu.presenter.swapChain.Get(), GeneratedFrame{ generation, motion, depth, gpu.presenter.extent }, vsync);
+                        });
+                    });
+                };
+                if (!present.generation.has_value())
+                    return PresentFrame(gpu.presenter, present.vsync);
+                return Generated(gpu, *present.generation, present.vsync);
+            };
+            return Shown(gpu, present).and_then([&] { return SignalFence(gpu.device, c.fence); }).transform([&c](interior::FenceValue v) { return WithFence(c, v); });
         };
         return std::visit(infra::Overloaded{
                               [&](const interior::Transition& t) { return RecordTransition(gpu, t, c); },

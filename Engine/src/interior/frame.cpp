@@ -101,11 +101,48 @@ struct Blend
     return multiplier.Get() > 1;
 }
 
+constexpr auto kSingle = FrameGenTag::Parse(1);
+static_assert(kSingle.has_value());
+
+// How many pictures the engine's own blend shows for each processed one. NVIDIA DLSS Frame Generation makes its
+// pictures behind the swap chain, so with it the engine shows each processed picture once.
+[[nodiscard]] FrameGen BlendMultiplier(const SessionPlan& plan, const LiveSettings& controls) noexcept
+{
+    switch (plan.frameGenMethod)
+    {
+    case FrameGenMethod::Blend: return controls.frameGen;
+    case FrameGenMethod::Nvidia: return *kSingle;
+    }
+    return *kSingle;
+}
+
 // A processed frame copies the picture shown so far into the history before it makes the next, so the frames
 // shown until the one after can be drawn between the two.
-[[nodiscard]] bool WritesHistory(const FrameState& state, const LiveSettings& controls) noexcept
+[[nodiscard]] bool WritesHistory(const SessionPlan& plan, const FrameState& state, const LiveSettings& controls) noexcept
 {
-    return state.hasOutput && IsGenerating(controls.frameGen);
+    return state.hasOutput && IsGenerating(BlendMultiplier(plan, controls));
+}
+
+// NVIDIA DLSS Frame Generation makes the pictures between two processed ones out of what it is handed with
+// each, so a frame with nothing new would only be one more picture to make others from; it is not presented.
+[[nodiscard]] bool PresentsUnchanged(const SessionPlan& plan, const LiveSettings& controls) noexcept
+{
+    switch (plan.frameGenMethod)
+    {
+    case FrameGenMethod::Blend: return true;
+    case FrameGenMethod::Nvidia: return !IsGenerating(controls.frameGen);
+    }
+    return true;
+}
+
+[[nodiscard]] std::optional<Generation> GenerationOf(const SessionPlan& plan, const LiveSettings& controls, bool reset) noexcept
+{
+    switch (plan.frameGenMethod)
+    {
+    case FrameGenMethod::Blend: return std::nullopt;
+    case FrameGenMethod::Nvidia: return Generation{ controls.frameGen, reset, plan.source };
+    }
+    return std::nullopt;
 }
 
 // Two captures further apart than a long pause do not belong together, and nothing is drawn between them.
@@ -351,20 +388,20 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
 
     // What the history holds after this frame: a processed frame writes it when it is wanted, and a history from
     // before a reset or a long pause is not one to draw from.
-    static constexpr auto NextHasHistory = [] [[nodiscard]] (const FrameState& state, const FrameInput& input) noexcept -> bool {
-        static constexpr auto WrittenFresh = [] [[nodiscard]] (const FrameState& state, const FrameInput& input) noexcept -> bool {
-            return WritesHistory(state, NextControls(state.controls, input.controlRequest)) && !IsHistoryStale(state, input.now);
+    static constexpr auto NextHasHistory = [] [[nodiscard]] (const SessionPlan& plan, const FrameState& state, const FrameInput& input) noexcept -> bool {
+        static constexpr auto WrittenFresh = [] [[nodiscard]] (const SessionPlan& plan, const FrameState& state, const FrameInput& input) noexcept -> bool {
+            return WritesHistory(plan, state, NextControls(state.controls, input.controlRequest)) && !IsHistoryStale(state, input.now);
         };
-        return ProcessesFrame(state, input) ? WrittenFresh(state, input) : state.hasHistory;
+        return ProcessesFrame(state, input) ? WrittenFresh(plan, state, input) : state.hasHistory;
     };
 
-    static constexpr auto BlendOf = [] [[nodiscard]] (const FrameState& state, const FrameInput& input) noexcept -> Blend {
+    static constexpr auto BlendOf = [] [[nodiscard]] (const SessionPlan& plan, const FrameState& state, const FrameInput& input) noexcept -> Blend {
         static constexpr auto BlendFrom = [] [[nodiscard]] (Fraction point, bool historyReady) noexcept -> Blend {
             static constexpr auto IsBetween = [] [[nodiscard]] (Fraction point, bool historyReady) noexcept -> bool { return historyReady && point.Get() < kWhole.Get(); };
             return IsBetween(point, historyReady) ? Blend{ point, true } : Blend{ kWhole, false };
         };
-        const Fraction point = BlendPoint(NextCapture(state, input), NextCaptureInterval(state, input), input.now, NextControls(state.controls, input.controlRequest).frameGen);
-        return BlendFrom(point, NextHasHistory(state, input));
+        const Fraction point = BlendPoint(NextCapture(state, input), NextCaptureInterval(state, input), input.now, BlendMultiplier(plan, NextControls(state.controls, input.controlRequest)));
+        return BlendFrom(point, NextHasHistory(plan, state, input));
     };
 
     static constexpr auto NextState = [] [[nodiscard]] (const SessionPlan& plan, const FrameState& state, const FrameInput& input, const StateTable& states, FrameSlot slot) noexcept -> FrameState {
@@ -388,12 +425,22 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
                            NextSplit(state.split, input.splitRequest),
                            NextControls(state.controls, input.controlRequest),
                            NextCaptureInterval(state, input),
-                           NextHasHistory(state, input) };
+                           NextHasHistory(plan, state, input) };
     };
 
     static constexpr auto StepsFor = [] [[nodiscard]] (const SessionPlan& plan, const FrameState& state, const FrameInput& input, const LevelExtents& extents, FrameSlot slot) noexcept -> BuildResult {
-        static constexpr auto BlitSteps = [] [[nodiscard]] (const Builder& b, bool hasOutput, ResourceKind source, const Display& display, const Blend& blend, BackBufferIndex index,
-                                                            bool vsync) noexcept -> BuildResult {
+        static constexpr auto BlitSteps = [] [[nodiscard]] (const Builder& b, bool hasOutput, ResourceKind source, const Display& display, const Blend& blend, BackBufferIndex index, bool vsync,
+                                                            const std::optional<Generation>& generation) noexcept -> BuildResult {
+            // What goes with a picture handed to NVIDIA DLSS Frame Generation is read when it is presented, so both are
+            // left readable by shaders, which is the state it is told they are in.
+            static constexpr auto GenerationInputs = [] [[nodiscard]] (const Builder& b, const std::optional<Generation>& generation) noexcept -> BuildResult {
+                if (!generation.has_value())
+                    return b;
+                return MoveTo(b, SimpleId(ResourceKind::MotionVectors), ResourceState::ShaderRead).and_then([](const Builder& n) {
+                    return MoveTo(n, SimpleId(ResourceKind::Depth), ResourceState::ShaderRead);
+                });
+            };
+
             static constexpr auto TargetContent = [] [[nodiscard]] (const Builder& b, bool hasOutput, ResourceKind source, const Display& display, const Blend& blend,
                                                                     BackBufferIndex index) noexcept -> BuildResult {
                 static constexpr auto DrawSteps = [] [[nodiscard]] (const Builder& b, ResourceKind source, const Display& display, const Blend& blend, BackBufferIndex index) noexcept -> BuildResult {
@@ -433,8 +480,9 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
             return MoveTo(b, BackBufferId(index), ResourceState::RenderTarget)
                 .and_then([&](const Builder& n) { return TargetContent(n, hasOutput, source, display, blend, index); })
                 .and_then([index](const Builder& n) { return MoveTo(n, BackBufferId(index), ResourceState::Present); })
+                .and_then([&generation](const Builder& n) { return GenerationInputs(n, generation); })
                 .and_then([](const Builder& n) { return Emit(n, Step{ Submit{ Phase::Two } }); })
-                .and_then([vsync](const Builder& n) { return Emit(n, Step{ Present{ vsync } }); });
+                .and_then([vsync, &generation](const Builder& n) { return Emit(n, Step{ Present{ vsync, generation } }); });
         };
 
         static constexpr auto DisplayOf = [] [[nodiscard]] (const FrameState& state, const FrameInput& input) noexcept -> Display {
@@ -676,13 +724,13 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
             static constexpr auto NeedsReset = [] [[nodiscard]] (const FrameState& state, Instant now) noexcept -> bool { return !state.hasPrevious || IsHistoryStale(state, now); };
 
             // The picture shown so far, drawn into the history as it is before this frame makes the next one over it.
-            static constexpr auto HistorySteps = [] [[nodiscard]] (const Builder& b, const FrameState& state, const LiveSettings& controls) noexcept -> BuildResult {
+            static constexpr auto HistorySteps = [] [[nodiscard]] (const Builder& b, const SessionPlan& plan, const FrameState& state, const LiveSettings& controls) noexcept -> BuildResult {
                 static constexpr auto CopyOf = [] [[nodiscard]] (const FrameState& state) noexcept -> Draw {
                     return Draw{
                         SimpleId(state.displaySource), SimpleId(ResourceKind::ModelColor), SimpleId(ResourceKind::History), DisplayMode::Processed, state.split, std::nullopt, std::nullopt, kWhole
                     };
                 };
-                if (!WritesHistory(state, controls))
+                if (!WritesHistory(plan, state, controls))
                     return b;
                 return MoveTo(b, SimpleId(ResourceKind::History), ResourceState::RenderTarget)
                     .and_then([&state](const Builder& n) { return MoveTo(n, SimpleId(state.displaySource), ResourceState::ShaderRead); })
@@ -692,20 +740,26 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
             };
             const bool reset = NeedsReset(state, input.now);
             const LiveSettings controls = NextControls(state.controls, input.controlRequest);
-            return HistorySteps(Builder{ StepList{}, state.states }, state, controls)
+            return HistorySteps(Builder{ StepList{}, state.states }, plan, state, controls)
                 .and_then([&](const Builder& n) { return PhaseOne(n, plan, extents, state.currentSet); })
                 .and_then([&](const Builder& n) { return MotionPhaseTwo(n, plan, extents, state, slot); })
                 .and_then([&](const Builder& n) { return SuperResolutionSteps(n, plan, reset); })
                 .and_then([&](const Builder& n) { return NeuralRenderingSteps(n, plan, controls, reset); })
                 .and_then([&](const Builder& n) {
-                    return BlitSteps(n, true, DisplaySourceOf(plan, controls.neuralRendering), DisplayOf(state, input), BlendOf(state, input), input.backBuffer, controls.vsync);
+                    return BlitSteps(n, true, DisplaySourceOf(plan, controls.neuralRendering), DisplayOf(state, input), BlendOf(plan, state, input), input.backBuffer, controls.vsync,
+                                     GenerationOf(plan, controls, reset));
                 });
         };
 
         static constexpr auto RepeatSteps = [] [[nodiscard]] (const SessionPlan& plan, const FrameState& state, const FrameInput& input) noexcept -> BuildResult {
+            // The list the frame opened is still closed and handed over, empty, so the next frame finds it as every
+            // frame leaves it.
+            static constexpr auto NothingShown = [] [[nodiscard]] (const FrameState& state) noexcept -> BuildResult { return Emit(Builder{ StepList{}, state.states }, Step{ Submit{ Phase::Two } }); };
             const LiveSettings live = NextControls(state.controls, input.controlRequest);
-            return BlitSteps(Builder{ StepList{}, state.states }, state.hasOutput, DisplaySourceOf(plan, live.neuralRendering), DisplayOf(state, input), BlendOf(state, input), input.backBuffer,
-                             live.vsync);
+            if (!PresentsUnchanged(plan, live))
+                return NothingShown(state);
+            return BlitSteps(Builder{ StepList{}, state.states }, state.hasOutput, DisplaySourceOf(plan, live.neuralRendering), DisplayOf(state, input), BlendOf(plan, state, input), input.backBuffer,
+                             live.vsync, GenerationOf(plan, live, false));
         };
         return ProcessesFrame(state, input) ? FreshSteps(plan, state, input, extents, slot) : RepeatSteps(plan, state, input);
     };

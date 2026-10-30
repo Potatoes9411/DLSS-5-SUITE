@@ -101,6 +101,15 @@ constexpr std::array<std::wstring_view, 12> kVocabulary{ L"--monitor", L"all",  
 }
 
 // Off unless asked for, and nothing outside one to six.
+[[nodiscard]] bool NvidiaFrameGenIsOffUnlessAsked(infra::RngState&) noexcept
+{
+    const std::array<std::wstring_view, 1> on{ L"--nvidia-frame-gen=on" };
+    const std::array<std::wstring_view, 1> off{ L"--nvidia-frame-gen=off" };
+    const auto asked = ParseOptions(on);
+    const auto refused = ParseOptions(off);
+    return !DefaultOptions().nvidiaFrameGen && asked.has_value() && asked->nvidiaFrameGen && refused.has_value() && !refused->nvidiaFrameGen;
+}
+
 [[nodiscard]] bool FrameGenRefusesZeroAndSeven(infra::RngState&) noexcept
 {
     const std::array<std::wstring_view, 1> zero{ L"--frame-gen=0" };
@@ -289,6 +298,7 @@ std::uint32_t OptionsSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("--nr-passes refuses zero", seed, 1, PassesRefuseZero));
     failures += Failures(proptest::ForAll("--frame-gen accepts one to six", seed, 60, FrameGenAcceptsOneToSix));
     failures += Failures(proptest::ForAll("--frame-gen refuses zero and seven", seed, 1, FrameGenRefusesZeroAndSeven));
+    failures += Failures(proptest::ForAll("--nvidia-frame-gen is off unless asked", seed, 1, NvidiaFrameGenIsOffUnlessAsked));
     failures += Failures(proptest::ForAll("--nr-local-tone accepts every finite value", seed, 300, StrengthAcceptsEveryFiniteValue));
     failures += Failures(proptest::ForAll("--nr-intensity refuses what is not a number", seed, 1, IntensityRefusesWhatIsNotANumber));
     failures += Failures(proptest::ForAll("--mv-scale-x accepts every finite value", seed, 300, MotionScaleAcceptsEveryFiniteValue));

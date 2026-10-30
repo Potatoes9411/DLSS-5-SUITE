@@ -72,6 +72,7 @@ enum class OptionId : std::uint8_t {
     ExcludeOwnWindows,
     ExclusionLog,
     FrameGen,
+    NvidiaFrameGen,
 };
 
 enum class ValueKind : std::uint8_t {
@@ -104,7 +105,7 @@ struct OptionSpec
     ValueKind kind;
 };
 
-constexpr std::array<OptionSpec, 53> kSpecs{ {
+constexpr std::array<OptionSpec, 54> kSpecs{ {
     { L"help", OptionId::Help, ValueKind::Flag },
     { L"list-monitors", OptionId::ListMonitors, ValueKind::Flag },
     { L"monitor", OptionId::Monitor, ValueKind::MonitorSel },
@@ -125,6 +126,7 @@ constexpr std::array<OptionSpec, 53> kSpecs{ {
     { L"mv-level", OptionId::MvLevel, ValueKind::UInt },
     { L"nr-passes", OptionId::NrPasses, ValueKind::UInt },
     { L"frame-gen", OptionId::FrameGen, ValueKind::UInt },
+    { L"nvidia-frame-gen", OptionId::NvidiaFrameGen, ValueKind::Bool },
     { L"nvof-grid", OptionId::NvofGrid, ValueKind::Grid },
     { L"nvof-perf", OptionId::NvofPerf, ValueKind::Perf },
     { L"depth-value", OptionId::DepthValue, ValueKind::Float },
@@ -408,6 +410,7 @@ Options DefaultOptions() noexcept
         true,
         false,
         *kDefaultFrameGen,
+        false,
     };
 }
 
@@ -559,6 +562,7 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                 ValueOr(list, OptionId::ExcludeOwnWindows, d.excludeOwnWindows),
                 ValueOr(list, OptionId::ExclusionLog, d.exclusionLog),
                 n.frameGen,
+                ValueOr(list, OptionId::NvidiaFrameGen, d.nvidiaFrameGen),
             };
         };
         const Options d = DefaultOptions();

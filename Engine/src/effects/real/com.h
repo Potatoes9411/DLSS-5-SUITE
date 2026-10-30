@@ -156,6 +156,20 @@ enum class ApiCall : std::uint8_t {
     MfWriteSample,
     MfFinalize,
     PngWriteTimeout,
+    OpenStreamlineFile, // the signature checks again, on sl.interposer.dll, NVIDIA Streamline beside the program
+    StreamlineNotSigned,
+    StreamlineNotFromNvidia,
+    StreamlineRootNotTrusted,
+    LoadStreamline,             // the code is GetLastError
+    StreamlineInit,             // the code is the sl::Result of slInit
+    StreamlineDevice,           // ... of slSetD3DDevice
+    FrameGenerationUnsupported, // ... of slIsFeatureSupported for DLSS Frame Generation on this adapter
+    StreamlineUpgrade,          // ... of slUpgradeInterface
+    StreamlineFocus,            // sl.common.dll does not import GetForegroundWindow where it was expected
+    StreamlineFrame,            // ... of the per-frame calls: the frame token, the constants, the tags, the options or a marker
+    StreamlineState,            // ... of slDLSSGGetState
+    CreateSwapChainForHwnd,
+    WaitForCompositor,
 };
 
 struct Error

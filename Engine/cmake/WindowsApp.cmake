@@ -71,6 +71,7 @@ set(DSCREEN_REAL_SOURCES
   src/effects/real/clock.cpp
   src/effects/real/console.cpp
   src/effects/real/environment.cpp
+  src/effects/real/streamline.cpp
   src/app/main.cpp)
 if(DSCREEN_ENABLE_NVOF)
   find_path(NVOF_INCLUDE_DIR nvOpticalFlowD3D12.h HINTS "${NVOF_SDK_DIR}/NvOFInterface" "${NVOF_SDK_DIR}/include" "${NVOF_SDK_DIR}")
@@ -89,6 +90,10 @@ list(APPEND DSCREEN_REAL_SOURCES res/app.rc)
 add_executable(FullScreenWrapperForDLSS5 ${DSCREEN_REAL_SOURCES})
 add_dependencies(FullScreenWrapperForDLSS5 FullScreenWrapperForDLSS5Shaders)
 target_include_directories(FullScreenWrapperForDLSS5 PRIVATE "${CMAKE_BINARY_DIR}/generated" "${NGX_INCLUDE_DIR}")
+# NVIDIA Streamline 2.14.16, the headers only (MIT, external/streamline/LICENSE.txt): the library is loaded at run
+# time from beside the executable, so nothing is linked. NVIDIA is a first-party publisher for this tool (A1);
+# added 2026-10-30 at the owner's request for NVIDIA DLSS Frame Generation in the overlay.
+target_include_directories(FullScreenWrapperForDLSS5 SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/external/streamline/include")
 if(DSCREEN_ENABLE_NVOF)
   target_include_directories(FullScreenWrapperForDLSS5 PRIVATE "${NVOF_INCLUDE_DIR}")
   target_compile_definitions(FullScreenWrapperForDLSS5 PRIVATE DSCREEN_HAVE_NVOF=1)

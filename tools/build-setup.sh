@@ -78,6 +78,29 @@ else
     cp "$APP/Engine/build/FullScreenWrapperForDLSS5.exe" "$APP/publish/engine/"
     cp "$APP/Engine/build/nvngx_dlss.dll" "$APP/publish/engine/"
     cp "$APP/Engine/LICENSE" "$APP/publish/engine/LICENSE.txt"
+
+    # NVIDIA Streamline 2.14.16, for the overlay's NVIDIA DLSS Frame Generation. The
+    # engine loads it from beside itself and checks NVIDIA's signature first. It
+    # comes from NVIDIA's own release, never the repo (the DLLs may ship inside an
+    # application, not on their own):
+    #   https://github.com/NVIDIA-RTX/Streamline/releases/tag/v2.14.16
+    # unpacked so STREAMLINE_SDK_DIR (default ../streamline-sdk/sdk) has bin/x64.
+    # SKIP_STREAMLINE=1 builds without it; the engine then uses its own frame gen.
+    SL_DIR="${STREAMLINE_SDK_DIR:-$ROOT/streamline-sdk/sdk}"
+    if [ "$SKIP_STREAMLINE" = "1" ]; then
+        echo "--- Streamline skipped (SKIP_STREAMLINE=1) ---"
+    else
+        for f in sl.interposer.dll sl.common.dll sl.dlss_g.dll sl.reflex.dll sl.pcl.dll nvngx_dlssg.dll; do
+            if [ ! -f "$SL_DIR/bin/x64/$f" ]; then
+                echo "Streamline file $f not found under $SL_DIR/bin/x64 (set STREAMLINE_SDK_DIR, or SKIP_STREAMLINE=1)" >&2
+                exit 1
+            fi
+            cp "$SL_DIR/bin/x64/$f" "$APP/publish/engine/"
+        done
+        cp "$SL_DIR/license.txt" "$APP/publish/engine/Streamline-LICENSE.txt"
+        cp "$SL_DIR/bin/x64/nvngx_dlss.license.txt" "$APP/publish/engine/NVIDIA-DLSS-LICENSE.txt"
+        cp "$SL_DIR/bin/x64/reflex.license.txt" "$APP/publish/engine/NVIDIA-Reflex-LICENSE.txt"
+    fi
 fi
 
 # RobloxShadeHost is an optional third method. It observes Roblox through

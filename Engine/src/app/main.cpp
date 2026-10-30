@@ -546,14 +546,57 @@ struct Ended
             });
         };
         const bool wantsNgx = WantsNgx(b.options, b.geometry);
-        return real::CreateGpuDevice(real::DeviceSettings{ b.options.debugLayer, b.options.adapter }).and_then([&](real::GpuDevice device) {
-            return LogAdapter(console, device).and_then([&] { return RequireNvidia(device, wantsNgx); }).and_then([&] {
-                return WithRuntime(console, b, std::move(device), NgxSettingsOf(b.options, b.executableDirectory), wantsNgx);
-            });
-        });
+        // NVIDIA DLSS Frame Generation is a designed fallback: when Streamline cannot start, the session says why and
+        // runs the engine's own frame generation on the device as it was, and the plan follows (Offered).
+        static constexpr auto WithFrameGenerationIfAsked = [] [[nodiscard]] (const Console& console, const Base& b, Devices d) noexcept -> Result<Devices, Error> {
+            static constexpr auto Joined = [] [[nodiscard]] (const Console& console, Devices d, real::FrameGeneration generation) noexcept -> Result<Devices, Error> {
+                static constexpr auto MostText = [] [[nodiscard]] (const real::Streamline& streamline) noexcept -> Line {
+                    return real::ReportGeneration(streamline)
+                        .transform([](const real::GenerationReport& r) { return infra::Formatted<kLineCapacity>("up to {}x on this GPU", r.mostBetween + 1u); })
+                        .value_or(infra::Formatted<kLineCapacity>("its limit on this GPU unknown"));
+                };
+                const Line line = infra::Formatted<kLineCapacity>("NVIDIA DLSS Frame Generation: Streamline started, {}", MostText(generation.streamline).Get());
+                return Log(console, LogLevel::Info, line.Get()).transform([&d, &generation] {
+                    return Devices{ real::WithFrameGeneration(std::move(d.device), std::move(generation)), std::move(d.runtime), std::move(d.held) };
+                });
+            };
+
+            static constexpr auto FellBack = [] [[nodiscard]] (const Console& console, Devices d, const Error& error) noexcept -> Result<Devices, Error> {
+                const Line line = infra::Formatted<kLineCapacity>("NVIDIA DLSS Frame Generation could not start ({}); the engine's own frame generation is used instead", real::Describe(error).Get());
+                return Log(console, LogLevel::Warn, line.Get()).transform([&d] { return std::move(d); });
+            };
+            if (!b.options.nvidiaFrameGen)
+                return d;
+            Result<real::FrameGeneration, Error> started = real::StartFrameGeneration(d.device, b.executableDirectory, b.options.ngxProjectId); // WAIVER(R2): moved from once, below.
+            if (!started.has_value())
+                return FellBack(console, std::move(d), started.error());
+            return Joined(console, std::move(d), std::move(*started));
+        };
+
+        return real::CreateGpuDevice(real::DeviceSettings{ b.options.debugLayer, b.options.adapter })
+            .and_then([&](real::GpuDevice device) {
+                return LogAdapter(console, device).and_then([&] { return RequireNvidia(device, wantsNgx); }).and_then([&] {
+                    return WithRuntime(console, b, std::move(device), NgxSettingsOf(b.options, b.executableDirectory), wantsNgx);
+                });
+            })
+            .and_then([&](Devices d) { return WithFrameGenerationIfAsked(console, b, std::move(d)); });
     };
 
     static constexpr auto Offered = [] [[nodiscard]] (const Base& b, const Devices& d) noexcept -> Base {
+        // A session that asked for NVIDIA DLSS Frame Generation and did not get Streamline started blends its
+        // pictures itself; why was logged when Streamline was asked for.
+        static constexpr auto WithoutNvidiaFrameGen = [] [[nodiscard]] (const Options& o) noexcept -> Options {
+            Options without = o; // WAIVER(R2): a copy with one answer replaced, made once and read from there on.
+            without.nvidiaFrameGen = false;
+            return without;
+        };
+
+        static constexpr auto FrameGenOffered = [] [[nodiscard]] (const Base& b, const Devices& d) noexcept -> Base {
+            if (d.device.streamline.has_value())
+                return b;
+            return Base{ WithoutNvidiaFrameGen(b.options), b.executableDirectory, b.geometry, b.monitors };
+        };
+
         // A session that asked for super resolution and cannot have it runs without it rather than stopping.
         // Nothing else in the picture depends on it, and the panel greys the choice and says why.
         static constexpr auto WithoutSuperResolution = [] [[nodiscard]] (const Options& o) noexcept -> Options {
@@ -561,9 +604,12 @@ struct Ended
             without.sr = interior::SrMode::Off;
             return without;
         };
-        if (OffersSuperResolution(d))
-            return b;
-        return Base{ WithoutSuperResolution(b.options), b.executableDirectory, b.geometry, b.monitors };
+        static constexpr auto SuperResolutionOffered = [] [[nodiscard]] (const Base& b, const Devices& d) noexcept -> Base {
+            if (OffersSuperResolution(d))
+                return b;
+            return Base{ WithoutSuperResolution(b.options), b.executableDirectory, b.geometry, b.monitors };
+        };
+        return SuperResolutionOffered(FrameGenOffered(b, d), d);
     };
 
     static constexpr auto Planned = [] [[nodiscard]] (const Console& console, const Base& b, const Devices& d) noexcept -> Result<SessionPlan, Error> {

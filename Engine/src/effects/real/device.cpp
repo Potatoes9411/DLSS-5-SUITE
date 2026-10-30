@@ -179,6 +179,7 @@ Result<GpuDevice, Error> CreateGpuDevice(const DeviceSettings& settings) noexcep
             return GpuDevice{ core.factory,
                               core.candidate.adapter,
                               core.device,
+                              nullptr,
                               queues.queue,
                               queues.fence,
                               std::move(event),
@@ -188,7 +189,8 @@ Result<GpuDevice, Error> CreateGpuDevice(const DeviceSettings& settings) noexcep
                               device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV),
                               IsNvidia(core.candidate),
                               NameOf(core.candidate),
-                              ReadDriverVersion(core.candidate.adapter.Get()) };
+                              ReadDriverVersion(core.candidate.adapter.Get()),
+                              std::nullopt };
         };
         return CreateFenceEvent().and_then([&](UniqueHandle event) {
             return CreateHeap(core.device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kRtvSlots, D3D12_DESCRIPTOR_HEAP_FLAG_NONE).and_then([&](Com<ID3D12DescriptorHeap> rtv) {
@@ -292,6 +294,22 @@ AdapterList UsableAdapters(IDXGIFactory4* factory) noexcept
     };
     const auto add = [factory](const AdapterList& so, std::uint32_t index) { return WithUsable(so, CandidateAt(factory, index)); };
     return std::ranges::fold_left(std::views::iota(std::uint32_t{ 0 }, kMaxAdapters), AdapterList{}, add);
+}
+
+Result<FrameGeneration, Error> StartFrameGeneration(const GpuDevice& device, const interior::DirectoryPath& executableDirectory, const interior::ProjectIdText& projectId) noexcept
+{
+    return StartStreamline(executableDirectory, projectId, device.device.Get(), device.adapter.Get()).and_then([&device](Streamline streamline) {
+        return CreateProxyQueue(streamline, device.device.Get()).transform([&streamline](ProxyQueue proxy) { return FrameGeneration{ std::move(proxy), std::move(streamline) }; });
+    });
+}
+
+GpuDevice WithFrameGeneration(GpuDevice device, FrameGeneration generation) noexcept
+{
+    GpuDevice next = std::move(device); // WAIVER(R2): the device moved on whole with three members replaced, read once after.
+    next.proxyDevice = std::move(generation.proxy.device);
+    next.queue = std::move(generation.proxy.queue);
+    next.streamline = std::move(generation.streamline);
+    return next;
 }
 
 } // namespace real

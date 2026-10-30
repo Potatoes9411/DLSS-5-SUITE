@@ -44,7 +44,8 @@ using namespace interior;
                         DisplayMode::Processed,
                         false,
                         true,
-                        *FrameGenTag::Parse(1 + proptest::DrawBelow(rng, kMaxFrameGen)) };
+                        *FrameGenTag::Parse(1 + proptest::DrawBelow(rng, kMaxFrameGen)),
+                        proptest::DrawBool(rng) ? FrameGenMethod::Nvidia : FrameGenMethod::Blend };
 }
 
 [[nodiscard]] bool SessionEndsCleanlyUnderInjectedFailures(infra::RngState& rng) noexcept
@@ -61,10 +62,19 @@ using namespace interior;
            e == sim::SimError::NgxNeuralRenderingFailed;
 }
 
+// The engine's own blend presents every frame; NVIDIA DLSS Frame Generation is handed only the frames with
+// something new, which the frame tests cover.
+[[nodiscard]] SessionPlan Blended(const SessionPlan& p) noexcept
+{
+    SessionPlan plan = p; // WAIVER(R2): a test fixture, copied and adjusted before use.
+    plan.frameGenMethod = FrameGenMethod::Blend;
+    return plan;
+}
+
 [[nodiscard]] bool WithoutFailuresEveryFrameIsPresented(infra::RngState& rng) noexcept
 {
     const std::uint64_t seed = proptest::Draw(rng);
-    const SessionPlan plan = PlanFor(rng);
+    const SessionPlan plan = Blended(PlanFor(rng));
     const std::uint32_t frames = proptest::DrawBetween(rng, 1, 100);
     sim::SimEnvironment env(seed, plan, sim::FailureRates{ 0, 0, 0, 0 }, frames);
     const auto outcome = app::RunSession<sim::SimEnvironment, sim::SimError>(env, plan, InitialFrameState(plan), 1000);

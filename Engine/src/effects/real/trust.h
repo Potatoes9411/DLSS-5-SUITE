@@ -18,8 +18,8 @@ struct TrustedFile
 };
 
 // Which of NVIDIA's files is being checked, which is what a refusal names: the two models, the driver's
-// optical flow library, and the NGX runtime when a copy sits beside the program.
-enum class ModelKind : std::uint8_t { NeuralRendering, SuperResolution, OpticalFlow, Runtime };
+// optical flow library, the NGX runtime when a copy sits beside the program, and NVIDIA Streamline.
+enum class ModelKind : std::uint8_t { NeuralRendering, SuperResolution, OpticalFlow, Runtime, Streamline };
 
 // The one neural-rendering compatibility model shipped by SUITE may instead match its exact pinned SHA-256.
 // Every other file verifies every Authenticode signature it carries, the first and each one after it, and fails

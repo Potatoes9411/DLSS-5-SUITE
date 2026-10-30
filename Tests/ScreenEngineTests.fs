@@ -90,6 +90,13 @@ let ``frame generation is written as the engine's multiplier and kept within one
     Assert.Equal(Some "6", valueOf "--frame-gen" (args { defaults with FrameGen = 7 }))
 
 [<Fact>]
+let ``NVIDIA frame generation is off unless asked, and asking restarts the overlay`` () =
+    Assert.Equal(Some "off", valueOf "--nvidia-frame-gen" (args defaults))
+    Assert.Equal(Some "on", valueOf "--nvidia-frame-gen" (args { defaults with NvidiaFrameGen = true }))
+    // Streamline goes behind the swap chain the session is built with, so no running session takes it.
+    Assert.False(liveFieldsOnly defaults { defaults with NvidiaFrameGen = true })
+
+[<Fact>]
 let ``frame generation is a live setting`` () =
     Assert.True(liveFieldsOnly defaults { defaults with FrameGen = 3 })
 
@@ -140,6 +147,7 @@ let ``settings survive being saved and loaded`` () =
             Skin = SkinStrength 0.4
             Passes = 2
             FrameGen = 3
+            NvidiaFrameGen = true
             Motion = NoMotion }
     Assert.Equal(original, deserialize (serialize original))
 
@@ -296,6 +304,7 @@ let ``a settings file from before the advanced options keeps their defaults`` ()
     Assert.Equal(advancedDefaults, loaded.Advanced)
     // Frame generation came later still: off, not a multiplier of 0 the engine refuses.
     Assert.Equal(1, loaded.FrameGen)
+    Assert.False(loaded.NvidiaFrameGen)
 
 [<Fact>]
 let ``a settings file with some advanced options keeps the rest at their defaults`` () =

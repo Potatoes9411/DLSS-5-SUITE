@@ -149,7 +149,8 @@ struct Replay
                         DisplayMode::Processed,
                         false,
                         true,
-                        *FrameGenTag::Parse(1 + proptest::DrawBelow(rng, kMaxFrameGen)) };
+                        *FrameGenTag::Parse(1 + proptest::DrawBelow(rng, kMaxFrameGen)),
+                        FrameGenMethod::Blend };
 }
 
 [[nodiscard]] FrameInput RandomInput(infra::RngState& rng, std::uint64_t clock, std::uint32_t backBuffer) noexcept
@@ -676,6 +677,76 @@ struct Replay
     return plain && !second->next.hasHistory;
 }
 
+[[nodiscard]] SessionPlan WithNvidia(const SessionPlan& p, std::uint32_t multiplier) noexcept
+{
+    SessionPlan plan = WithFrameGen(p, multiplier); // WAIVER(R2): a test fixture, copied and adjusted before use.
+    plan.frameGenMethod = FrameGenMethod::Nvidia;
+    return plan;
+}
+
+[[nodiscard]] std::vector<Present> PresentsOf(const StepList& steps) noexcept
+{
+    std::vector<Present> presents;
+    for (const Step& step : steps.Items()) // WAIVER(R2): a test collects the emitted presents in order.
+        if (const Present* present = std::get_if<Present>(&step); present != nullptr)
+            presents.push_back(*present);
+    return presents;
+}
+
+// With NVIDIA DLSS Frame Generation behind the swap chain the engine never blends: every frame it draws shows the
+// processed picture as it is, and every present hands over the multiplier with the motion vectors and the depth
+// plane readable, which is what the effect layer tells Streamline they are.
+[[nodiscard]] bool NvidiaFramesNeverBlendAndHandOverTheirInputs(infra::RngState& rng) noexcept
+{
+    const std::uint32_t multiplier = proptest::DrawBetween(rng, 1, 6);
+    const SessionPlan plan = WithNvidia(RandomPlan(rng), multiplier);
+    FrameState state = InitialFrameState(plan);
+    std::uint64_t clock = 0;
+    for (std::uint32_t i = 0; i < 12; ++i) // WAIVER(R2): test drives a sequence of frames.
+    {
+        clock += proptest::DrawBelow(rng, 60000);
+        const FrameInput input = CaptureAt(clock, proptest::DrawBool(rng));
+        const auto framePlan = PlanFrame(plan, state, input);
+        if (!framePlan.has_value())
+            return false;
+        const Replay replay = ReplayPlan(state.states, *framePlan);
+        const bool untouched = std::ranges::none_of(framePlan->steps.Items(), TouchesHistory);
+        const bool asItIs = std::ranges::all_of(framePlan->steps.Items(), DrawsTheProcessedPictureAsItIs);
+        const std::vector<Present> presents = PresentsOf(framePlan->steps);
+        const bool handedOver = std::ranges::all_of(presents, [multiplier](const Present& p) { return p.generation.has_value() && p.generation->multiplier.Get() == multiplier; });
+        const bool readable = presents.empty() || (StateOf(framePlan->next.states, SimpleId(ResourceKind::MotionVectors)) == ResourceState::ShaderRead &&
+                                                   StateOf(framePlan->next.states, SimpleId(ResourceKind::Depth)) == ResourceState::ShaderRead);
+        if (!replay.valid || replay.submits == 0 || !untouched || !asItIs || !handedOver || !readable || framePlan->next.hasHistory)
+            return false;
+        state = framePlan->next;
+    }
+    return true;
+}
+
+// A frame with nothing new is not handed to NVIDIA DLSS Frame Generation once it is making pictures: the list is
+// still submitted, empty, and nothing is presented. At one picture for one it is presented as before.
+[[nodiscard]] bool NvidiaRepeatsAreNotPresentedWhileGenerating(infra::RngState& rng) noexcept
+{
+    const std::uint32_t multiplier = proptest::DrawBetween(rng, 1, 6);
+    const SessionPlan plan = WithNvidia(RandomPlan(rng), multiplier);
+    const auto first = PlanFrame(plan, InitialFrameState(plan), CaptureAt(0, true));
+    const auto repeat = first.has_value() ? PlanFrame(plan, first->next, CaptureAt(5000, false)) : first;
+    if (!repeat.has_value())
+        return false;
+    const Replay replay = ReplayPlan(first->next.states, *repeat);
+    const bool firstShown = PresentsOf(first->steps).size() == 1 && PresentsOf(first->steps)[0].generation->reset;
+    const bool repeatAsExpected = multiplier > 1 ? (repeat->steps.Size() == 1 && replay.submits == 1 && replay.presents == 0) : replay.presents == 1;
+    return firstShown && repeatAsExpected && replay.valid;
+}
+
+// The engine's own blend never hands anything over: its presents carry no generation.
+[[nodiscard]] bool BlendPresentsCarryNoGeneration(infra::RngState& rng) noexcept
+{
+    const SessionPlan plan = RandomPlan(rng);
+    const auto framePlan = PlanFrame(plan, InitialFrameState(plan), RandomInput(rng, 0, 0));
+    return framePlan.has_value() && std::ranges::none_of(PresentsOf(framePlan->steps), [](const Present& p) { return p.generation.has_value(); });
+}
+
 } // namespace
 
 std::uint32_t FrameSuite(std::uint64_t seed) noexcept
@@ -707,6 +778,9 @@ std::uint32_t FrameSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("the blend point is the first step at or past the share gone", seed, 2000, BlendPointIsTheFirstStepAtOrPastTheShareGone));
     failures += Failures(proptest::ForAll("a frame between captures is drawn from the history", seed, 300, AFrameBetweenCapturesIsDrawnFromTheHistory));
     failures += Failures(proptest::ForAll("a reset leaves nothing to draw between", seed, 200, AResetLeavesNothingToDrawBetween));
+    failures += Failures(proptest::ForAll("NVIDIA frames never blend and hand over their inputs", seed, 300, NvidiaFramesNeverBlendAndHandOverTheirInputs));
+    failures += Failures(proptest::ForAll("NVIDIA repeats are not presented while generating", seed, 300, NvidiaRepeatsAreNotPresentedWhileGenerating));
+    failures += Failures(proptest::ForAll("the engine's blend presents carry no generation", seed, 200, BlendPresentsCarryNoGeneration));
     return failures;
 }
 

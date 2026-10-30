@@ -59,6 +59,7 @@ struct Refusals
     case ModelKind::SuperResolution: return Refusals{ ApiCall::OpenUpscalerFile, ApiCall::UpscalerNotSigned, ApiCall::UpscalerNotFromNvidia, ApiCall::UpscalerRootNotTrusted };
     case ModelKind::OpticalFlow: return Refusals{ ApiCall::OpenOpticalFlowFile, ApiCall::OpticalFlowNotSigned, ApiCall::OpticalFlowNotFromNvidia, ApiCall::OpticalFlowRootNotTrusted };
     case ModelKind::Runtime: return Refusals{ ApiCall::OpenRuntimeFile, ApiCall::RuntimeNotSigned, ApiCall::RuntimeNotFromNvidia, ApiCall::RuntimeRootNotTrusted };
+    case ModelKind::Streamline: return Refusals{ ApiCall::OpenStreamlineFile, ApiCall::StreamlineNotSigned, ApiCall::StreamlineNotFromNvidia, ApiCall::StreamlineRootNotTrusted };
     }
     return Refusals{ ApiCall::OpenModelFile, ApiCall::ModelNotSigned, ApiCall::ModelNotFromNvidia, ApiCall::ModelRootNotTrusted };
 }
@@ -85,6 +86,15 @@ struct Signature
 [[nodiscard]] Found Better(const Found& a, const Found& b) noexcept
 {
     return b.signer > a.signer ? b : a;
+}
+
+// NVIDIA signs the Streamline files a second time under "NVIDIA Corporation NVS Root", a root of its own that no
+// Windows trusts (signtool on sl.interposer.dll 2.14.16: signature 1 terminates in that root). For those files a
+// signature after the first that fails for that reason alone counts as no signer at all; the first signature still
+// has to be NVIDIA's, rooted on Microsoft's list, and any other failure still refuses the file.
+[[nodiscard]] bool IsPrivatelyRootedSecondary(const Error& error, ModelKind kind) noexcept
+{
+    return kind == ModelKind::Streamline && error.call == RefusalsOf(kind).notSigned && error.code == static_cast<std::uint32_t>(CERT_E_UNTRUSTEDROOT);
 }
 
 struct StoreCloser
@@ -400,13 +410,21 @@ Result<TrustedFile, Error> OpenApproved(const interior::FilePath& path, ModelKin
             return Answered(request, kind);
         };
 
+        static constexpr auto Secondary = [] [[nodiscard]] (WINTRUST_FILE_INFO * file, DWORD index, ModelKind kind) noexcept -> Result<Signature, Error> {
+            static constexpr auto NoSigner = [] [[nodiscard]] (const Error& error, ModelKind kind) noexcept -> Result<Signature, Error> {
+                if (!IsPrivatelyRootedSecondary(error, kind))
+                    return Fail(error);
+                return Signature{ Found{ Signer::Other, 0 }, 0 };
+            };
+            return Checked(file, index, WSS_VERIFY_SPECIFIC, kind).or_else([kind](const Error& error) { return NoSigner(error, kind); });
+        };
+
         // The signatures after the first, each verified on its own. The fold keeps the best signer found so
         // far, and a signature that is not trusted ends it with that refusal.
         static constexpr auto Rest = [] [[nodiscard]] (WINTRUST_FILE_INFO * file, const Signature& first, ModelKind kind) noexcept -> Status<Error> {
             static constexpr auto Best = [] [[nodiscard]] (WINTRUST_FILE_INFO * file, const Signature& first, ModelKind kind) noexcept -> Result<Found, Error> {
                 return std::ranges::fold_left(std::views::iota(DWORD{ 1 }, first.secondaries + 1), Result<Found, Error>{ first.found }, [file, kind](Result<Found, Error> best, DWORD index) {
-                    return best.and_then(
-                        [file, kind, index](const Found& found) { return Checked(file, index, WSS_VERIFY_SPECIFIC, kind).transform([found](const Signature& s) { return Better(found, s.found); }); });
+                    return best.and_then([file, kind, index](const Found& found) { return Secondary(file, index, kind).transform([found](const Signature& s) { return Better(found, s.found); }); });
                 });
             };
 

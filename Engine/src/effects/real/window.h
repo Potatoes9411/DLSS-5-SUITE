@@ -1,11 +1,15 @@
 #pragma once
 #include "effects/real/com.h"
+#include "global_common.h"
 #include "infrastructure/bounded_vector.h"
 #include "interior/monitors.h"
 
 #include <optional>
 
 namespace real {
+
+// The class the overlay window is registered under, which is also how this process finds its own overlay.
+inline constexpr wchar_t kOutputWindowClass[] = DSCREEN_WIDE(DSCREEN_FILE_STEM) L"OutputWindow";
 
 struct WindowSettings
 {

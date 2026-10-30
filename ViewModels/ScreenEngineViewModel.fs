@@ -608,6 +608,14 @@ type ScreenEngineViewModel() as this =
 
     member _.FrameGenOptions = frameGens |> List.map snd
 
+    /// NVIDIA DLSS Frame Generation instead of SUITE's own; it restarts the overlay.
+    member this.NvidiaFrameGen
+        with get () = settings.NvidiaFrameGen
+        and set (value: bool) =
+            if value <> settings.NvidiaFrameGen then
+                this.Change { settings with NvidiaFrameGen = value }
+                this.RaisePropertyChanged("NvidiaFrameGen")
+
     member _.SelectedFrameGenIndex
         with get () = indexIn frameGens settings.FrameGen
         and set (value: int) =
@@ -1109,7 +1117,7 @@ type ScreenEngineViewModel() as this =
         for name in
             [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "SelectedWindowIndex"; "CaptureFolder"; "ModelFolder"; "NeuralRendering"
               "Intensity"; "IntensityText"; "LocalStructure"; "LocalStructureText"; "LocalTone"; "LocalToneText"
-              "Passes"; "PassesText"; "PassesSlider"; "LocalStructureSlider"; "LocalToneSlider"; "NrPresetSlider"; "NrPresetText"; "SrPresetText"; "MvLevelText"; "ResetThresholdText"; "SkinStrengthSlider"; "SkinStrengthText"; "AutoMask"; "SelectedStyleIndex"; "SelectedFrameGenIndex"; "SelectedSuperResolutionIndex"
+              "Passes"; "PassesText"; "PassesSlider"; "LocalStructureSlider"; "LocalToneSlider"; "NrPresetSlider"; "NrPresetText"; "SrPresetText"; "MvLevelText"; "ResetThresholdText"; "SkinStrengthSlider"; "SkinStrengthText"; "AutoMask"; "SelectedStyleIndex"; "SelectedFrameGenIndex"; "NvidiaFrameGen"; "SelectedSuperResolutionIndex"
               "SelectedCompareIndex"; "VSync"; "ShowPanel"; "NrPreset"; "SrPreset"; "MvLevel"
               "ResetThreshold"; "MvScaleAuto"; "UseManualMvScale"; "MvScaleX"; "MvScaleY"
               "CaptureBorder"; "Affinity"; "Topmost"; "ClickThrough"; "ExcludeOwnWindows"

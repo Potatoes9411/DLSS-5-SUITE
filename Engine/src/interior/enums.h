@@ -7,6 +7,9 @@ enum class MonitorSelectionKind : std::uint8_t { Primary, All, Index };
 enum class CursorMode : std::uint8_t { Auto, On, Off };
 enum class SrMode : std::uint8_t { Auto, Dlaa, Off };
 enum class MotionBackend : std::uint8_t { BuiltIn, NvOpticalFlow, None };
+// Who makes the pictures shown between two processed ones: the engine's own blend along the motion vectors,
+// or NVIDIA DLSS Frame Generation behind the swap chain.
+enum class FrameGenMethod : std::uint8_t { Blend, Nvidia };
 enum class CompareMode : std::uint8_t { Off, Split, Original };
 enum class ColorFormat : std::uint8_t { Rgba8, Rgba16f };
 enum class NrStyle : std::uint8_t { Standard, Natural, Cinematic };

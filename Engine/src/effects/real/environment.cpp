@@ -678,7 +678,7 @@ Result<FrameStart, Error> RealEnvironment::BeginFrame(const interior::FrameState
 
 Result<FrameStart, Error> RealEnvironment::Accept(const Begun& begun) noexcept
 {
-    static constexpr auto Reported = [] [[nodiscard]] (const Console& console, const Statistics& s, const interior::FrameInput& input) noexcept -> Result<Statistics, Error> {
+    static constexpr auto Reported = [] [[nodiscard]] (const Console& console, const Gpu& gpu, const Statistics& s, const interior::FrameInput& input) noexcept -> Result<Statistics, Error> {
         static constexpr auto IsReportDue = [] [[nodiscard]] (const Statistics& s, interior::Instant now) noexcept -> bool { return now.Get() - s.lastReport.Get() >= kReportIntervalMicroseconds; };
 
         static constexpr auto Counted = [] [[nodiscard]] (const Statistics& s, bool fresh) noexcept -> Statistics {
@@ -692,9 +692,22 @@ Result<FrameStart, Error> RealEnvironment::Accept(const Begun& begun) noexcept
             const double seconds = static_cast<double>(now.Get() - s.lastReport.Get()) / 1000000.0;
             return Log(console, interior::LogLevel::Info, infra::Formatted<120>("{:.1f} processed fps, {:.1f} presented fps", s.processed / seconds, s.presented / seconds).Get());
         };
+
+        // What DLSS Frame Generation made of what it was handed, beside the throughput, when it is behind the swap chain.
+        static constexpr auto LogGeneration = [] [[nodiscard]] (const Console& console, const Gpu& gpu) noexcept -> Status<Error> {
+            static constexpr auto LogReport = [] [[nodiscard]] (const Console& console, const GenerationReport& r) noexcept -> Status<Error> {
+                return Log(console, interior::LogLevel::Info,
+                           infra::Formatted<160>("NVIDIA DLSS Frame Generation: {} pictures shown for each one handed over (up to {} on this GPU), status 0x{:X}", r.shownPerPicture,
+                                                 r.mostBetween + 1u, r.status)
+                               .Get());
+            };
+            if (!gpu.device.streamline.has_value())
+                return {};
+            return ReportGeneration(*gpu.device.streamline).and_then([&console](const GenerationReport& r) { return LogReport(console, r); });
+        };
         if (!IsReportDue(s, input.now))
             return Counted(s, input.freshCapture);
-        return LogThroughput(console, s, input.now).transform([&] { return Counted(Restarted(s, input.now), input.freshCapture); });
+        return LogThroughput(console, s, input.now).and_then([&] { return LogGeneration(console, gpu); }).transform([&] { return Counted(Restarted(s, input.now), input.freshCapture); });
     };
 
     // The frame-generation multiplier is logged once when it changes, beside the throughput it changes.
@@ -715,7 +728,7 @@ Result<FrameStart, Error> RealEnvironment::Accept(const Begun& begun) noexcept
             return s;
         return LogFrameGen(console, requested).transform([&] { return WithFrameGen(s, requested); });
     };
-    const Result<Statistics, Error> stats = Reported(console_, stats_, begun.input).and_then([&](const Statistics& s) { return FrameGenReported(console_, s, begun.input); });
+    const Result<Statistics, Error> stats = Reported(console_, gpu_, stats_, begun.input).and_then([&](const Statistics& s) { return FrameGenReported(console_, s, begun.input); });
     if (!stats.has_value())
         return Fail(stats.error());
     frame_ = begun.frame; // WAIVER(R2): the frame context is the effect layer's state, replaced whole per frame.
@@ -990,12 +1003,17 @@ Result<ExecutionReport, Error> RealEnvironment::Retuned(const interior::LiveSett
 
 Result<ExecutionReport, Error> RealEnvironment::Ran(const interior::FramePlan& plan) noexcept
 {
-    static constexpr auto Presented = [] [[nodiscard]] (const Statistics& s) noexcept -> Statistics { return Statistics{ s.lastReport, s.processed, s.presented + 1, s.frameGen }; };
+    // A frame with nothing new that DLSS Frame Generation is not handed is planned and submitted, but not presented.
+    static constexpr auto Presented = [] [[nodiscard]] (const Statistics& s, const interior::StepList& steps) noexcept -> Statistics {
+        static constexpr auto IsPresent = [] [[nodiscard]] (const interior::Step& step) noexcept -> bool { return std::holds_alternative<interior::Present>(step); };
+        static constexpr auto CountOf = [] [[nodiscard]] (bool flag) noexcept -> std::uint32_t { return flag ? 1u : 0u; };
+        return Statistics{ s.lastReport, s.processed, s.presented + CountOf(std::ranges::any_of(steps.Items(), IsPresent)), s.frameGen };
+    };
     const Result<interior::FenceValue, Error> fence = ExecuteSteps(gpu_, frame_, plan.steps);
     if (!fence.has_value())
         return Fail(fence.error());
     frame_ = WithFence(frame_, *fence); // WAIVER(R2): the last signalled fence is effect-layer state, replaced whole per frame.
-    stats_ = Presented(stats_);         // WAIVER(R2): throughput counters, replaced whole per frame.
+    stats_ = Presented(stats_, plan.steps); // WAIVER(R2): throughput counters, replaced whole per frame.
     return ExecutionReport{ *fence, static_cast<std::uint32_t>(plan.steps.Size()) };
 }
 

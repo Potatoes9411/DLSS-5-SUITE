@@ -2,6 +2,9 @@
 
 #include "effects/real/resources.h"
 #include "infrastructure/fold.h"
+#include "infrastructure/overloaded.h"
+
+#include <dwmapi.h>
 
 #include <ranges>
 
@@ -26,26 +29,46 @@ struct Composition
     return Check(hr, ApiCall::CreateVisual).transform([&visual] { return visual; });
 }
 
-} // namespace
+[[nodiscard]] Result<BackBuffers, Error> CollectBuffers(const GpuDevice& gpu, IDXGISwapChain3* chain) noexcept
+{
+    static constexpr auto WithBuffer = [] [[nodiscard]] (const BackBuffers& buffers, const GpuDevice& gpu, IDXGISwapChain3* chain, std::uint32_t index) noexcept -> Result<BackBuffers, Error> {
+        static constexpr auto BufferAt = [] [[nodiscard]] (IDXGISwapChain3 * chain, std::uint32_t index) noexcept -> Result<Com<ID3D12Resource>, Error> {
+            static constexpr auto NamedBuffer = [] [[nodiscard]] (const Com<ID3D12Resource>& buffer) noexcept -> Result<Com<ID3D12Resource>, Error> {
+                return Check(buffer->SetName(L"Back buffer"), ApiCall::GetBuffer).transform([&buffer] { return buffer; });
+            };
+            Com<ID3D12Resource> buffer;
+            const HRESULT hr = chain->GetBuffer(index, IID_PPV_ARGS(&buffer));
+            return Check(hr, ApiCall::GetBuffer).and_then([&buffer] { return NamedBuffer(buffer); });
+        };
+        return BufferAt(chain, index).transform([&](const Com<ID3D12Resource>& buffer) {
+            CreateRtv(gpu, buffer.Get(), kSwapChainFormat, RtvHandle(gpu, index));
+            return infra::WithElement(buffers, index, buffer);
+        });
+    };
+    return infra::FoldResult(std::views::iota(std::uint32_t{ 0 }, interior::kBackBufferCount), Result<BackBuffers, Error>(BackBuffers{}),
+                             [&](const BackBuffers& acc, std::uint32_t index) { return WithBuffer(acc, gpu, chain, index); });
+}
 
-Result<Presenter, Error> CreatePresenter(const GpuDevice& gpu, HWND window, const interior::Extent& extent) noexcept
+[[nodiscard]] DXGI_SWAP_CHAIN_DESC1 SwapChainDescription(const interior::Extent& extent, UINT flags) noexcept
+{
+    return DXGI_SWAP_CHAIN_DESC1{ .Width = extent.width.Get(),
+                                  .Height = extent.height.Get(),
+                                  .Format = kSwapChainFormat,
+                                  .Stereo = FALSE,
+                                  .SampleDesc = DXGI_SAMPLE_DESC{ .Count = 1, .Quality = 0 },
+                                  .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
+                                  .BufferCount = interior::kBackBufferCount,
+                                  .Scaling = DXGI_SCALING_STRETCH,
+                                  .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
+                                  .AlphaMode = DXGI_ALPHA_MODE_IGNORE,
+                                  .Flags = flags };
+}
+
+[[nodiscard]] Result<Presenter, Error> CreateCompositedPresenter(const GpuDevice& gpu, HWND window, const interior::Extent& extent) noexcept
 {
     static constexpr auto CreateSwapChain = [] [[nodiscard]] (const GpuDevice& gpu, const interior::Extent& extent) noexcept -> Result<Com<IDXGISwapChain3>, Error> {
         static constexpr auto CreateCompositionSwapChain = [] [[nodiscard]] (const GpuDevice& gpu, const interior::Extent& extent) noexcept -> Result<Com<IDXGISwapChain1>, Error> {
-            static constexpr auto SwapChainDescription = [] [[nodiscard]] (const interior::Extent& extent) noexcept -> DXGI_SWAP_CHAIN_DESC1 {
-                return DXGI_SWAP_CHAIN_DESC1{ extent.width.Get(),
-                                              extent.height.Get(),
-                                              kSwapChainFormat,
-                                              FALSE,
-                                              DXGI_SAMPLE_DESC{ 1, 0 },
-                                              DXGI_USAGE_RENDER_TARGET_OUTPUT,
-                                              interior::kBackBufferCount,
-                                              DXGI_SCALING_STRETCH,
-                                              DXGI_SWAP_EFFECT_FLIP_DISCARD,
-                                              DXGI_ALPHA_MODE_IGNORE,
-                                              DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT };
-            };
-            const DXGI_SWAP_CHAIN_DESC1 desc = SwapChainDescription(extent);
+            const DXGI_SWAP_CHAIN_DESC1 desc = SwapChainDescription(extent, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
             Com<IDXGISwapChain1> chain;
             const HRESULT hr = gpu.factory->CreateSwapChainForComposition(gpu.queue.Get(), &desc, nullptr, &chain);
             return Check(hr, ApiCall::CreateSwapChainForComposition).transform([&chain] { return chain; });
@@ -93,28 +116,9 @@ Result<Presenter, Error> CreatePresenter(const GpuDevice& gpu, HWND window, cons
                 return Fail(Error{ ApiCall::WaitForFrame, 0 });
             return UniqueHandle(handle);
         };
-
-        static constexpr auto CollectBuffers = [] [[nodiscard]] (const GpuDevice& gpu, IDXGISwapChain3* chain) noexcept -> Result<BackBuffers, Error> {
-            static constexpr auto WithBuffer = [] [[nodiscard]] (const BackBuffers& buffers, const GpuDevice& gpu, IDXGISwapChain3* chain, std::uint32_t index) noexcept -> Result<BackBuffers, Error> {
-                static constexpr auto BufferAt = [] [[nodiscard]] (IDXGISwapChain3 * chain, std::uint32_t index) noexcept -> Result<Com<ID3D12Resource>, Error> {
-                    static constexpr auto NamedBuffer = [] [[nodiscard]] (const Com<ID3D12Resource>& buffer) noexcept -> Result<Com<ID3D12Resource>, Error> {
-                        return Check(buffer->SetName(L"Back buffer"), ApiCall::GetBuffer).transform([&buffer] { return buffer; });
-                    };
-                    Com<ID3D12Resource> buffer;
-                    const HRESULT hr = chain->GetBuffer(index, IID_PPV_ARGS(&buffer));
-                    return Check(hr, ApiCall::GetBuffer).and_then([&buffer] { return NamedBuffer(buffer); });
-                };
-                return BufferAt(chain, index).transform([&](const Com<ID3D12Resource>& buffer) {
-                    CreateRtv(gpu, buffer.Get(), kSwapChainFormat, RtvHandle(gpu, index));
-                    return infra::WithElement(buffers, index, buffer);
-                });
-            };
-            return infra::FoldResult(std::views::iota(std::uint32_t{ 0 }, interior::kBackBufferCount), Result<BackBuffers, Error>(BackBuffers{}),
-                                     [&](const BackBuffers& acc, std::uint32_t index) { return WithBuffer(acc, gpu, chain, index); });
-        };
         return WaitableOf(chain.Get()).and_then([&](UniqueHandle waitable) {
             return CollectBuffers(gpu, chain.Get()).transform([&](const BackBuffers& buffers) {
-                return Presenter{ chain, composition.device, composition.target, composition.visual, std::move(waitable), buffers, extent };
+                return Presenter{ chain, Composited{ composition.device, composition.target, composition.visual, std::move(waitable) }, buffers, extent };
             });
         });
     };
@@ -123,13 +127,49 @@ Result<Presenter, Error> CreatePresenter(const GpuDevice& gpu, HWND window, cons
     });
 }
 
+// No waitable is asked for and the frame latency is left alone: Streamline's pacer owns both on this swap chain.
+[[nodiscard]] Result<Presenter, Error> CreateGeneratedPresenter(const GpuDevice& gpu, const Streamline& streamline, HWND window, const interior::Extent& extent) noexcept
+{
+    static constexpr auto CreateWindowSwapChain = [] [[nodiscard]] (const GpuDevice& gpu, IDXGIFactory2* factory, HWND window,
+                                                                    const interior::Extent& extent) noexcept -> Result<Com<IDXGISwapChain3>, Error> {
+        const DXGI_SWAP_CHAIN_DESC1 desc = SwapChainDescription(extent, 0);
+        Com<IDXGISwapChain1> chain;
+        const HRESULT hr = factory->CreateSwapChainForHwnd(gpu.queue.Get(), window, &desc, nullptr, nullptr, &chain);
+        return Check(hr, ApiCall::CreateSwapChainForHwnd).and_then([&chain] { return As<IDXGISwapChain3>(chain, ApiCall::QueryInterface); });
+    };
+
+    static constexpr auto Assembled = [] [[nodiscard]] (const GpuDevice& gpu, const Com<IDXGISwapChain3>& chain, const interior::Extent& extent) noexcept -> Result<Presenter, Error> {
+        return CollectBuffers(gpu, chain.Get()).transform([&](const BackBuffers& buffers) { return Presenter{ chain, Generated{}, buffers, extent }; });
+    };
+    return ProxyFactory(streamline, gpu.factory.Get()).and_then([&](const Com<IDXGIFactory2>& factory) {
+        return CreateWindowSwapChain(gpu, factory.Get(), window, extent).and_then([&](const Com<IDXGISwapChain3>& chain) { return Assembled(gpu, chain, extent); });
+    });
+}
+
+} // namespace
+
+Result<Presenter, Error> CreatePresenter(const GpuDevice& gpu, HWND window, const interior::Extent& extent) noexcept
+{
+    if (!gpu.streamline.has_value())
+        return CreateCompositedPresenter(gpu, window, extent);
+    return CreateGeneratedPresenter(gpu, *gpu.streamline, window, extent);
+}
+
 Status<Error> WaitForNextFrame(const Presenter& presenter) noexcept
 {
-    static constexpr auto IsWaitFailure = [] [[nodiscard]] (DWORD result) noexcept -> bool { return result == WAIT_FAILED; };
-    const DWORD result = ::WaitForSingleObjectEx(presenter.waitable.get(), static_cast<DWORD>(kFrameWaitMicroseconds / 1000u), TRUE);
-    if (IsWaitFailure(result))
-        return Fail(LastError(ApiCall::WaitForFrame));
-    return {};
+    static constexpr auto WaitForSwapChain = [] [[nodiscard]] (const Composited& composited) noexcept -> Status<Error> {
+        static constexpr auto IsWaitFailure = [] [[nodiscard]] (DWORD result) noexcept -> bool { return result == WAIT_FAILED; };
+        const DWORD result = ::WaitForSingleObjectEx(composited.waitable.get(), static_cast<DWORD>(kFrameWaitMicroseconds / 1000u), TRUE);
+        if (IsWaitFailure(result))
+            return Fail(LastError(ApiCall::WaitForFrame));
+        return {};
+    };
+
+    // A frame with nothing new is not presented while DLSS Frame Generation runs, so no present comes back to wait
+    // on; the compositor's next frame is what the next look at the capture waits for. GetContainingOutput, which
+    // WaitForVBlank needs, answers DXGI_ERROR_UNSUPPORTED for this swap chain (observed on Windows 11 build 26300).
+    static constexpr auto WaitForRefresh = [] [[nodiscard]] (const Generated&) noexcept -> Status<Error> { return Check(::DwmFlush(), ApiCall::WaitForCompositor); };
+    return std::visit(infra::Overloaded{ WaitForSwapChain, WaitForRefresh }, presenter.surface);
 }
 
 Result<interior::BackBufferIndex, Error> CurrentBackBuffer(const Presenter& presenter) noexcept

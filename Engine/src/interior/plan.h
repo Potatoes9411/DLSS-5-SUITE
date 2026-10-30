@@ -55,6 +55,7 @@ struct SessionPlan
     bool captureCursor;
     bool vsync;
     FrameGen frameGen;
+    FrameGenMethod frameGenMethod;
     [[nodiscard]] friend constexpr bool operator==(const SessionPlan&, const SessionPlan&) noexcept = default;
 };
 

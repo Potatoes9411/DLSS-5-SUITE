@@ -235,6 +235,13 @@
                                           SelectedIndex="{Binding SelectedFrameGenIndex, Mode=TwoWay}" MinWidth="150" Height="34" />
                             </StackPanel>
 
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsScreenEngine}"
+                                        ToolTip.Tip="Uses NVIDIA DLSS Frame Generation for the in-between frames instead of SUITE's own. Needs an RTX 40 or 50 card: up to 4x on RTX 40, 6x on RTX 50. It takes about 15 seconds to start. If it can't start, SUITE's own frame generation is used and the engine log says why.">
+                                <TextBlock Text="NVIDIA frame gen" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" Width="110" />
+                                <ToggleSwitch IsChecked="{Binding NvidiaFrameGen, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                <TextBlock Text="RTX 40/50 · best quality" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                            </StackPanel>
+
                             <Border Height="1" Background="#24FFFFFF" Margin="0,3" IsVisible="{Binding IsNeuralScreen}" />
 
                             <!-- Everything NeuralScreen has that the Screen Engine does not.

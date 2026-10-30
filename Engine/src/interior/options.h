@@ -106,6 +106,7 @@ struct Options
     bool excludeOwnWindows; // ask the capture to leave our own windows out, rather than hiding them from all capture
     bool exclusionLog;      // write the capture-exclusion notes to a file beside the executable
     FrameGen frameGen;      // how many pictures are shown for each one the model makes
+    bool nvidiaFrameGen;    // the pictures between are made by NVIDIA DLSS Frame Generation rather than by the engine's own blend
     [[nodiscard]] friend constexpr bool operator==(const Options&, const Options&) noexcept = default;
 };
 

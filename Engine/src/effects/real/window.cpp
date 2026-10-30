@@ -25,7 +25,6 @@ using infra::Status;
 using interior::MonitorInfo;
 using interior::MonitorList;
 
-constexpr wchar_t kClassName[] = DSCREEN_WIDE(DSCREEN_FILE_STEM) L"OutputWindow";
 constexpr std::uint32_t kMaxMessagesPerPump = 64;
 
 [[nodiscard]] LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
@@ -354,7 +353,7 @@ Result<OutputWindow, Error> CreateOutputWindow(const interior::ScreenRect& rect,
                             .hCursor = ::LoadCursorW(nullptr, IDC_ARROW),
                             .hbrBackground = nullptr,
                             .lpszMenuName = nullptr,
-                            .lpszClassName = kClassName,
+                            .lpszClassName = kOutputWindowClass,
                             .hIconSm = SmallAppIcon() };
     };
 
@@ -363,8 +362,8 @@ Result<OutputWindow, Error> CreateOutputWindow(const interior::ScreenRect& rect,
             static constexpr auto RedirectionStyle = [] [[nodiscard]] (const WindowSettings& s) noexcept -> DWORD { return s.redirectionBitmap ? 0u : WS_EX_NOREDIRECTIONBITMAP; };
             return WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | TopmostStyle(s) | ClickThroughStyle(s) | RedirectionStyle(s);
         };
-        HWND handle = ::CreateWindowExW(ExtendedStyle(s), kClassName, DSCREEN_WIDE(DSCREEN_PRODUCT_NAME), WS_POPUP, rect.Left().Get(), rect.Top().Get(), Width(rect), Height(rect), nullptr, nullptr,
-                                        ::GetModuleHandleW(nullptr), nullptr);
+        HWND handle = ::CreateWindowExW(ExtendedStyle(s), kOutputWindowClass, DSCREEN_WIDE(DSCREEN_PRODUCT_NAME), WS_POPUP, rect.Left().Get(), rect.Top().Get(), Width(rect), Height(rect), nullptr,
+                                        nullptr, ::GetModuleHandleW(nullptr), nullptr);
         if (handle == nullptr)
             return Fail(LastError(ApiCall::CreateWindowExW));
         return UniqueWindow(handle);

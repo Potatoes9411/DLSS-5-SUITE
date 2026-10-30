@@ -152,9 +152,21 @@ struct Submit
     [[nodiscard]] friend constexpr bool operator==(const Submit&, const Submit&) noexcept = default;
 };
 
+// What NVIDIA DLSS Frame Generation is handed with a picture it is to make others after: how many pictures to
+// show for it, and whether it has no connection to the one before. The motion vectors and the depth plane go
+// with it, both left readable by shaders.
+struct Generation
+{
+    FrameGen multiplier;
+    bool reset;
+    Extent motion; // the size the motion vectors and the depth plane are made at
+    [[nodiscard]] friend constexpr bool operator==(const Generation&, const Generation&) noexcept = default;
+};
+
 struct Present
 {
     bool vsync;
+    std::optional<Generation> generation; // present whenever NVIDIA DLSS Frame Generation is behind the swap chain
     [[nodiscard]] friend constexpr bool operator==(const Present&, const Present&) noexcept = default;
 };
 
