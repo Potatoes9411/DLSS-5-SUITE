@@ -371,6 +371,9 @@ type MainViewModel() as this =
     /// DLSS 5 over the whole screen, run by the bundled engine.
     let screenEngine = new ScreenEngineViewModel()
 
+    /// DLSS 5 on a video, picture by picture, saved as a new file.
+    let video = VideoViewModel()
+
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
@@ -1458,6 +1461,8 @@ type MainViewModel() as this =
                 this.RaisePropertyChanged("IsEmulatorsTabActive")
                 this.RaisePropertyChanged("IsCommunityViewVisible")
                 this.RaisePropertyChanged("IsCommunityTabActive")
+                this.RaisePropertyChanged("IsVideoViewVisible")
+                this.RaisePropertyChanged("IsVideoTabActive")
                 this.RaisePropertyChanged("SearchPlaceholder")
 
                 // The community grid is server-side, so it is fetched the first
@@ -1485,6 +1490,9 @@ type MainViewModel() as this =
     member this.IsGamesTabActive = activeSection = "games"
     member this.IsEmulatorsTabActive = activeSection = "emulators"
     member this.IsCommunityTabActive = activeSection = "community"
+    member this.IsVideoViewVisible = activeSection = "video"
+    member this.IsVideoTabActive = activeSection = "video"
+    member _.Video = video
 
     /// The community section's own state. Exposed so the window can bind to it
     /// as `Community.X` rather than mirroring three dozen properties here.
@@ -1603,6 +1611,7 @@ type MainViewModel() as this =
     member this.ShowGames() = this.ActiveSection <- "games"
     member this.ShowEmulators() = this.ActiveSection <- "emulators"
     member this.ShowCommunity() = this.ActiveSection <- "community"
+    member this.ShowVideo() = this.ActiveSection <- "video"
 
     /// "Share result" in the Manage sheet. The post is built from the install
     /// this app made, so the route, API, bit-width and add-ons are already

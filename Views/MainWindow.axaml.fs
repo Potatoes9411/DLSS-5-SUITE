@@ -1069,6 +1069,59 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.ShowGames()
         | _ -> ()
 
+    member this.OnTabVideoClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ShowVideo()
+        | _ -> ()
+
+    // =====================================================================
+    // VIDEO TAB
+    // =====================================================================
+
+    member private this.WithVideo(f: VideoViewModel -> unit) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> f vm.Video
+        | _ -> ()
+
+    member this.OnVideoChooseSourceClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let top = TopLevel.GetTopLevel(this)
+            let options = Avalonia.Platform.Storage.FilePickerOpenOptions(Title = "Pick a video to run DLSS 5 on", AllowMultiple = false)
+            let! files = top.StorageProvider.OpenFilePickerAsync(options) |> Async.AwaitTask
+            if files.Count > 0 then
+                let path = files.[0].TryGetLocalPath()
+                if not (String.IsNullOrEmpty path) then
+                    Avalonia.Threading.Dispatcher.UIThread.Post(fun () -> this.WithVideo(fun v -> v.Source <- path))
+        }
+        |> Async.StartImmediate
+
+    member this.OnVideoChooseOutputClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let top = TopLevel.GetTopLevel(this)
+            let current = match this.DataContext with | :? MainViewModel as vm -> vm.Video.OutputPath | _ -> ""
+            let types =
+                [ "MP4 video", "*.mp4"; "MKV video", "*.mkv"; "WebM video", "*.webm"; "QuickTime video", "*.mov" ]
+                |> List.map (fun (name, pattern) -> Avalonia.Platform.Storage.FilePickerFileType(name, Patterns = [| pattern |]))
+            let options =
+                Avalonia.Platform.Storage.FilePickerSaveOptions(
+                    Title = "Save the DLSS 5 video as",
+                    SuggestedFileName = IO.Path.GetFileName(current),
+                    DefaultExtension = IO.Path.GetExtension(current).TrimStart('.'),
+                    FileTypeChoices = types,
+                    ShowOverwritePrompt = true)
+            let! file = top.StorageProvider.SaveFilePickerAsync(options) |> Async.AwaitTask
+            if not (isNull file) then
+                let path = file.TryGetLocalPath()
+                if not (String.IsNullOrEmpty path) then
+                    Avalonia.Threading.Dispatcher.UIThread.Post(fun () -> this.WithVideo(fun v -> v.ChooseOutput(path)))
+        }
+        |> Async.StartImmediate
+
+    member this.OnVideoFetchToolsClicked(sender: obj, e: RoutedEventArgs) = this.WithVideo(fun v -> v.FetchTools())
+    member this.OnVideoStartClicked(sender: obj, e: RoutedEventArgs) = this.WithVideo(fun v -> v.Start())
+    member this.OnVideoCancelClicked(sender: obj, e: RoutedEventArgs) = this.WithVideo(fun v -> v.Cancel())
+    member this.OnVideoShowResultClicked(sender: obj, e: RoutedEventArgs) = this.WithVideo(fun v -> v.ShowResult())
+
     member this.OnTabEmulatorsClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> vm.ShowEmulators()

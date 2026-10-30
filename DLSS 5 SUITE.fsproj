@@ -82,6 +82,7 @@
     <Compile Include="Services\RtxRemix.fs" />
     <Compile Include="Services\OpenXrLayer.fs" />
     <Compile Include="Services\ScreenEngine.fs" />
+    <Compile Include="Services\VideoDlss.fs" />
     <Compile Include="Services\NeuralScreen.fs" />
     <Compile Include="Services\RobloxShadeHost.fs" />
     <Compile Include="Services\AnalysisStore.fs" />
@@ -94,6 +95,7 @@
     <Compile Include="ViewModels\GameCardViewModel.fs" />
     <Compile Include="ViewModels\CommunityViewModel.fs" />
     <Compile Include="ViewModels\ScreenEngineViewModel.fs" />
+    <Compile Include="ViewModels\VideoViewModel.fs" />
     <Compile Include="ViewModels\MainViewModel.fs" />
     <Compile Include="Views\ScreenEngineWindow.axaml.fs" />
     <Compile Include="Views\MainWindow.axaml.fs" />

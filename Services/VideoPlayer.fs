@@ -76,7 +76,7 @@ module VideoPlayer =
 
     /// The browser_download_url of the first asset of a GitHub release whose
     /// name passes the test.
-    let private releaseAsset (api: string) (pick: string -> bool) =
+    let internal releaseAsset (api: string) (pick: string -> bool) =
         let json = http.Value.GetStringAsync(api).Result
         use doc = JsonDocument.Parse(json)
         let tag = match doc.RootElement.TryGetProperty("tag_name") with | true, v -> v.GetString() | _ -> "latest"
@@ -85,7 +85,7 @@ module VideoPlayer =
             let name = a.GetProperty("name").GetString()
             if pick name then Some(tag, name, a.GetProperty("browser_download_url").GetString()) else None)
 
-    let private downloadTo (url: string) (target: string) (progress: string -> unit) (label: string) =
+    let internal downloadTo (url: string) (target: string) (progress: string -> unit) (label: string) =
         use resp = http.Value.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).Result
         resp.EnsureSuccessStatusCode() |> ignore
         let total = resp.Content.Headers.ContentLength |> Option.ofNullable |> Option.defaultValue 0L
@@ -110,7 +110,7 @@ module VideoPlayer =
 
     /// Extracts a zip, dropping a single shared top folder and refusing any
     /// entry that would land outside the target.
-    let private extractFlat (zip: string) (target: string) (only: (string -> bool) option) =
+    let internal extractFlat (zip: string) (target: string) (only: (string -> bool) option) =
         use archive = ZipFile.OpenRead(zip)
         let entries = archive.Entries |> Seq.filter (fun e -> e.Name <> "") |> List.ofSeq
         let prefix =

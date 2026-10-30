@@ -203,6 +203,8 @@
                                     Content="{Binding Loc.Games}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
                             <Button Classes="SegmentedTab" Classes.Active="{Binding IsEmulatorsTabActive}" Click="OnTabEmulatorsClicked"
                                     Content="{Binding Loc.TabEmulators}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
+                            <Button Classes="SegmentedTab" Classes.Active="{Binding IsVideoTabActive}" Click="OnTabVideoClicked"
+                                    Content="VIDEO" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
                             <!-- COMMUNITY: hidden in this build.
                                  The feature talks to NODIX TECH's own Cloudflare Worker and the
                                  credentials for it are deliberately not in the shared source
@@ -254,6 +256,7 @@
                                 <StackPanel Orientation="Horizontal" Spacing="2">
                                     <Button Classes="SegmentedTab" Classes.Active="{Binding IsGamesTabActive}" Click="OnTabGamesClicked" Content="{Binding Loc.Games}" />
                                     <Button Classes="SegmentedTab" Classes.Active="{Binding IsEmulatorsTabActive}" Click="OnTabEmulatorsClicked" Content="{Binding Loc.TabEmulators}" />
+                                    <Button Classes="SegmentedTab" Classes.Active="{Binding IsVideoTabActive}" Click="OnTabVideoClicked" Content="VIDEO" />
                                     <Button Classes="SegmentedTab" Classes.Active="{Binding IsCommunityTabActive}" Click="OnTabCommunityClicked" Content="{Binding Loc.TabCommunity}" IsVisible="False" />
 
                                     <!-- Add Game / Folder Button (+) -->
@@ -1805,6 +1808,86 @@
                                     </Border>
 
                                     <Border Height="70" IsHitTestVisible="False" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- 5. VIDEO VIEW - DLSS 5 on a video, picture by picture, saved as a new file -->
+                        <Border Classes="PageReveal" Classes.Shown="{Binding IsVideoViewVisible}"
+                                IsVisible="{Binding IsVideoViewVisible}" Padding="20,4,20,0" ClipToBounds="False">
+                            <ScrollViewer x:Name="VideoScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,12,0,0" ClipToBounds="False">
+                                <StackPanel Spacing="14" MaxWidth="820" HorizontalAlignment="Center" DataContext="{Binding Video}" x:DataType="vm:VideoViewModel">
+
+                                    <Border Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="VIDEO · DLSS 5 ON EVERY FRAME" FontSize="11.5" FontWeight="Bold" Foreground="#94A3B8" />
+                                            <TextBlock Text="Paste a YouTube link or pick a video file. SUITE runs DLSS 5 on every frame, adds frame generation if you want it, and saves a new video. It never drops a frame, so a minute of video can take a few minutes."
+                                                       TextWrapping="Wrap" Foreground="#CBD5E1" FontSize="12" />
+                                            <TextBlock Text="{Binding CannotRunText}" IsVisible="{Binding CannotRun}" TextWrapping="Wrap" Foreground="#FBBF24" FontSize="11.5" FontWeight="SemiBold" />
+
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <TextBox Grid.Column="0" Text="{Binding Source, Mode=TwoWay}" PlaceholderText="Paste a YouTube link, or choose a file" FontSize="12" IsEnabled="{Binding IsIdle}" />
+                                                <Button Grid.Column="1" Content="Choose file..." Click="OnVideoChooseSourceClicked" IsEnabled="{Binding IsIdle}" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding YouTubeNotice}" TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
+
+                                            <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+
+                                            <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="10">
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Frame generation" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Row="0" Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding FrameGenOptions}" SelectedIndex="{Binding SelectedFrameGenIndex, Mode=TwoWay}"
+                                                          HorizontalAlignment="Stretch" Height="34" IsEnabled="{Binding IsIdle}"
+                                                          ToolTip.Tip="Extra frames drawn between each pair of the video's own frames, from the motion between them. 2x turns 30 fps into 60." />
+                                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Process at" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Row="0" Grid.Column="3" Classes="GlassComboBox" ItemsSource="{Binding SizeOptions}" SelectedIndex="{Binding SelectedSizeIndex, Mode=TwoWay}"
+                                                          HorizontalAlignment="Stretch" Height="34" IsEnabled="{Binding IsIdle}"
+                                                          ToolTip.Tip="Bigger videos are scaled down to this before DLSS 5, which is faster. Source size keeps every pixel." />
+
+                                                <TextBlock Grid.Row="1" Grid.Column="0" Text="File type" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Row="1" Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding ContainerOptions}" SelectedIndex="{Binding SelectedContainerIndex, Mode=TwoWay}"
+                                                          HorizontalAlignment="Stretch" Height="34" IsEnabled="{Binding IsIdle}" />
+                                                <TextBlock Grid.Row="1" Grid.Column="2" Text="Codec" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Row="1" Grid.Column="3" Classes="GlassComboBox" ItemsSource="{Binding CodecOptions}" SelectedIndex="{Binding SelectedCodecIndex, Mode=TwoWay}"
+                                                          HorizontalAlignment="Stretch" Height="34" IsEnabled="{Binding IsIdle}" />
+
+                                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Quality" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Row="2" Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding QualityOptions}" SelectedIndex="{Binding SelectedQualityIndex, Mode=TwoWay}"
+                                                          HorizontalAlignment="Stretch" Height="34" IsEnabled="{Binding IsIdle}" />
+                                                <StackPanel Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                                                            IsVisible="{Binding NvencApplies}"
+                                                            ToolTip.Tip="Encodes on the graphics card (NVENC), which is much faster. Turn it off if saving fails.">
+                                                    <ToggleSwitch IsChecked="{Binding UseNvenc, Mode=TwoWay}" OnContent="" OffContent="" IsEnabled="{Binding IsIdle}" />
+                                                    <TextBlock Text="NVIDIA encoder" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                                <TextBlock Grid.Column="0" Text="Save to" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                <TextBox Grid.Column="1" Text="{Binding OutputPath, Mode=TwoWay}" FontSize="12" IsEnabled="{Binding IsIdle}" />
+                                                <Button Grid.Column="2" Content="Choose..." Click="OnVideoChooseOutputClicked" IsEnabled="{Binding IsIdle}" />
+                                            </Grid>
+                                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLink}">
+                                                <ToggleSwitch IsChecked="{Binding KeepDownload, Mode=TwoWay}" OnContent="" OffContent="" IsEnabled="{Binding IsIdle}" />
+                                                <TextBlock Text="Keep the downloaded original too" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                            </StackPanel>
+
+                                            <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" IsVisible="{Binding NeedsTools}">
+                                                <TextBlock Grid.Column="0" Text="{Binding ToolsText}" TextWrapping="Wrap" Foreground="#FBBF24" FontSize="11.5" VerticalAlignment="Center" />
+                                                <Button Grid.Column="1" Content="Download video tools" Click="OnVideoFetchToolsClicked" IsEnabled="{Binding !IsFetchingTools}" />
+                                            </Grid>
+
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Button Content="Start" Click="OnVideoStartClicked" IsEnabled="{Binding CanStart}" IsVisible="{Binding IsIdle}" />
+                                                <Button Content="Cancel" Click="OnVideoCancelClicked" IsVisible="{Binding IsBusy}" />
+                                                <Button Content="Show in folder" Click="OnVideoShowResultClicked" IsVisible="{Binding HasResult}" />
+                                            </StackPanel>
+                                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="6" IsVisible="{Binding HasProgress}" />
+                                            <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="#CBD5E1" FontSize="12" />
+                                            <TextBlock Text="DLSS 5 uses your Screen Engine settings (intensity, style, structure and tone)." TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
+                                        </StackPanel>
+                                    </Border>
                                 </StackPanel>
                             </ScrollViewer>
                         </Border>
