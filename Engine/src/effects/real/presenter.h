@@ -32,10 +32,15 @@ struct Generated
 {
 };
 
+// No window at all: the pictures are drawn into textures of their own and read back, for a video.
+struct Offscreen
+{
+};
+
 struct Presenter
 {
-    Com<IDXGISwapChain3> swapChain;
-    std::variant<Composited, Generated> surface;
+    Com<IDXGISwapChain3> swapChain; // nothing when offscreen
+    std::variant<Composited, Generated, Offscreen> surface;
     BackBuffers backBuffers;
     interior::Extent extent;
 };
@@ -45,6 +50,8 @@ struct Presenter
 // device it is the window's own flip-model swap chain instead, which is the kind Streamline can put DLSS Frame
 // Generation behind; on Windows 11 build 26300 a layered, click-through window shows one and lets clicks through.
 [[nodiscard]] infra::Result<Presenter, Error> CreatePresenter(const GpuDevice& gpu, HWND window, const interior::Extent& extent) noexcept;
+// Back buffers that are plain textures, in the state a presented back buffer is in, for pictures read back.
+[[nodiscard]] infra::Result<Presenter, Error> CreateOffscreenPresenter(const GpuDevice& gpu, const interior::Extent& extent) noexcept;
 [[nodiscard]] infra::Status<Error> WaitForNextFrame(const Presenter& presenter) noexcept;
 [[nodiscard]] infra::Result<interior::BackBufferIndex, Error> CurrentBackBuffer(const Presenter& presenter) noexcept;
 [[nodiscard]] infra::Status<Error> PresentFrame(const Presenter& presenter, bool vsync) noexcept;

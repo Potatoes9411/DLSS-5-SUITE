@@ -134,6 +134,133 @@ struct CopyRegion
     D3D11_BOX box;
 };
 
+[[nodiscard]] Result<Devices, Error> CreateDevices(const GpuDevice& gpu) noexcept
+{
+    static constexpr auto CreateDevice11 = [] [[nodiscard]] (const GpuDevice& gpu, Com<ID3D11DeviceContext>& context) noexcept -> Result<Com<ID3D11Device>, Error> {
+        Com<ID3D11Device> device;
+        const HRESULT hr = ::D3D11CreateDevice(gpu.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context);
+        return Check(hr, ApiCall::D3D11CreateDevice).transform([&device] { return device; });
+    };
+
+    // The free-threaded pool uses the context from the capture service's thread, so it is protected.
+    static constexpr auto ProtectContext = [] [[nodiscard]] (const Com<ID3D11DeviceContext>& context) noexcept -> Status<Error> {
+        return As<ID3D11Multithread>(context, ApiCall::QueryInterface).transform([](const Com<ID3D11Multithread>& multithread) { multithread->SetMultithreadProtected(TRUE); });
+    };
+
+    static constexpr auto WinrtDeviceOf = [] [[nodiscard]] (const Com<ID3D11Device>& device11) noexcept -> Result<Com<WGD11::IDirect3DDevice>, Error> {
+        return As<IDXGIDevice>(device11, ApiCall::QueryInterface).and_then([](const Com<IDXGIDevice>& dxgi) {
+            Com<IInspectable> inspectable;
+            const HRESULT hr = ::CreateDirect3D11DeviceFromDXGIDevice(dxgi.Get(), &inspectable);
+            return Check(hr, ApiCall::CreateDirect3D11DeviceFromDXGIDevice).and_then([&inspectable] { return As<WGD11::IDirect3DDevice>(inspectable, ApiCall::QueryInterface); });
+        });
+    };
+    Com<ID3D11DeviceContext> context;
+    return CreateDevice11(gpu, context).and_then([&](const Com<ID3D11Device>& device11) {
+        return ProtectContext(context).and_then([&] { return As<ID3D11DeviceContext4>(context, ApiCall::QueryInterface); }).and_then([&](const Com<ID3D11DeviceContext4>& context4) {
+            return WinrtDeviceOf(device11).transform([&](const Com<WGD11::IDirect3DDevice>& winrt) { return Devices{ device11, context4, winrt }; });
+        });
+    });
+}
+
+[[nodiscard]] Result<Bridge, Error> CreateBridge(const Devices& d, const GpuDevice& gpu, const interior::Extent& extent) noexcept
+{
+    static constexpr auto SharedFenceFor = [] [[nodiscard]] (const Devices& d, const GpuDevice& gpu) noexcept -> Result<SharedFence, Error> {
+        static constexpr auto CreateSharedFence = [] [[nodiscard]] (const Com<ID3D11Device>& device11) noexcept -> Result<Com<ID3D11Fence>, Error> {
+            return As<ID3D11Device5>(device11, ApiCall::QueryInterface).and_then([](const Com<ID3D11Device5>& device5) -> Result<Com<ID3D11Fence>, Error> {
+                Com<ID3D11Fence> fence;
+                return Check(device5->CreateFence(0, D3D11_FENCE_FLAG_SHARED, IID_PPV_ARGS(&fence)), ApiCall::D3D11CreateFence).transform([&fence] { return fence; });
+            });
+        };
+
+        static constexpr auto FenceHandle = [] [[nodiscard]] (const Com<ID3D11Fence>& fence) noexcept -> Result<UniqueHandle, Error> {
+            HANDLE handle = nullptr;
+            return Check(fence->CreateSharedHandle(nullptr, GENERIC_ALL, nullptr, &handle), ApiCall::CreateSharedHandle).transform([handle] { return UniqueHandle(handle); });
+        };
+
+        // WAIVER(R7): the same open over another interface; a template here would put metaprogramming outside infrastructure.
+        static constexpr auto OpenedFence = [] [[nodiscard]] (const GpuDevice& gpu, const UniqueHandle& handle) noexcept -> Result<Com<ID3D12Fence>, Error> {
+            Com<ID3D12Fence> opened;
+            return Check(gpu.device->OpenSharedHandle(handle.get(), IID_PPV_ARGS(&opened)), ApiCall::OpenSharedHandle).transform([&opened] { return opened; });
+        };
+        return CreateSharedFence(d.device11).and_then([&](const Com<ID3D11Fence>& fence) {
+            return FenceHandle(fence).and_then(
+                [&](const UniqueHandle& handle) { return OpenedFence(gpu, handle).transform([&fence](const Com<ID3D12Fence>& shared) { return SharedFence{ fence, shared }; }); });
+        });
+    };
+
+    static constexpr auto SharedCanvasFor = [] [[nodiscard]] (const Devices& d, const GpuDevice& gpu, const interior::Extent& extent) noexcept -> Result<SharedCanvas, Error> {
+        static constexpr auto CreateCanvas = [] [[nodiscard]] (const Com<ID3D11Device>& device11, const interior::Extent& extent) noexcept -> Result<Com<ID3D11Texture2D>, Error> {
+            static constexpr auto CanvasDescription = [] [[nodiscard]] (const interior::Extent& extent) noexcept -> D3D11_TEXTURE2D_DESC {
+                return D3D11_TEXTURE2D_DESC{ extent.width.Get(),
+                                             extent.height.Get(),
+                                             1,
+                                             1,
+                                             kCanvasFormat,
+                                             { 1, 0 },
+                                             D3D11_USAGE_DEFAULT,
+                                             D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET,
+                                             0,
+                                             D3D11_RESOURCE_MISC_SHARED | D3D11_RESOURCE_MISC_SHARED_NTHANDLE };
+            };
+            const D3D11_TEXTURE2D_DESC desc = CanvasDescription(extent);
+            Com<ID3D11Texture2D> canvas;
+            return Check(device11->CreateTexture2D(&desc, nullptr, &canvas), ApiCall::CreateTexture2D).transform([&canvas] { return canvas; });
+        };
+
+        static constexpr auto ResourceHandle = [] [[nodiscard]] (const Com<ID3D11Texture2D>& canvas) noexcept -> Result<UniqueHandle, Error> {
+            return As<IDXGIResource1>(canvas, ApiCall::QueryInterface).and_then([](const Com<IDXGIResource1>& resource) -> Result<UniqueHandle, Error> {
+                HANDLE handle = nullptr;
+                const HRESULT hr = resource->CreateSharedHandle(nullptr, DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE, nullptr, &handle);
+                return Check(hr, ApiCall::CreateSharedHandle).transform([handle] { return UniqueHandle(handle); });
+            });
+        };
+
+        static constexpr auto OpenedCanvas = [] [[nodiscard]] (const GpuDevice& gpu, const UniqueHandle& handle) noexcept -> Result<Com<ID3D12Resource>, Error> {
+            Com<ID3D12Resource> opened;
+            return Check(gpu.device->OpenSharedHandle(handle.get(), IID_PPV_ARGS(&opened)), ApiCall::OpenSharedHandle).transform([&opened] { return opened; });
+        };
+        return CreateCanvas(d.device11, extent).and_then([&](const Com<ID3D11Texture2D>& canvas) {
+            return ResourceHandle(canvas).and_then(
+                [&](const UniqueHandle& handle) { return OpenedCanvas(gpu, handle).transform([&canvas](const Com<ID3D12Resource>& shared) { return SharedCanvas{ canvas, shared }; }); });
+        });
+    };
+    return SharedCanvasFor(d, gpu, extent).and_then([&](const SharedCanvas& canvas) {
+        return SharedFenceFor(d, gpu).and_then([&](const SharedFence& free) {
+            return SharedFenceFor(d, gpu).transform([&](const SharedFence& ready) { return Bridge{ canvas.canvas, canvas.shared, free.fence, free.shared, ready.fence, ready.shared }; });
+        });
+    });
+}
+
+// Ordering, entirely on the GPU: the queue signals that everything submitted so far has finished with the
+// canvas, the capture device waits for that before writing it, and the queue waits for the write to land.
+[[nodiscard]] Status<Error> ReleaseCanvas(const Capture& capture, interior::FenceValue value) noexcept
+{
+    return Check(capture.queue->Signal(capture.sharedCanvasFree.Get(), value.Get()), ApiCall::QueueSignal);
+}
+
+[[nodiscard]] Status<Error> AwaitCanvas(const Capture& capture, interior::FenceValue value) noexcept
+{
+    return Check(capture.context->Wait(capture.canvasFree.Get(), value.Get()), ApiCall::ContextWait);
+}
+
+[[nodiscard]] Status<Error> SignalCopied(const Capture& capture, interior::FenceValue value) noexcept
+{
+    const HRESULT hr = capture.context->Signal(capture.canvasReady.Get(), value.Get());
+    capture.context->Flush();
+    return Check(hr, ApiCall::ContextSignal);
+}
+
+[[nodiscard]] Status<Error> QueueAwaitsCopy(const Capture& capture, interior::FenceValue value) noexcept
+{
+    return Check(capture.queue->Wait(capture.sharedCanvasReady.Get(), value.Get()), ApiCall::QueueWait);
+}
+
+// One fence value per frame, never zero, so the values only ever rise.
+[[nodiscard]] interior::FenceValue ValueOf(interior::FrameNumber number) noexcept
+{
+    return interior::FenceValueTag::Parse(number.Get() + 1);
+}
+
 } // namespace
 
 Status<Error> InitializeRuntime() noexcept
@@ -272,100 +399,7 @@ Result<Capture, Error> CreateCapture(const GpuDevice& gpu, const interior::Scree
         });
     };
 
-    static constexpr auto CreateDevices = [] [[nodiscard]] (const GpuDevice& gpu) noexcept -> Result<Devices, Error> {
-        static constexpr auto CreateDevice11 = [] [[nodiscard]] (const GpuDevice& gpu, Com<ID3D11DeviceContext>& context) noexcept -> Result<Com<ID3D11Device>, Error> {
-            Com<ID3D11Device> device;
-            const HRESULT hr = ::D3D11CreateDevice(gpu.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context);
-            return Check(hr, ApiCall::D3D11CreateDevice).transform([&device] { return device; });
-        };
 
-        // The free-threaded pool uses the context from the capture service's thread, so it is protected.
-        static constexpr auto ProtectContext = [] [[nodiscard]] (const Com<ID3D11DeviceContext>& context) noexcept -> Status<Error> {
-            return As<ID3D11Multithread>(context, ApiCall::QueryInterface).transform([](const Com<ID3D11Multithread>& multithread) { multithread->SetMultithreadProtected(TRUE); });
-        };
-
-        static constexpr auto WinrtDeviceOf = [] [[nodiscard]] (const Com<ID3D11Device>& device11) noexcept -> Result<Com<WGD11::IDirect3DDevice>, Error> {
-            return As<IDXGIDevice>(device11, ApiCall::QueryInterface).and_then([](const Com<IDXGIDevice>& dxgi) {
-                Com<IInspectable> inspectable;
-                const HRESULT hr = ::CreateDirect3D11DeviceFromDXGIDevice(dxgi.Get(), &inspectable);
-                return Check(hr, ApiCall::CreateDirect3D11DeviceFromDXGIDevice).and_then([&inspectable] { return As<WGD11::IDirect3DDevice>(inspectable, ApiCall::QueryInterface); });
-            });
-        };
-        Com<ID3D11DeviceContext> context;
-        return CreateDevice11(gpu, context).and_then([&](const Com<ID3D11Device>& device11) {
-            return ProtectContext(context).and_then([&] { return As<ID3D11DeviceContext4>(context, ApiCall::QueryInterface); }).and_then([&](const Com<ID3D11DeviceContext4>& context4) {
-                return WinrtDeviceOf(device11).transform([&](const Com<WGD11::IDirect3DDevice>& winrt) { return Devices{ device11, context4, winrt }; });
-            });
-        });
-    };
-
-    static constexpr auto CreateBridge = [] [[nodiscard]] (const Devices& d, const GpuDevice& gpu, const interior::Extent& extent) noexcept -> Result<Bridge, Error> {
-        static constexpr auto SharedFenceFor = [] [[nodiscard]] (const Devices& d, const GpuDevice& gpu) noexcept -> Result<SharedFence, Error> {
-            static constexpr auto CreateSharedFence = [] [[nodiscard]] (const Com<ID3D11Device>& device11) noexcept -> Result<Com<ID3D11Fence>, Error> {
-                return As<ID3D11Device5>(device11, ApiCall::QueryInterface).and_then([](const Com<ID3D11Device5>& device5) -> Result<Com<ID3D11Fence>, Error> {
-                    Com<ID3D11Fence> fence;
-                    return Check(device5->CreateFence(0, D3D11_FENCE_FLAG_SHARED, IID_PPV_ARGS(&fence)), ApiCall::D3D11CreateFence).transform([&fence] { return fence; });
-                });
-            };
-
-            static constexpr auto FenceHandle = [] [[nodiscard]] (const Com<ID3D11Fence>& fence) noexcept -> Result<UniqueHandle, Error> {
-                HANDLE handle = nullptr;
-                return Check(fence->CreateSharedHandle(nullptr, GENERIC_ALL, nullptr, &handle), ApiCall::CreateSharedHandle).transform([handle] { return UniqueHandle(handle); });
-            };
-
-            // WAIVER(R7): the same open over another interface; a template here would put metaprogramming outside infrastructure.
-            static constexpr auto OpenedFence = [] [[nodiscard]] (const GpuDevice& gpu, const UniqueHandle& handle) noexcept -> Result<Com<ID3D12Fence>, Error> {
-                Com<ID3D12Fence> opened;
-                return Check(gpu.device->OpenSharedHandle(handle.get(), IID_PPV_ARGS(&opened)), ApiCall::OpenSharedHandle).transform([&opened] { return opened; });
-            };
-            return CreateSharedFence(d.device11).and_then([&](const Com<ID3D11Fence>& fence) {
-                return FenceHandle(fence).and_then(
-                    [&](const UniqueHandle& handle) { return OpenedFence(gpu, handle).transform([&fence](const Com<ID3D12Fence>& shared) { return SharedFence{ fence, shared }; }); });
-            });
-        };
-
-        static constexpr auto SharedCanvasFor = [] [[nodiscard]] (const Devices& d, const GpuDevice& gpu, const interior::Extent& extent) noexcept -> Result<SharedCanvas, Error> {
-            static constexpr auto CreateCanvas = [] [[nodiscard]] (const Com<ID3D11Device>& device11, const interior::Extent& extent) noexcept -> Result<Com<ID3D11Texture2D>, Error> {
-                static constexpr auto CanvasDescription = [] [[nodiscard]] (const interior::Extent& extent) noexcept -> D3D11_TEXTURE2D_DESC {
-                    return D3D11_TEXTURE2D_DESC{ extent.width.Get(),
-                                                 extent.height.Get(),
-                                                 1,
-                                                 1,
-                                                 kCanvasFormat,
-                                                 { 1, 0 },
-                                                 D3D11_USAGE_DEFAULT,
-                                                 D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET,
-                                                 0,
-                                                 D3D11_RESOURCE_MISC_SHARED | D3D11_RESOURCE_MISC_SHARED_NTHANDLE };
-                };
-                const D3D11_TEXTURE2D_DESC desc = CanvasDescription(extent);
-                Com<ID3D11Texture2D> canvas;
-                return Check(device11->CreateTexture2D(&desc, nullptr, &canvas), ApiCall::CreateTexture2D).transform([&canvas] { return canvas; });
-            };
-
-            static constexpr auto ResourceHandle = [] [[nodiscard]] (const Com<ID3D11Texture2D>& canvas) noexcept -> Result<UniqueHandle, Error> {
-                return As<IDXGIResource1>(canvas, ApiCall::QueryInterface).and_then([](const Com<IDXGIResource1>& resource) -> Result<UniqueHandle, Error> {
-                    HANDLE handle = nullptr;
-                    const HRESULT hr = resource->CreateSharedHandle(nullptr, DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE, nullptr, &handle);
-                    return Check(hr, ApiCall::CreateSharedHandle).transform([handle] { return UniqueHandle(handle); });
-                });
-            };
-
-            static constexpr auto OpenedCanvas = [] [[nodiscard]] (const GpuDevice& gpu, const UniqueHandle& handle) noexcept -> Result<Com<ID3D12Resource>, Error> {
-                Com<ID3D12Resource> opened;
-                return Check(gpu.device->OpenSharedHandle(handle.get(), IID_PPV_ARGS(&opened)), ApiCall::OpenSharedHandle).transform([&opened] { return opened; });
-            };
-            return CreateCanvas(d.device11, extent).and_then([&](const Com<ID3D11Texture2D>& canvas) {
-                return ResourceHandle(canvas).and_then(
-                    [&](const UniqueHandle& handle) { return OpenedCanvas(gpu, handle).transform([&canvas](const Com<ID3D12Resource>& shared) { return SharedCanvas{ canvas, shared }; }); });
-            });
-        };
-        return SharedCanvasFor(d, gpu, extent).and_then([&](const SharedCanvas& canvas) {
-            return SharedFenceFor(d, gpu).and_then([&](const SharedFence& free) {
-                return SharedFenceFor(d, gpu).transform([&](const SharedFence& ready) { return Bridge{ canvas.canvas, canvas.shared, free.fence, free.shared, ready.fence, ready.shared }; });
-            });
-        });
-    };
 
     // Our windows stay covered unless every session agreed to leave them out: one that did not would capture
     // them, and the model would be fed its own answer.
@@ -436,20 +470,6 @@ Result<bool, Error> AcquireFrames(const Capture& capture, interior::FrameNumber 
 
     static constexpr auto CopyAndClose = [] [[nodiscard]] (const Capture& capture, const PendingList& pending, interior::FenceValue value) noexcept -> Result<bool, Error> {
         static constexpr auto CopyOrdered = [] [[nodiscard]] (const Capture& capture, const PendingList& pending, interior::FenceValue value) noexcept -> Status<Error> {
-            // Ordering, entirely on the GPU: the queue signals that everything submitted so far has finished with the
-            // canvas, the capture device waits for that before writing it, and the queue waits for the write to land.
-            static constexpr auto ReleaseCanvas = [] [[nodiscard]] (const Capture& capture, interior::FenceValue value) noexcept -> Status<Error> {
-                return Check(capture.queue->Signal(capture.sharedCanvasFree.Get(), value.Get()), ApiCall::QueueSignal);
-            };
-
-            static constexpr auto AwaitCanvas = [] [[nodiscard]] (const Capture& capture, interior::FenceValue value) noexcept -> Status<Error> {
-                return Check(capture.context->Wait(capture.canvasFree.Get(), value.Get()), ApiCall::ContextWait);
-            };
-
-            static constexpr auto QueueAwaitsCopy = [] [[nodiscard]] (const Capture& capture, interior::FenceValue value) noexcept -> Status<Error> {
-                return Check(capture.queue->Wait(capture.sharedCanvasReady.Get(), value.Get()), ApiCall::QueueWait);
-            };
-
             static constexpr auto CopiedAndSignalled = [] [[nodiscard]] (const Capture& capture, const PendingList& pending, interior::FenceValue value) noexcept -> Status<Error> {
                 static constexpr auto CopyPending = [](const Capture& capture, const PendingList& pending) noexcept -> void {
                     static constexpr auto CopyOne = [](const Capture& capture, const Pending& p) noexcept -> void {
@@ -482,11 +502,6 @@ Result<bool, Error> AcquireFrames(const Capture& capture, interior::FrameNumber 
                     std::ranges::for_each(pending.Items(), [&capture](const Pending& p) { CopyOne(capture, p); });
                 };
 
-                static constexpr auto SignalCopied = [] [[nodiscard]] (const Capture& capture, interior::FenceValue value) noexcept -> Status<Error> {
-                    const HRESULT hr = capture.context->Signal(capture.canvasReady.Get(), value.Get());
-                    capture.context->Flush();
-                    return Check(hr, ApiCall::ContextSignal);
-                };
                 CopyPending(capture, pending);
                 return SignalCopied(capture, value);
             };
@@ -503,9 +518,49 @@ Result<bool, Error> AcquireFrames(const Capture& capture, interior::FrameNumber 
         return CopyOrdered(capture, pending, value).and_then([&pending] { return CloseAll(pending); }).transform([] { return true; });
     };
 
-    // One fence value per frame, never zero, so the values only ever rise.
-    static constexpr auto ValueOf = [] [[nodiscard]] (interior::FrameNumber number) noexcept -> interior::FenceValue { return interior::FenceValueTag::Parse(number.Get() + 1); };
     return CollectPending(capture).and_then([&](const PendingList& pending) { return CopyAndClose(capture, pending, ValueOf(number)); });
+}
+
+Result<Capture, Error> CreateVideoCanvas(const GpuDevice& gpu, const interior::Geometry& geometry) noexcept
+{
+    return CreateDevices(gpu).and_then([&](const Devices& d) {
+        return CreateBridge(d, gpu, geometry.sourceExtent).transform([&](const Bridge& bridge) {
+            return Capture{ d.device11,
+                            d.context,
+                            d.winrtDevice,
+                            bridge.canvas,
+                            bridge.sharedCanvas,
+                            bridge.canvasFree,
+                            bridge.sharedCanvasFree,
+                            bridge.canvasReady,
+                            bridge.sharedCanvasReady,
+                            gpu.queue,
+                            Sessions{},
+                            geometry.sourceRect,
+                            geometry.sourceExtent,
+                            false };
+        });
+    });
+}
+
+Status<Error> UploadFrame(const Capture& capture, std::span<const std::byte> pixels, interior::FrameNumber number) noexcept
+{
+    static constexpr auto RowBytes = [] [[nodiscard]] (const Capture& capture) noexcept -> UINT { return capture.canvasExtent.width.Get() * 4u; };
+
+    static constexpr auto IsWholePicture = [] [[nodiscard]] (const Capture& capture, std::span<const std::byte> pixels) noexcept -> bool {
+        return pixels.size() == static_cast<std::size_t>(RowBytes(capture)) * capture.canvasExtent.height.Get();
+    };
+
+    static constexpr auto Written = [] [[nodiscard]] (const Capture& capture, std::span<const std::byte> pixels, interior::FenceValue value) noexcept -> Status<Error> {
+        capture.context->UpdateSubresource(capture.canvas.Get(), 0, nullptr, pixels.data(), RowBytes(capture), 0);
+        return SignalCopied(capture, value);
+    };
+    if (!IsWholePicture(capture, pixels))
+        return Fail(Error{ ApiCall::UpdateSubresource, static_cast<std::uint32_t>(pixels.size()) });
+    const interior::FenceValue value = ValueOf(number);
+    return ReleaseCanvas(capture, value).and_then([&] { return AwaitCanvas(capture, value); }).and_then([&] { return Written(capture, pixels, value); }).and_then([&] {
+        return QueueAwaitsCopy(capture, value);
+    });
 }
 
 } // namespace real

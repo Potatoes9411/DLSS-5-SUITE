@@ -148,6 +148,21 @@ private:
     interior::Instant now_;                   // WAIVER(R2): this frame's clock reading, replaced whole per frame.
 };
 
+// The session's GPU for a video: no window and no capture, the pictures written into the canvas from memory
+// and read back from back buffers of its own, with the models built as for the screen.
+struct VideoGpu
+{
+    Gpu gpu;
+    interior::FenceValue fence;
+    std::uint32_t finestPixels;
+};
+
+[[nodiscard]] infra::Result<VideoGpu, Error> CreateVideoGpu(GpuDevice device, std::optional<NgxRuntime> runtime, const interior::SessionPlan& plan, const interior::Geometry& geometry) noexcept;
+
+// The share of the finest level's pixels the motion search could not match, read from the frame that last
+// used the slot, when it asked for the count.
+[[nodiscard]] infra::Result<std::optional<interior::Fraction>, Error> UnmatchedShare(const Gpu& gpu, std::uint32_t finestPixels, const interior::FrameState& state, interior::FrameSlot slot) noexcept;
+
 [[nodiscard]] infra::Result<RealEnvironment, Error> CreateEnvironment(HeldFiles held, GpuDevice device, std::optional<NgxRuntime> runtime, const interior::SessionPlan& plan,
                                                                       const interior::Geometry& geometry, OutputWindow window, const ControlPanel* panel, const EnvironmentSettings& settings,
                                                                       const interior::Options& options, const Console& console) noexcept;

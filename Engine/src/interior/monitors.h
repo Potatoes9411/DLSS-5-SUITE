@@ -39,6 +39,8 @@ struct Geometry
 [[nodiscard]] Result<Extent, MonitorError> ExtentOf(const ScreenRect& rect) noexcept;
 [[nodiscard]] Result<MonitorList, MonitorError> SelectSource(const MonitorList& ordered, const SourceSelection& selection) noexcept;
 [[nodiscard]] Result<Geometry, MonitorError> ResolveGeometry(const MonitorList& monitors, const Options& options) noexcept;
+// A video is on no screen: its pictures are placed at the origin at their own size, and nothing is captured.
+[[nodiscard]] Result<Geometry, MonitorError> VideoGeometry(const Extent& extent) noexcept;
 [[nodiscard]] bool IsSameRect(const ScreenRect& a, const ScreenRect& b) noexcept;
 [[nodiscard]] std::string_view Describe(MonitorError error) noexcept;
 

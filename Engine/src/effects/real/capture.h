@@ -54,6 +54,14 @@ struct Capture
 // has finished reading it and before this frame's work runs. True when a frame arrived.
 [[nodiscard]] infra::Result<bool, Error> AcquireFrames(const Capture& capture, interior::FrameNumber number) noexcept;
 
+// A canvas the size of a video's pictures, with the devices and fences a capture has and no capture sessions:
+// the pictures are written into it from memory instead (UploadFrame).
+[[nodiscard]] infra::Result<Capture, Error> CreateVideoCanvas(const GpuDevice& gpu, const interior::Geometry& geometry) noexcept;
+// Writes one picture, rows of 32-bit blue, green, red and a spare byte with nothing between them, into the
+// canvas, ordered on the GPU the way a captured frame is: after the work before has finished reading it, and
+// before this frame's work runs.
+[[nodiscard]] infra::Status<Error> UploadFrame(const Capture& capture, std::span<const std::byte> pixels, interior::FrameNumber number) noexcept;
+
 // Changes what the running capture sessions include; both are settings of the session, not of the frame.
 [[nodiscard]] infra::Status<Error> ApplyCaptureSettings(const Capture& capture, const CaptureSettings& settings) noexcept;
 

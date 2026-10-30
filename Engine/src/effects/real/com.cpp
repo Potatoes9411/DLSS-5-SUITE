@@ -175,6 +175,9 @@ std::string_view Describe(ApiCall call) noexcept
     case ApiCall::StreamlineState: return "slDLSSGGetState";
     case ApiCall::CreateSwapChainForHwnd: return "IDXGIFactory2::CreateSwapChainForHwnd";
     case ApiCall::WaitForCompositor: return "DwmFlush, waiting for the compositor's next frame";
+    case ApiCall::UpdateSubresource: return "a picture handed in is not the size of the video's pictures";
+    case ApiCall::ReadVideoFrame: return "reading the next picture of the video from standard input";
+    case ApiCall::WriteVideoFrame: return "writing a finished picture of the video to standard output";
     }
     return "unknown call";
 }

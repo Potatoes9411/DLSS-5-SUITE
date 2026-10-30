@@ -110,6 +110,18 @@ constexpr std::array<std::wstring_view, 12> kVocabulary{ L"--monitor", L"all",  
     return !DefaultOptions().nvidiaFrameGen && asked.has_value() && asked->nvidiaFrameGen && refused.has_value() && !refused->nvidiaFrameGen;
 }
 
+// A video is asked for with all three of its numbers or not at all; none of them may be zero.
+[[nodiscard]] bool VideoNeedsItsSizeAndPeriod(infra::RngState&) noexcept
+{
+    const std::array<std::wstring_view, 3> whole{ L"--video-width=1920", L"--video-height=1080", L"--video-frame-us=33367" };
+    const std::array<std::wstring_view, 2> noPeriod{ L"--video-width=1920", L"--video-height=1080" };
+    const std::array<std::wstring_view, 3> zeroPeriod{ L"--video-width=1920", L"--video-height=1080", L"--video-frame-us=0" };
+    const auto parsed = ParseOptions(whole);
+    const bool read =
+        parsed.has_value() && parsed->video.has_value() && parsed->video->extent.width.Get() == 1920 && parsed->video->extent.height.Get() == 1080 && parsed->video->period.Get() == 33367;
+    return read && !ParseOptions(noPeriod).has_value() && !ParseOptions(zeroPeriod).has_value() && !DefaultOptions().video.has_value();
+}
+
 [[nodiscard]] bool FrameGenRefusesZeroAndSeven(infra::RngState&) noexcept
 {
     const std::array<std::wstring_view, 1> zero{ L"--frame-gen=0" };
@@ -299,6 +311,7 @@ std::uint32_t OptionsSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("--frame-gen accepts one to six", seed, 60, FrameGenAcceptsOneToSix));
     failures += Failures(proptest::ForAll("--frame-gen refuses zero and seven", seed, 1, FrameGenRefusesZeroAndSeven));
     failures += Failures(proptest::ForAll("--nvidia-frame-gen is off unless asked", seed, 1, NvidiaFrameGenIsOffUnlessAsked));
+    failures += Failures(proptest::ForAll("a video needs its size and period", seed, 1, VideoNeedsItsSizeAndPeriod));
     failures += Failures(proptest::ForAll("--nr-local-tone accepts every finite value", seed, 300, StrengthAcceptsEveryFiniteValue));
     failures += Failures(proptest::ForAll("--nr-intensity refuses what is not a number", seed, 1, IntensityRefusesWhatIsNotANumber));
     failures += Failures(proptest::ForAll("--mv-scale-x accepts every finite value", seed, 300, MotionScaleAcceptsEveryFiniteValue));

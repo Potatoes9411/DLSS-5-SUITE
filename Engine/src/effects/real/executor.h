@@ -71,6 +71,11 @@ struct FrameContext
     interior::FenceValue fence;
 };
 
+[[nodiscard]] inline FrameContext ContextAt(const FrameContext& f, interior::FenceValue fence) noexcept
+{
+    return FrameContext{ f.number, f.slot, f.set, f.hasPrevious, fence };
+}
+
 [[nodiscard]] infra::Status<Error> OpenList(const Gpu& gpu, interior::FrameSlot slot) noexcept;
 [[nodiscard]] infra::Result<interior::FenceValue, Error> FlushList(const Gpu& gpu, interior::FenceValue previous) noexcept;
 [[nodiscard]] infra::Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameContext& frame, const interior::StepList& steps) noexcept;

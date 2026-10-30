@@ -170,6 +170,9 @@ enum class ApiCall : std::uint8_t {
     StreamlineState,            // ... of slDLSSGGetState
     CreateSwapChainForHwnd,
     WaitForCompositor,
+    UpdateSubresource, // the code is the size of the picture handed in, which is not the size of the video's pictures
+    ReadVideoFrame,    // the code is GetLastError, or the bytes read when a picture ended part-way
+    WriteVideoFrame,   // the code is GetLastError
 };
 
 struct Error

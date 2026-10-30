@@ -1,5 +1,7 @@
 #include "interior/monitors.h"
 
+#include <limits>
+
 #include "infrastructure/checked.h"
 #include "infrastructure/fold.h"
 
@@ -118,6 +120,26 @@ Result<Extent, MonitorError> ExtentOf(const ScreenRect& rect) noexcept
         });
     };
     return Span(rect.Left(), rect.Right()).and_then([&rect](PixelCount width) { return Span(rect.Top(), rect.Bottom()).transform([width](PixelCount height) { return Extent{ width, height }; }); });
+}
+
+Result<Geometry, MonitorError> VideoGeometry(const Extent& extent) noexcept
+{
+    // A pixel count is at most kMaxPixelCount, which a coordinate holds.
+    static constexpr auto EdgeOf = [] [[nodiscard]] (PixelCount count) noexcept -> Result<Coordinate, MonitorError> {
+        return CoordinateTag::Parse(static_cast<std::int32_t>(count.Get())).transform_error([](UnitError e) { return AsMonitorError(e); });
+    };
+
+    static constexpr auto RectTo = [] [[nodiscard]] (Coordinate right, Coordinate bottom) noexcept -> Result<ScreenRect, MonitorError> {
+        static_assert(kMaxPixelCount <= static_cast<std::uint32_t>(std::numeric_limits<std::int32_t>::max()));
+        return CoordinateTag::Parse(0).transform_error([](UnitError e) { return AsMonitorError(e); }).and_then([&](Coordinate origin) {
+            return ScreenRectTag::Parse(origin, origin, right, bottom).transform_error([](UnitError e) { return AsMonitorError(e); });
+        });
+    };
+    return EdgeOf(extent.width).and_then([&](Coordinate right) {
+        return EdgeOf(extent.height).and_then([&](Coordinate bottom) { return RectTo(right, bottom); }).transform([&](const ScreenRect& rect) {
+            return Geometry{ MonitorList{}, rect, rect, extent, extent };
+        });
+    });
 }
 
 Result<MonitorList, MonitorError> SelectSource(const MonitorList& ordered, const SourceSelection& selection) noexcept

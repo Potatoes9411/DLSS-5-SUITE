@@ -146,6 +146,11 @@ struct Composition
     });
 }
 
+[[nodiscard]] bool IsOffscreen(const Presenter& presenter) noexcept
+{
+    return std::holds_alternative<Offscreen>(presenter.surface);
+}
+
 } // namespace
 
 Result<Presenter, Error> CreatePresenter(const GpuDevice& gpu, HWND window, const interior::Extent& extent) noexcept
@@ -153,6 +158,24 @@ Result<Presenter, Error> CreatePresenter(const GpuDevice& gpu, HWND window, cons
     if (!gpu.streamline.has_value())
         return CreateCompositedPresenter(gpu, window, extent);
     return CreateGeneratedPresenter(gpu, *gpu.streamline, window, extent);
+}
+
+Result<Presenter, Error> CreateOffscreenPresenter(const GpuDevice& gpu, const interior::Extent& extent) noexcept
+{
+    static constexpr auto WithTarget = [] [[nodiscard]] (const BackBuffers& buffers, const GpuDevice& gpu, const interior::Extent& extent, std::uint32_t index) noexcept -> Result<BackBuffers, Error> {
+        static constexpr auto TargetRequest = [] [[nodiscard]] (const interior::Extent& extent) noexcept -> TextureRequest {
+            return TextureRequest{
+                .extent = extent, .format = kSwapChainFormat, .flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, .initialState = D3D12_RESOURCE_STATE_PRESENT, .name = L"Offscreen back buffer"
+            };
+        };
+        return CreateTexture(gpu, TargetRequest(extent)).transform([&](const Texture& texture) {
+            CreateRtv(gpu, texture.resource.Get(), kSwapChainFormat, RtvHandle(gpu, index));
+            return infra::WithElement(buffers, index, texture.resource);
+        });
+    };
+    return infra::FoldResult(std::views::iota(std::uint32_t{ 0 }, interior::kBackBufferCount), Result<BackBuffers, Error>(BackBuffers{}),
+                             [&](const BackBuffers& acc, std::uint32_t index) { return WithTarget(acc, gpu, extent, index); })
+        .transform([&extent](const BackBuffers& buffers) { return Presenter{ nullptr, Offscreen{}, buffers, extent }; });
 }
 
 Status<Error> WaitForNextFrame(const Presenter& presenter) noexcept
@@ -169,16 +192,23 @@ Status<Error> WaitForNextFrame(const Presenter& presenter) noexcept
     // on; the compositor's next frame is what the next look at the capture waits for. GetContainingOutput, which
     // WaitForVBlank needs, answers DXGI_ERROR_UNSUPPORTED for this swap chain (observed on Windows 11 build 26300).
     static constexpr auto WaitForRefresh = [] [[nodiscard]] (const Generated&) noexcept -> Status<Error> { return Check(::DwmFlush(), ApiCall::WaitForCompositor); };
-    return std::visit(infra::Overloaded{ WaitForSwapChain, WaitForRefresh }, presenter.surface);
+    // Nothing is shown, so nothing is waited for: the next picture is wanted as soon as the last is read back.
+    static constexpr auto WaitForNothing = [] [[nodiscard]] (const Offscreen&) noexcept -> Status<Error> { return {}; };
+    return std::visit(infra::Overloaded{ WaitForSwapChain, WaitForRefresh, WaitForNothing }, presenter.surface);
 }
 
 Result<interior::BackBufferIndex, Error> CurrentBackBuffer(const Presenter& presenter) noexcept
 {
+    if (IsOffscreen(presenter))
+        return Fail(Error{ ApiCall::GetCurrentBackBufferIndex, 1 });
     return interior::BackBufferIndexTag::Parse(presenter.swapChain->GetCurrentBackBufferIndex()).transform_error([](interior::UnitError) { return Error{ ApiCall::GetCurrentBackBufferIndex, 0 }; });
 }
 
+// Offscreen, a picture is finished once it is drawn: it is read back from its texture, and there is nothing to show.
 Status<Error> PresentFrame(const Presenter& presenter, bool vsync) noexcept
 {
+    if (IsOffscreen(presenter))
+        return {};
     return Check(presenter.swapChain->Present(vsync ? 1u : 0u, 0), ApiCall::Present);
 }
 

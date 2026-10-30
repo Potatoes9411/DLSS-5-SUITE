@@ -72,6 +72,7 @@ set(DSCREEN_REAL_SOURCES
   src/effects/real/console.cpp
   src/effects/real/environment.cpp
   src/effects/real/streamline.cpp
+  src/effects/real/video.cpp
   src/app/main.cpp)
 if(DSCREEN_ENABLE_NVOF)
   find_path(NVOF_INCLUDE_DIR nvOpticalFlowD3D12.h HINTS "${NVOF_SDK_DIR}/NvOFInterface" "${NVOF_SDK_DIR}/include" "${NVOF_SDK_DIR}")

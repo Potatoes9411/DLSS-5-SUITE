@@ -58,6 +58,14 @@ struct SourceSelection
     [[nodiscard]] friend constexpr bool operator==(const SourceSelection&, const SourceSelection&) noexcept = default;
 };
 
+// A video worked on instead of the screen: the size of its pictures, and how long each one is shown for.
+struct VideoSource
+{
+    Extent extent;
+    Microseconds period;
+    [[nodiscard]] friend constexpr bool operator==(const VideoSource&, const VideoSource&) noexcept = default;
+};
+
 struct Options
 {
     bool showHelp;
@@ -107,6 +115,7 @@ struct Options
     bool exclusionLog;      // write the capture-exclusion notes to a file beside the executable
     FrameGen frameGen;      // how many pictures are shown for each one the model makes
     bool nvidiaFrameGen;    // the pictures between are made by NVIDIA DLSS Frame Generation rather than by the engine's own blend
+    std::optional<VideoSource> video; // a video's pictures from standard input instead of the screen, and the finished ones to standard output
     [[nodiscard]] friend constexpr bool operator==(const Options&, const Options&) noexcept = default;
 };
 

@@ -8,6 +8,7 @@
 #include "effects/real/ngx.h"
 #include "effects/real/panel.h"
 #include "effects/real/trust.h"
+#include "effects/real/video.h"
 #include "effects/real/window.h"
 #include "global_common.h"
 #include "infrastructure/array_util.h"
@@ -348,6 +349,19 @@ struct Ended
             };
             return o.window.IsEmpty() ? o : AsWholeSource(o);
         };
+        // A video is on no screen, so no monitor is looked at: its pictures are the source and the target.
+        static constexpr auto VideoBase = [] [[nodiscard]] (const Console& console, const Options& options, const interior::VideoSource& video) noexcept -> Result<Base, Error> {
+            static constexpr auto FromMonitorError = [] [[nodiscard]] (interior::MonitorError error) noexcept -> Explanation {
+                return Explanation{ interior::Describe(error), Error{ real::ApiCall::ResolveGeometry, static_cast<std::uint32_t>(error) } };
+            };
+            return ExecutableDirectory().and_then([&](const interior::DirectoryPath& directory) {
+                return interior::VideoGeometry(video.extent).transform_error([&console](interior::MonitorError e) { return Logged(console, FromMonitorError(e)); }).transform([&](const Geometry& g) {
+                    return Base{ options, directory, g, interior::MonitorList{} };
+                });
+            });
+        };
+        if (options.video.has_value())
+            return VideoBase(console, options, *options.video);
         return ExecutableDirectory().and_then([&](const interior::DirectoryPath& directory) {
             return real::EnumerateMonitors().and_then([&](const interior::MonitorList& monitors) {
                 return SourcesFor(options, monitors).and_then([&](const interior::MonitorList& sources) { return BasedOn(console, SelectionFor(options), directory, monitors, sources); });
@@ -565,7 +579,9 @@ struct Ended
                 const Line line = infra::Formatted<kLineCapacity>("NVIDIA DLSS Frame Generation could not start ({}); the engine's own frame generation is used instead", real::Describe(error).Get());
                 return Log(console, LogLevel::Warn, line.Get()).transform([&d] { return std::move(d); });
             };
-            if (!b.options.nvidiaFrameGen)
+            // NVIDIA DLSS Frame Generation presents into a window's swap chain; a video has neither.
+            static constexpr auto WantsIt = [] [[nodiscard]] (const Options& o) noexcept -> bool { return o.nvidiaFrameGen && !o.video.has_value(); };
+            if (!WantsIt(b.options))
                 return d;
             Result<real::FrameGeneration, Error> started = real::StartFrameGeneration(d.device, b.executableDirectory, b.options.ngxProjectId); // WAIVER(R2): moved from once, below.
             if (!started.has_value())
@@ -775,10 +791,41 @@ struct Ended
             return Environment(console, b, std::move(d), plan, panel).and_then([&](real::RealEnvironment env) { return Drive(console, b, plan, env); });
         });
     };
+    // A video is worked through once, picture by picture, from standard input to standard output, with no window and
+    // no panel; the session ends when the pictures do, and nothing asks for another.
+    static constexpr auto Videoed = [] [[nodiscard]] (const Console& console, const Base& b, Devices d, const SessionPlan& plan) noexcept -> Result<Ended, Error> {
+        static constexpr auto Drive = [] [[nodiscard]] (const Console& console, real::VideoEnvironment env, const SessionPlan& plan) noexcept -> Result<Ended, Error> {
+            static constexpr auto Reported = [] [[nodiscard]] (const Console& console, const real::VideoEnvironment& env, const app::SessionOutcome& outcome) noexcept -> Result<Ended, Error> {
+                const Line line = infra::Formatted<kLineCapacity>("Video: {} pictures read, {} written", env.PicturesRead(), env.PicturesWritten());
+                return Log(console, LogLevel::Info, line.Get()).transform([&outcome] {
+                    return Ended{ .frames = outcome.finalState.number, .again = std::nullopt, .resized = false, .abandoned = false };
+                });
+            };
+            return app::RunSession<real::VideoEnvironment, Error>(env, plan, interior::InitialFrameState(plan), kFrameLimit).and_then([&](const app::SessionOutcome& outcome) {
+                return Reported(console, env, outcome);
+            });
+        };
+
+        static constexpr auto StreamsOfThisProcess = [] [[nodiscard]] () noexcept -> real::VideoStreams {
+            return real::VideoStreams{ .input = ::GetStdHandle(STD_INPUT_HANDLE), .output = ::GetStdHandle(STD_OUTPUT_HANDLE) };
+        };
+        const Line line = infra::Formatted<kLineCapacity>("Video: {}x{} pictures, {} microseconds each, {} frame(s) written for each", plan.source.width.Get(), plan.source.height.Get(),
+                                                          b.options.video->period.Get(), plan.frameGen.Get());
+        return Log(console, LogLevel::Info, line.Get())
+            .and_then([&] { return real::CreateVideoGpu(std::move(d.device), std::move(d.runtime), plan, b.geometry); })
+            .and_then([&](real::VideoGpu gpu) { return real::CreateVideoEnvironment(std::move(gpu), plan, b.options.video->period, StreamsOfThisProcess(), console); })
+            .and_then([&](real::VideoEnvironment env) { return Drive(console, std::move(env), plan); });
+    };
+
+    static constexpr auto IsVideo = [] [[nodiscard]] (const Base& b) noexcept -> bool { return b.options.video.has_value(); };
     return ResolveBase(console, options).and_then([&](const Base& found) {
         return CreateDevices(console, found).and_then([&](Devices d) {
             const Base b = Offered(found, d);
-            return Planned(console, b, d).and_then([&](const SessionPlan& plan) { return Staged(console, b, std::move(d), plan, held); });
+            return Planned(console, b, d).and_then([&](const SessionPlan& plan) {
+                if (IsVideo(b))
+                    return Videoed(console, b, std::move(d), plan);
+                return Staged(console, b, std::move(d), plan, held);
+            });
         });
     });
 }

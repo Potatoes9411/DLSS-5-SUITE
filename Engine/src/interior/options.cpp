@@ -73,6 +73,9 @@ enum class OptionId : std::uint8_t {
     ExclusionLog,
     FrameGen,
     NvidiaFrameGen,
+    VideoWidth,
+    VideoHeight,
+    VideoFrameMicroseconds,
 };
 
 enum class ValueKind : std::uint8_t {
@@ -105,7 +108,7 @@ struct OptionSpec
     ValueKind kind;
 };
 
-constexpr std::array<OptionSpec, 54> kSpecs{ {
+constexpr std::array<OptionSpec, 57> kSpecs{ {
     { L"help", OptionId::Help, ValueKind::Flag },
     { L"list-monitors", OptionId::ListMonitors, ValueKind::Flag },
     { L"monitor", OptionId::Monitor, ValueKind::MonitorSel },
@@ -127,6 +130,9 @@ constexpr std::array<OptionSpec, 54> kSpecs{ {
     { L"nr-passes", OptionId::NrPasses, ValueKind::UInt },
     { L"frame-gen", OptionId::FrameGen, ValueKind::UInt },
     { L"nvidia-frame-gen", OptionId::NvidiaFrameGen, ValueKind::Bool },
+    { L"video-width", OptionId::VideoWidth, ValueKind::UInt },
+    { L"video-height", OptionId::VideoHeight, ValueKind::UInt },
+    { L"video-frame-us", OptionId::VideoFrameMicroseconds, ValueKind::UInt },
     { L"nvof-grid", OptionId::NvofGrid, ValueKind::Grid },
     { L"nvof-perf", OptionId::NvofPerf, ValueKind::Perf },
     { L"depth-value", OptionId::DepthValue, ValueKind::Float },
@@ -411,6 +417,7 @@ Options DefaultOptions() noexcept
         false,
         *kDefaultFrameGen,
         false,
+        std::nullopt,
     };
 }
 
@@ -499,8 +506,43 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
             });
         };
 
+        // All three or none: the size of the pictures, and how long each is shown for, in microseconds.
+        static constexpr auto VideoOf = [] [[nodiscard]] (const ParsedList& list) noexcept -> Result<std::optional<VideoSource>, OptionsError> {
+            static constexpr auto Required = [] [[nodiscard]] (const ParsedList& list, OptionId id, ArgumentIndex asker) noexcept -> Result<ParsedOption, OptionsError> {
+                const std::optional<ParsedOption> option = LastOf<std::uint32_t>(list, id);
+                if (!option.has_value())
+                    return Fail(At(OptionsErrorKind::MissingValue, asker));
+                return *option;
+            };
+
+            static constexpr auto CountOf = [] [[nodiscard]] (const ParsedOption& option) noexcept -> Result<PixelCount, OptionsError> {
+                return PixelCountTag::Parse(Held<std::uint32_t>(option.value, 0u)).transform_error([&option](UnitError) { return At(OptionsErrorKind::ValueOutOfRange, option.argument); });
+            };
+
+            static constexpr auto PeriodOf = [] [[nodiscard]] (const ParsedOption& option) noexcept -> Result<Microseconds, OptionsError> {
+                const std::uint32_t raw = Held<std::uint32_t>(option.value, 0u);
+                if (raw == 0)
+                    return Fail(At(OptionsErrorKind::ValueOutOfRange, option.argument));
+                return MicrosecondsTag::Parse(raw);
+            };
+
+            static constexpr auto Sized = [] [[nodiscard]] (const ParsedList& list, const ParsedOption& width) noexcept -> Result<std::optional<VideoSource>, OptionsError> {
+                return CountOf(width).and_then([&](PixelCount w) {
+                    return Required(list, OptionId::VideoHeight, width.argument).and_then(CountOf).and_then([&](PixelCount h) {
+                        return Required(list, OptionId::VideoFrameMicroseconds, width.argument).and_then(PeriodOf).transform([&](Microseconds period) {
+                            return std::optional<VideoSource>{ VideoSource{ Extent{ w, h }, period } };
+                        });
+                    });
+                });
+            };
+            const std::optional<ParsedOption> width = LastOf<std::uint32_t>(list, OptionId::VideoWidth);
+            if (!width.has_value())
+                return std::optional<VideoSource>{};
+            return Sized(list, *width);
+        };
+
         static constexpr auto Assemble = [] [[nodiscard]] (const ParsedList& list, const Options& d, const NrTuning& tuning, const ValidatedNumbers& n, std::optional<NgxAppId> appId,
-                                                           ProjectIdText projectId) noexcept -> Options {
+                                                           ProjectIdText projectId, const std::optional<VideoSource>& video) noexcept -> Options {
             static constexpr auto HasFlag = [] [[nodiscard]] (const ParsedList& list, OptionId id) noexcept -> bool { return LastOf<FlagValue>(list, id).has_value(); };
 
             static constexpr auto SourceOf = [] [[nodiscard]] (const ParsedList& list) noexcept -> SourceSelection {
@@ -563,6 +605,7 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                 ValueOr(list, OptionId::ExclusionLog, d.exclusionLog),
                 n.frameGen,
                 ValueOr(list, OptionId::NvidiaFrameGen, d.nvidiaFrameGen),
+                video,
             };
         };
         const Options d = DefaultOptions();
@@ -570,7 +613,8 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
             return NumbersOf(list, d).and_then([&](ValidatedNumbers numbers) {
                 return AppIdOf(list).and_then([&](std::optional<NgxAppId> appId) {
                     return ProjectIdOf(list, d.ngxProjectId).and_then([&](ProjectIdText projectId) {
-                        return RejectConflicts(Assemble(list, d, TuningFrom(list, tuning, d.tuning), numbers, appId, projectId));
+                        return VideoOf(list).and_then(
+                            [&](const std::optional<VideoSource>& video) { return RejectConflicts(Assemble(list, d, TuningFrom(list, tuning, d.tuning), numbers, appId, projectId, video)); });
                     });
                 });
             });
