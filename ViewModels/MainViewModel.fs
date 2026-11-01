@@ -2631,6 +2631,19 @@ type MainViewModel() as this =
         if this.IsGtaFiveMProfile then GtaDlss5.findFiveMTarget () |> Option.map snd |> Option.defaultValue "d3d11.dll"
         else "d3d11.dll"
 
+    /// GTA V Enhanced single-player has DLSS of its own, which the add-on
+    /// hooks; FiveM and Legacy go through the whole-screen route.
+    member this.GtaHasNativeDlss = this.IsGtaEnhancedProfile && not this.IsGtaFiveMProfile
+
+    /// NaturalVision Enhanced (or another mod) already loads ReShade here as ReShade.asi.
+    member this.GtaHasAsiReShade = this.GtaHasNativeDlss && GtaDlss5.hasAsiReShade this.GtaDlssTarget
+
+    member this.GtaEnhancedDlssText =
+        if this.GtaHasAsiReShade then
+            "NaturalVision Enhanced found. Its ReShade 6.7 cannot load DLSS 5, so SUITE's ReShade 6.8 replaces its ReShade.asi (NVE's copy is kept, and Remove puts it back). RenoDX's DLSS5 Tool then hooks the game's own DLSS; the game's own Streamline files stay, and the screen-capture feed is not used. Known issue: on ReShade 6.8, clicking NVE's own tab in the ReShade menu crashes the game - NVE's look itself still loads. Story mode only."
+        else
+            "ReShade, RenoDX's DLSS5 Tool and the DLSS 5 model, hooked into the game's own DLSS. The game's own Streamline files stay, and the screen-capture feed is not used. Story mode only."
+
     member this.GtaDlssTargetFound = this.GtaDlssTarget <> "" && IO.Directory.Exists(this.GtaDlssTarget)
     member this.GtaDlssPayloadReady = GtaDlss5.payloadReady ()
     member this.IsGtaDlssInstalled = this.GtaDlssTargetFound && GtaDlss5.isInstalled this.GtaDlssTarget
@@ -2644,7 +2657,7 @@ type MainViewModel() as this =
 
     member private this.RaiseGtaDlss() =
         for name in
-            [ "GtaDlssTarget"; "GtaDlssTargetFound"; "IsGtaDlssInstalled"; "GtaDlssInstalling"
+            [ "GtaDlssTarget"; "GtaDlssTargetFound"; "IsGtaDlssInstalled"; "GtaDlssInstalling"; "GtaHasAsiReShade"; "GtaEnhancedDlssText"
               "GtaDlssStatus"; "GtaDlssProgress"; "HasGtaDlssStatus" ] do
             this.RaisePropertyChanged(name)
 
@@ -2669,16 +2682,21 @@ type MainViewModel() as this =
                         gtaDlssProgress <- percent
                         this.RaiseGtaDlss())
                 let proxyName = this.GtaDlssProxyName
+                let nativeDlss = this.GtaHasNativeDlss
+                let done_ =
+                    if nativeDlss then
+                        "DLSS 5 Neural Rendering installed. Turn on DLSS in the game's graphics settings, then press End for ReShade: in RenoDX DLSS set the hook mode to Upscaled (or Auto), and start with model C and 1 pass - every extra pass costs a lot of fps."
+                    else "DLSS 5 Neural Rendering installed. Enable DLSS in the game's graphics settings, then press End to open ReShade."
                 async {
                     let! result =
-                        Threading.Tasks.Task.Run(fun () -> GtaDlss5.install target proxyName report)
+                        Threading.Tasks.Task.Run(fun () -> GtaDlss5.install target proxyName nativeDlss report)
                         |> Async.AwaitTask
                         |> Async.Catch
                     Dispatcher.UIThread.Post(fun () ->
                         gtaDlssInstalling <- false
                         gtaDlssStatus <-
                             match result with
-                            | Choice1Of2 () -> "DLSS 5 Neural Rendering installed. Enable DLSS in the game's graphics settings, then press Home (End for GTA V Enhanced) to open ReShade."
+                            | Choice1Of2 () -> done_
                             | Choice2Of2 error -> AppLog.error "GTA/FiveM DLSS 5 install failed" error; "Could not install: " + error.Message
                         gtaDlssProgress <- (match result with Choice1Of2 () -> 100.0 | Choice2Of2 _ -> 0.0)
                         this.RaiseGtaDlss())

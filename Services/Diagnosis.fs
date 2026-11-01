@@ -218,7 +218,8 @@ module Diagnosis =
                "It started, and nothing here recorded the session"; "has loaded nothing from this folder"
                "loaded nothing from this folder"; "from another folder - ours is never"
                "It looks as though it ran and nothing this install wrote was loaded"
-               "the proxy is reached and ReShade is not"; "ReShade found a Direct3D 9 device"; ", and the install went beside" ]
+               "the proxy is reached and ReShade is not"; "ReShade found a Direct3D 9 device"; ", and the install went beside"
+               "ReShade is too old for the DLSS 5 add-on" ]
           4, [ "The game refused OptiScaler's swapchain"; "The game's DLSS call was never hooked" ]
           5, [ "Inconclusive - the feed did not get far enough"; "It started and closed during start-up"; "The add-on runs but never produces a frame" ]
           6, [ "Set up correctly, but not switched on yet"; "OptiScaler loaded; neural rendering not switched on"
@@ -326,6 +327,7 @@ module Diagnosis =
                     true, "OptiScaler loaded; neural rendering not switched on.", false
 
     let private addonName = rx "Registered add-on \"([^\"]+)\" v(\\S+)"
+    let private apiRefused = rx @"requested API version \((\d+)\) is not supported \((\d+)\)"
 
     /// The ReShade routes: dx12 (renodx-dlss5), dx11 / dx9 / emulator with
     /// or without the feeder, neural upstream.
@@ -377,6 +379,20 @@ module Diagnosis =
         else
             for f in missing do
                 findings.Add(bad (sprintf "Add-on missing from the folder: %s." (Path.GetFileName f)) "An antivirus most likely removed it.")
+
+            // A ReShade older than the add-on refuses it outright, and the log
+            // says so: NaturalVision Enhanced's ReShade.asi 6.7.3 (API 18)
+            // against RenoDX's add-on and the feed (API 20).
+            let refused = lastMatch apiRefused rtext
+            refused |> Option.iter (fun m ->
+                findings.Add(bad (sprintf "ReShade refused an add-on: it needs API %s, this ReShade has %s." m.Groups.[1].Value m.Groups.[2].Value)
+                                 "A ReShade 6.8 build with full add-on support is needed."))
+            let asi = Path.Combine(folder, "ReShade.asi")
+            match (try Some(Version(FileVersionInfo.GetVersionInfo(asi).FileVersion)) with _ -> None) with
+            | Some v when File.Exists asi && v < Version(6, 8) ->
+                findings.Add(warn (sprintf "ReShade.asi in the game folder is ReShade %O, which cannot load DLSS 5." v)
+                                  "NaturalVision Enhanced ships this one; for GTA V Enhanced use SUITE's DLSS 5 Neural Rendering button, which upgrades it.")
+            | _ -> ()
 
             let loaded =
                 [ for m in addonName.Matches(rtext) -> m.Groups.[1].Value, m.Groups.[2].Value ]
@@ -431,7 +447,9 @@ module Diagnosis =
             if has joined "SuperSampling.Available=0" then findings.Add(bad "The driver reports DLSS as NOT available." "")
             let hookFail = Regex.Match(rtext, @"vtable::Hook\(Failed to find (NVSDK_NGX_\w+_EvaluateFeature\w*)")
             let verdict =
-                if Regex.IsMatch(joined, @"evaluate raised 0xC0000005") && Regex.IsMatch(joined, @"D3D12Core\.dll\s*<-\s*nvngx_dlssnr\.dll\s*<-\s*_nvngx\.dll") then
+                if refused.IsSome && ours.IsEmpty then
+                    "This game's ReShade is too old for the DLSS 5 add-on - it refused to load it. Replace it with ReShade 6.8 (full add-on build)."
+                elif Regex.IsMatch(joined, @"evaluate raised 0xC0000005") && Regex.IsMatch(joined, @"D3D12Core\.dll\s*<-\s*nvngx_dlssnr\.dll\s*<-\s*_nvngx\.dll") then
                     "Driver 616.64+ faults inside NGX with this add-on - roll the driver back to 616.56, or try the OptiScaler route."
                 else
                     match lastMatch crashRec joined with

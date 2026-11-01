@@ -1801,11 +1801,23 @@ module ModInstaller =
             let exeDir = Path.GetDirectoryName(exePath)
             let dlssnrFile = Path.Combine(modRoot, dlss5DirName, dlssnrFileName)
 
+            // GTA V Enhanced has DLSS of its own for RenoDX to hook, so the
+            // screen-capture feed only adds GPU work and loading-screen stalls.
+            // With NaturalVision Enhanced its ReShade.asi is already loaded, and
+            // a second ReShade beside it hangs the game: that setup has its own
+            // button, which replaces NVE's ReShade instead.
+            let gtaEnhanced = GtaProfiles.isEnhanced game.Title exePath && not (GtaProfiles.isFiveM game.Title)
+            let reShadeRoute = mode = Dx12Auto || mode = Dx11 || mode = Dx9
+            if gtaEnhanced && reShadeRoute && File.Exists(Path.Combine(exeDir, "ReShade.asi")) then
+                { Success = false
+                  Message = "NaturalVision Enhanced already loads ReShade in this game. Use the DLSS 5 Neural Rendering button in this game's GTA V section instead - it upgrades NVE's ReShade rather than adding a second one." }
+            else
+
             // Neural upstream rides along with the ReShade and AMD routes.
             // OptiScaler picks a whole different payload for it instead, so it
             // never reads this.
             let neuralWanted = neural && mode <> OptiScalerMode && mode <> Emulator
-            let feederWanted = feeder && mode <> OptiScalerMode && mode <> Emulator && mode <> AmdMode
+            let feederWanted = feeder && not gtaEnhanced && mode <> OptiScalerMode && mode <> Emulator && mode <> AmdMode
             let neuralAddonFile = Path.Combine(modRoot, neuralAddonName)
 
             // The overlay only travels with the routes that can actually host

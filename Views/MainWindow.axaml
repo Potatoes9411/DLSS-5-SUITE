@@ -2706,7 +2706,7 @@
                                         IsVisible="{Binding IsGtaEnhancedProfile}">
                                     <StackPanel Spacing="9">
                                         <TextBlock Text="DLSS 5 NEURAL RENDERING" FontSize="9.5" FontWeight="Bold" Foreground="#86EFAC" LetterSpacing="0.8" />
-                                        <TextBlock Text="ReShade64 renamed to dxgi.dll, RenoDX's DLSS5 Tool, the compatibility model and Streamline runtime - the same files the main install already carries." FontSize="11" Foreground="#D1FAE5" TextWrapping="Wrap" LineHeight="16" />
+                                        <TextBlock Text="{Binding GtaEnhancedDlssText}" FontSize="11" Foreground="#D1FAE5" TextWrapping="Wrap" LineHeight="16" />
                                         <TextBlock Text="{Binding GtaFiveMTargetMissingText}" FontSize="11" Foreground="#FCA5A5" TextWrapping="Wrap" IsVisible="{Binding !GtaDlssTargetFound}" />
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <Button Classes="PrimaryActionBtn" Content="Install DLSS 5 Neural Rendering" Click="OnInstallGtaDlss5Clicked"
