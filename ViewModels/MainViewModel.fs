@@ -2638,11 +2638,17 @@ type MainViewModel() as this =
     /// NaturalVision Enhanced (or another mod) already loads ReShade here as ReShade.asi.
     member this.GtaHasAsiReShade = this.GtaHasNativeDlss && GtaDlss5.hasAsiReShade this.GtaDlssTarget
 
+    /// DLSS 5 here runs at the game's full output resolution - this RenoDX
+    /// build cannot scale it down - and on top of NVE and ray tracing that can
+    /// run a 12 GB card out of memory, which closes the game without an error.
+    member private _.GtaMemoryTip =
+        "DLSS 5 runs at the game's full resolution here, so with 12 GB of graphics memory or less use about 1080p-1200p and 1 pass; if the game closes by itself while you look around, lower the resolution first."
+
     member this.GtaEnhancedDlssText =
         if this.GtaHasAsiReShade then
-            "NaturalVision Enhanced found. Its ReShade 6.7 cannot load DLSS 5, so SUITE's ReShade 6.8 replaces its ReShade.asi (NVE's copy is kept, and Remove puts it back). RenoDX's DLSS5 Tool then hooks the game's own DLSS; the game's own Streamline files stay, and the screen-capture feed is not used. Known issue: on ReShade 6.8, clicking NVE's own tab in the ReShade menu crashes the game - NVE's look itself still loads. Story mode only."
+            "NaturalVision Enhanced found. Its ReShade 6.7 cannot load DLSS 5, so SUITE's ReShade 6.8 replaces its ReShade.asi (NVE's copy is kept, and Remove puts it back). RenoDX's DLSS5 Tool then hooks the game's own DLSS; the game's own Streamline files stay, and the screen-capture feed is not used. Known issue: on ReShade 6.8, clicking NVE's own tab in the ReShade menu crashes the game - NVE's look itself still loads. " + this.GtaMemoryTip + " Story mode only."
         else
-            "ReShade, RenoDX's DLSS5 Tool and the DLSS 5 model, hooked into the game's own DLSS. The game's own Streamline files stay, and the screen-capture feed is not used. Story mode only."
+            "ReShade, RenoDX's DLSS5 Tool and the DLSS 5 model, hooked into the game's own DLSS. The game's own Streamline files stay, and the screen-capture feed is not used. " + this.GtaMemoryTip + " Story mode only."
 
     member this.GtaDlssTargetFound = this.GtaDlssTarget <> "" && IO.Directory.Exists(this.GtaDlssTarget)
     member this.GtaDlssPayloadReady = GtaDlss5.payloadReady ()
