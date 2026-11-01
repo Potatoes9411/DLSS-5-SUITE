@@ -129,10 +129,11 @@ module GtaDlss5 =
                 "PreprocessorDefinitions=" + String.Join(",", kept)
             else l)
 
-    /// The ReShade.ini settings this route needs. On a game with its own DLSS
-    /// the add-on hooks that DLSS ("Upscaled" mode) instead of redrawing the
-    /// whole screen at Present, and without the [INSTALL] hooks GTA V Enhanced
-    /// hangs on its loading screen. NVE's own shader paths are left alone.
+    /// The ReShade.ini settings this route needs. Without the [INSTALL] hooks
+    /// GTA V Enhanced hangs on its loading screen. The add-on's own settings
+    /// keep their defaults: [RenoDX.DLSS5] NREnableUpscaling=1 turned out to
+    /// be NR's own upscaling, which this RenoDX build lacks, and it left the
+    /// game running behind a black screen. NVE's own shader paths are left alone.
     let private iniSettings (nativeDlss: bool) (asi: bool) =
         [ yield "[INPUT]", "KeyOverlay", "35,0,0,0"
           yield "[OVERLAY]", "TutorialProgress", "4"
@@ -142,7 +143,6 @@ module GtaDlss5 =
           if nativeDlss then
               yield "[INSTALL]", "HookStreamline", "1"
               yield "[INSTALL]", "HookDirectX", "1"
-              yield "[RenoDX.DLSS5]", "NREnableUpscaling", "1"
           else
               yield "[GENERAL]", "PreprocessorDefinitions", "DLSS5_MV_PROVIDER=3" ]
 
