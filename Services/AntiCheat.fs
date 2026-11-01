@@ -167,10 +167,29 @@ module AntiCheat =
 
         found
 
+    /// BattlEye installed but switched off: GTA V reads -nobattleye from the
+    /// commandline.txt beside its executable (SUITE's GTA fix writes it
+    /// there), and then starts story mode without it.
+    let battlEyeOff (installDir: string) (exePath: string) : bool =
+        let exeDir =
+            try
+                if String.IsNullOrWhiteSpace(exePath) then "" else Path.GetDirectoryName(exePath)
+            with _ -> ""
+
+        [ exeDir; installDir ]
+        |> List.filter (fun d -> not (String.IsNullOrWhiteSpace(d)))
+        |> List.exists (fun d ->
+            let path = Path.Combine(d, "commandline.txt")
+            try
+                File.Exists(path)
+                && File.ReadAllText(path).IndexOf("-nobattleye", StringComparison.OrdinalIgnoreCase) >= 0
+            with _ -> false)
+
     /// The anti-cheat this game carries, by name ("" when something is only
-    /// named like one), or None. Quick - a few hundred directory entries - but
-    /// it touches the disk, so callers run it off the UI thread.
-    let detect (title: string) (installDir: string) (exePath: string) : string option =
+    /// named like one), or None - whether or not it is switched off. Quick - a
+    /// few hundred directory entries - but it touches the disk, so callers run
+    /// it off the UI thread.
+    let detectInstalled (title: string) (installDir: string) (exePath: string) : string option =
         let byTitle =
             let t = squash title
             if t = "" then None
@@ -192,3 +211,10 @@ module AntiCheat =
                 |> List.distinctBy (fun d -> d.TrimEnd('\\', '/').ToLowerInvariant())
 
             roots |> List.tryPick walk
+
+    /// The anti-cheat that will actually run with this game, or None: as
+    /// detectInstalled, less a BattlEye that is switched off.
+    let detect (title: string) (installDir: string) (exePath: string) : string option =
+        match detectInstalled title installDir exePath with
+        | Some "BattlEye" when battlEyeOff installDir exePath -> None
+        | found -> found

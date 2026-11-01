@@ -332,6 +332,16 @@ module Diagnosis =
     /// The ReShade routes: dx12 (renodx-dlss5), dx11 / dx9 / emulator with
     /// or without the feeder, neural upstream.
     let private analyseReShade (folder: string) (installedAt: DateTime) (feeder: bool) (neural: bool) (ourFiles: string list) (findings: ResizeArray<Finding>) : bool * string * bool =
+        // An ASI loader can carry ReShade instead of a proxy DLL: GTA V with
+        // NaturalVision Enhanced does, and SUITE's GTA route keeps it and sets
+        // the feed aside. An older install record still names the proxy and
+        // the feed, so neither counts as missing then.
+        let asiReShade = File.Exists(Path.Combine(folder, "ReShade.asi"))
+        let feedAside (f: string) =
+            let n = Path.GetFileName(f).ToLowerInvariant()
+            asiReShade && (n.StartsWith "dlss5-feed." || n = "dlss5_feed.fx")
+        let feeder = feeder && not (asiReShade && not (File.Exists(Path.Combine(folder, "dlss5-feed.addon64"))))
+        let ourFiles = ourFiles |> List.filter (fun f -> not (feedAside f && not (File.Exists f)))
         let reshadeLog = Path.Combine(folder, "ReShade.log")
         let feedLog = Path.Combine(folder, "dlss5-feed.log")
         let hostLog = Path.Combine(folder, "host64", "dlss5-feed-host.log")
@@ -356,7 +366,8 @@ module Diagnosis =
             ourFiles
             |> List.filter (fun f ->
                 let n = Path.GetFileName(f).ToLowerInvariant()
-                List.contains n [ "dxgi.dll"; "d3d11.dll"; "d3d12.dll"; "d3d9.dll"; "opengl32.dll" ]
+                not asiReShade
+                && List.contains n [ "dxgi.dll"; "d3d11.dll"; "d3d12.dll"; "d3d9.dll"; "opengl32.dll" ]
                 && Path.GetDirectoryName(f).Equals(folder, StringComparison.OrdinalIgnoreCase))
             |> List.filter (fun f -> not (File.Exists f))
         let goneShare =
@@ -409,7 +420,13 @@ module Diagnosis =
                 else n.Equals(want, StringComparison.OrdinalIgnoreCase) || (renodxOurs && n.Equals("RenoDX DLSS", StringComparison.OrdinalIgnoreCase))
             let ours = names |> List.filter isOurs
             let others = names |> List.filter (fun n -> not (isOurs n) && not (has n "Feed") && not (has n "Bridge") && not (has n "overlay"))
-            let foreign = others |> List.filter (fun n -> Regex.IsMatch(n, @"dlss|\bngx\b|nvngx|neural|optiscaler", RegexOptions.IgnoreCase))
+            // RenoDX's "DLSS Fix" (GTA V Enhanced) only corrects the game's own
+            // DLSS inputs and runs fine beside ours - not a competing hook.
+            let foreign =
+                others
+                |> List.filter (fun n ->
+                    Regex.IsMatch(n, @"dlss|\bngx\b|nvngx|neural|optiscaler", RegexOptions.IgnoreCase)
+                    && not (n.Equals("DLSS Fix", StringComparison.OrdinalIgnoreCase)))
             if not names.IsEmpty && ours.IsEmpty && not (names |> List.exists (fun n -> has n "Feed")) then
                 findings.Add(bad (sprintf "The '%s' add-on did not load." want) "")
             if not foreign.IsEmpty then

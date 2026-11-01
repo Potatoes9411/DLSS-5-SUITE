@@ -2357,7 +2357,7 @@
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
                                 <TextBlock Text="!" FontSize="16" FontWeight="Black" Foreground="#FCD34D" VerticalAlignment="Top" />
                                 <StackPanel Grid.Column="1" Spacing="3">
-                                    <TextBlock Text="ANTI-CHEAT DETECTED" FontSize="10" FontWeight="Bold" Foreground="#FCD34D" LetterSpacing="0.7" />
+                                    <TextBlock Text="{Binding ManageAntiCheatHeader}" FontSize="10" FontWeight="Bold" Foreground="#FCD34D" LetterSpacing="0.7" />
                                     <TextBlock Text="{Binding ManageAntiCheatText}" FontSize="11.5" Foreground="#FDE68A" TextWrapping="Wrap" LineHeight="16" />
                                 </StackPanel>
                             </Grid>

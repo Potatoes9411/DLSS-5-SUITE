@@ -405,6 +405,7 @@ type MainViewModel() as this =
     // Informational only. Detection never blocks an install: it gives people
     // a clear warning before a render-hook route touches a protected game.
     let mutable manageAntiCheat: string option = None
+    let mutable manageAntiCheatOff = false
     let mutable manageExePath = ""
     let mutable manageFolder = ""
     let mutable manageReShadeText = "Checking..."
@@ -2065,8 +2066,13 @@ type MainViewModel() as this =
 
     member _.HasManageAntiCheat = manageAntiCheat.IsSome
 
+    member _.ManageAntiCheatHeader =
+        if manageAntiCheatOff then "ANTI-CHEAT SWITCHED OFF" else "ANTI-CHEAT DETECTED"
+
     member _.ManageAntiCheatText =
         match manageAntiCheat with
+        | Some _ when manageAntiCheatOff ->
+            "BattlEye is installed but switched off (-nobattleye in commandline.txt), so story mode runs without it and Autopilot can start the game. GTA Online needs it back on - take the mods out before you play online."
         | Some name when not (String.IsNullOrWhiteSpace(name)) ->
             sprintf "%s detected. Render-hook installs can be blocked or lead to enforcement in online modes. Use only where the game's rules allow it." name
         | Some _ ->
@@ -3493,6 +3499,7 @@ type MainViewModel() as this =
         manageAnalysis <- None
         manageTitle <- card.Title
         manageAntiCheat <- None
+        manageAntiCheatOff <- false
         this.RaisePropertyChanged("HasManageAntiCheat")
         autopilotStatus <- (if autopilotCts.IsSome then autopilotStatus else "")
         this.RaiseVerdict()
@@ -3540,13 +3547,17 @@ type MainViewModel() as this =
         let antiCheatExe = manageExePath
         System.Threading.Tasks.Task.Run(fun () ->
             let found =
-                try AntiCheat.detect antiCheatTitle antiCheatFolder antiCheatExe
+                try AntiCheat.detectInstalled antiCheatTitle antiCheatFolder antiCheatExe
                 with _ -> None
+            let off =
+                found = Some "BattlEye" && (try AntiCheat.battlEyeOff antiCheatFolder antiCheatExe with _ -> false)
             Dispatcher.UIThread.Post(fun () ->
                 match manageCard with
                 | Some openCard when obj.ReferenceEquals(openCard, card) ->
                     manageAntiCheat <- found
+                    manageAntiCheatOff <- off
                     this.RaisePropertyChanged("HasManageAntiCheat")
+                    this.RaisePropertyChanged("ManageAntiCheatHeader")
                     this.RaisePropertyChanged("ManageAntiCheatText")
                 | _ -> ()))
         |> ignore
