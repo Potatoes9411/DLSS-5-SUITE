@@ -3277,9 +3277,16 @@ type MainViewModel() as this =
                 else "The player is set up, but the DLSS 5 install did not finish: " + o.Message)
 
     member this.PlayVideoLink() =
-        match VideoPlayer.play videoLink with
-        | Ok() -> this.VideoSay "Playing. F6 switches the neural pass; Home opens ReShade."
-        | Error why -> this.VideoSay why
+        if VideoPlayer.looksLikeUrl videoLink then
+            let link = videoLink
+            this.VideoWork(fun () ->
+                match VideoPlayer.playLink link (fun s -> this.VideoSay s) with
+                | Ok() -> "Playing (streamed through SUITE, so it plays from the start and can't be skipped through). F6 switches the neural pass; Home opens ReShade."
+                | Error why -> why)
+        else
+            match VideoPlayer.play videoLink with
+            | Ok() -> this.VideoSay "Playing. F6 switches the neural pass; Home opens ReShade."
+            | Error why -> this.VideoSay why
 
     member this.PlayVideoFile(path: string) =
         match VideoPlayer.play path with

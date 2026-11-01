@@ -282,9 +282,13 @@ module VideoPlayer =
         else Error "That is not a file or a web link."
 
     let mutable private feed: Process option = None
+    /// yt-dlp writing a link's picture and sound into the feed's ffmpeg.
+    let mutable private source: Process option = None
 
     let stopFeed () =
-        feed |> Option.iter (fun p -> try (if not p.HasExited then p.Kill()) with _ -> ())
+        for p in [ source; feed ] do
+            p |> Option.iter (fun p -> try (if not p.HasExited then p.Kill(true)) with _ -> ())
+        source <- None
         feed <- None
 
     let private startFfmpeg (args: string) =
@@ -360,6 +364,64 @@ module VideoPlayer =
                     stopFeed ()
                     failwith "the screen could not be captured"
             startPlayer (webcamUrl + " /play")
+            Ok()
+        with ex -> Error ex.Message
+
+    /// A web link. YouTube now refuses its stream links (HTTP 403) to a player
+    /// that fetches them itself, so MPC-HC buffered forever. yt-dlp fetches
+    /// the picture and sound instead - H.264 and AAC up to 1080p, which the
+    /// feed's ffmpeg passes on untouched - and ffmpeg streams them into the
+    /// player in real time over the webcam's port. No seeking: it is a stream.
+    let playLink (url: string) (progress: string -> unit) : Result<unit, string> =
+        try
+            if not (isSetUp ()) then failwith "Set the player up first."
+            let ytdlp = Path.Combine(folder (), "yt-dlp.exe")
+            if not (File.Exists ytdlp) then failwith "yt-dlp is missing from the player folder - set the player up again."
+            ensureFfmpeg progress
+            stopFeed ()
+            progress "Looking up the video..."
+            let fetchInfo = ProcessStartInfo(ytdlp, WorkingDirectory = tools (), UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true)
+            for a in [ "--no-playlist"; "-q"; "--no-warnings"
+                       "--config-locations"; Path.Combine(folder (), "yt-dlp.conf")
+                       "--ffmpeg-location"; tools ()
+                       "-f"; "bv*[height<=1080][vcodec^=avc1]+ba[acodec^=mp4a]/b[vcodec^=avc1]/b"
+                       "-o"; "-"
+                       url.Trim() ] do
+                fetchInfo.ArgumentList.Add a
+            let fetcher = Process.Start(fetchInfo)
+            let errors = StringBuilder()
+            fetcher.ErrorDataReceived.Add(fun e -> if not (isNull e.Data) then lock errors (fun () -> errors.AppendLine(e.Data) |> ignore))
+            fetcher.BeginErrorReadLine()
+            source <- Some fetcher
+            let streamInfo = ProcessStartInfo(ffmpeg (), sprintf "-hide_banner -loglevel error -re -i pipe:0 -c copy -f mpegts \"%s\"" feedTarget, WorkingDirectory = tools (), UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true)
+            let streamer = Process.Start(streamInfo)
+            feed <- Some streamer
+            // The player opens once the first of the picture is on its way:
+            // started earlier it gives up on a port that is still silent.
+            let first = Array.zeroCreate<byte> 65536
+            let got = fetcher.StandardOutput.BaseStream.Read(first, 0, first.Length)
+            if got <= 0 then
+                stopFeed ()
+                let why = lock errors (fun () -> errors.ToString().Trim().Split('\n') |> Array.tryLast |> Option.defaultValue "")
+                failwith ("yt-dlp could not get the video. " + why.Trim())
+            streamer.StandardInput.BaseStream.Write(first, 0, got)
+            Threading.Tasks.Task.Run(fun () ->
+                try
+                    try fetcher.StandardOutput.BaseStream.CopyTo(streamer.StandardInput.BaseStream)
+                    with _ -> ()
+                finally
+                    try streamer.StandardInput.Close() with _ -> ())
+            |> ignore
+            startPlayer (webcamUrl + " /play")
+            // Closing the player ends the stream too; otherwise yt-dlp would
+            // go on fetching a long video nobody is watching.
+            Threading.Tasks.Task.Run(fun () ->
+                let playerOpen () = Process.GetProcessesByName(Path.GetFileNameWithoutExtension PlayerExe).Length > 0
+                Threading.Thread.Sleep(10000)
+                while source = Some fetcher && playerOpen () do
+                    Threading.Thread.Sleep(3000)
+                if source = Some fetcher then stopFeed ())
+            |> ignore
             Ok()
         with ex -> Error ex.Message
 
