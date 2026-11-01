@@ -279,8 +279,26 @@ module VideoDlss =
 
     let private downloadDir () = Path.Combine(Path.GetTempPath(), "DLSS5SuiteVideo")
 
-    /// yt-dlp's own "[download]  42.1% of ..." lines, read as they come.
-    let private downloadPercent = Regex(@"\[download\]\s+([0-9.]+)%", RegexOptions.Compiled)
+    /// yt-dlp's own "[download]  42.1% of ~ 3.21GiB at 12.3MiB/s ETA 02:31" lines, read as they come.
+    let private downloadPercent =
+        Regex(@"\[download\]\s+([0-9.]+)%(?:\s+of\s+~?\s*([0-9.]+\s*[KMGT]?i?B))?(?:\s+at\s+([0-9.]+\s*[KMGT]?i?B/s))?(?:\s+ETA\s+([0-9:]+))?", RegexOptions.Compiled)
+
+    /// "[info] id: Downloading 1 format(s): 400+251" - one file per "+", fetched one after another.
+    let private formatCount = Regex(@"Downloading \d+ format\(s\):\s*(\S+)", RegexOptions.Compiled)
+
+    /// The status line for one progress line: the part, how far, the size, the speed and the time left.
+    let private downloadStatus (m: Match) (part: int) (parts: int) =
+        let piece (i: int) = if m.Groups.[i].Success then Some(m.Groups.[i].Value.Replace(" ", "")) else None
+        let what =
+            if parts < 2 then "the video"
+            elif part <= 1 then sprintf "the picture (part 1 of %d)" parts
+            else sprintf "the sound (part %d of %d)" part parts
+        [ Some(sprintf "Downloading %s... %s%%" what m.Groups.[1].Value)
+          piece 2 |> Option.map (fun s -> "of " + s)
+          piece 3
+          piece 4 |> Option.map (fun s -> s + " left") ]
+        |> List.choose id
+        |> String.concat " · "
 
     let private fetch (url: string) (report: Update -> unit) (ct: CancellationToken) : Task<Result<string, string>> = task {
         match ytDlpPath (), ffmpegPath (), denoPath () with
@@ -288,7 +306,12 @@ module VideoDlss =
             let dir = Path.Combine(downloadDir (), Guid.NewGuid().ToString("N"))
             Directory.CreateDirectory(dir) |> ignore
             let psi = ProcessStartInfo(ytdlp, UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true)
-            for a in [ "--no-playlist"; "--newline"; "--no-mtime"
+            // A pip-installed yt-dlp on PATH is plain Python, which holds its
+            // output back until exit when it goes to a pipe: no progress at all.
+            psi.Environment.["PYTHONUNBUFFERED"] <- "1"
+            psi.Environment.["PYTHONIOENCODING"] <- "utf-8"
+            psi.StandardOutputEncoding <- Text.Encoding.UTF8
+            for a in [ "--no-playlist"; "--newline"; "--progress"; "--no-mtime"
                        "-f"; "bv*[height<=2160]+ba/b"
                        "--merge-output-format"; "mkv"
                        "--ffmpeg-location"; Path.GetDirectoryName(ffmpeg)
@@ -297,19 +320,29 @@ module VideoDlss =
                        "--print"; "after_move:filepath"
                        url ] do
                 psi.ArgumentList.Add a
+            report { Status = "Looking up the video..."; Fraction = None }
             use p = Process.Start(psi)
             use _ = ct.Register(fun () -> try p.Kill(true) with _ -> ())
             let mutable finalPath = ""
+            let mutable parts = 1
+            let mutable part = 0
             let errors = Text.StringBuilder()
             p.ErrorDataReceived.Add(fun e -> if not (isNull e.Data) then errors.AppendLine(e.Data) |> ignore)
             p.BeginErrorReadLine()
             let mutable line = p.StandardOutput.ReadLine()
             while not (isNull line) do
                 let m = downloadPercent.Match(line)
+                let formats = formatCount.Match(line)
                 if m.Success then
                     match Double.TryParse(m.Groups.[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture) with
-                    | true, pct -> report { Status = sprintf "Downloading the video... %.0f%%" pct; Fraction = Some(pct / 100.0) }
+                    | true, pct -> report { Status = downloadStatus m part parts; Fraction = Some(pct / 100.0) }
                     | _ -> ()
+                elif formats.Success then
+                    parts <- formats.Groups.[1].Value.Split('+').Length
+                elif line.StartsWith("[download] Destination:", StringComparison.Ordinal) then
+                    part <- part + 1
+                elif line.StartsWith("[Merger]", StringComparison.Ordinal) then
+                    report { Status = "Joining the picture and the sound..."; Fraction = None }
                 elif line.Trim() <> "" && File.Exists(line.Trim()) then
                     finalPath <- line.Trim()
                 line <- p.StandardOutput.ReadLine()
