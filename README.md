@@ -6,7 +6,7 @@
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-[![Version](https://img.shields.io/badge/Version-1.2.4-35d22b?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.2.6-35d22b?style=flat-square)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-24292e?style=flat-square)]()
 [![Framework](https://img.shields.io/badge/Framework-.NET%208%20|%20Avalonia%20UI-512bd4?style=flat-square)]()
 [![Language](https://img.shields.io/badge/Language-F%23-30b9db?style=flat-square)]()
@@ -65,6 +65,10 @@ DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace o
 - **Quality / Balanced / Performance** presets, a **before / after** image from two screenshots, and **RTX 40 multi-frame generation** (RTX40MFG-Unlock) for RTX 40 cards.
 - Automatic per-game fixes: hybrid-graphics laptops start the game on the NVIDIA GPU, and RE Engine games get REFramework so ReShade's add-ons can load. Uninstall takes both back out.
 - The library also finds EA, Ubisoft, Battle.net, Rockstar, Amazon, itch, Heroic and Xbox / Game Pass games, and more emulators (Eden, Citron, Azahar, Play!).
+- **Screen Engine frame generation**: 2x-6x in the overlay from the engine's own motion vectors, or NVIDIA DLSS Frame Generation on RTX 40/50 (up to 6x on RTX 50).
+- **Video tab**: DLSS 5 and frame generation applied to a YouTube link or a video file, picture by picture, with download progress, speed and time left. YouTube links in the player stream through SUITE so they play instead of buffering.
+- **GTA V Enhanced with NaturalVision Enhanced**: the DLSS 5 Neural Rendering button upgrades NVE's ReShade to one that can load DLSS 5, keeps the game's own DLSS files, and Remove puts everything back. With 12 GB of graphics memory or less, use about 1080p-1200p and 1 pass. BattlEye switched off with -nobattleye is recognised as off.
+- Results shared by DLSS 5 Autopilot users order Autopilot's routes, and "It worked" / "It didn't" can be shared without a browser.
 - DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
 
 Compatibility varies by game, graphics hardware, anti-cheat system and game update. The project does not promise that every title will work, and it does not bypass anti-cheat protections.
