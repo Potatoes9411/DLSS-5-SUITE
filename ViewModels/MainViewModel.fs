@@ -320,6 +320,25 @@ type BatchRowViewModel(card: GameCardViewModel) =
         this.Status <- text
         this.RaisePropertyChanged("Status")
 
+/// One entry in the top-right edition menu. Picking one re-skins the whole
+/// app for that tool while SUITE's own layout stays underneath.
+type Edition =
+    { Key: string
+      Name: string
+      Tagline: string
+      /// The glyph in the row's icon tile.
+      Icon: Geometry
+      Accent: IBrush
+      AccentSoft: IBrush
+      AccentEdge: IBrush
+      Available: bool
+      IsCurrent: bool }
+
+    member this.Badge =
+        if this.IsCurrent then "ACTIVE"
+        elif this.Available then ""
+        else "SOON"
+
 type MainViewModel() as this =
     inherit ViewModelBase()
 
@@ -594,6 +613,8 @@ type MainViewModel() as this =
 
     /// Performance mode: no moving background, no card hover animation.
     let mutable isPerformanceMode = false
+    let mutable isEditionMenuOpen = false
+    let mutable activeEdition = "suite"
 
     /// The in-game overlay, and the look it wears. Deployed with every install
     /// on the routes that can host it - see `ModInstaller.overlaySupported`.
@@ -1205,6 +1226,60 @@ type MainViewModel() as this =
             if value <> DiscordPresence.isEnabled () then
                 DiscordPresence.setEnabled value
                 this.RaisePropertyChanged("IsDiscordPresenceOn")
+
+    /// A click for each panel as the edition menu unfolds.
+    member this.IsMenuSoundOn
+        with get () = MenuSound.isEnabled ()
+        and set (value: bool) =
+            if value <> MenuSound.isEnabled () then
+                MenuSound.setEnabled value
+                this.RaisePropertyChanged("IsMenuSoundOn")
+
+    // ---- the edition menu (top right) ----
+    member this.IsEditionMenuOpen
+        with get () = isEditionMenuOpen
+        and set value =
+            if isEditionMenuOpen <> value then
+                isEditionMenuOpen <- value
+                this.RaisePropertyChanged("IsEditionMenuOpen")
+
+    /// DLSS 5 SUITE first; the others are the tools still to come, with
+    /// working names of their own.
+    member _.Editions: Edition list =
+        // The tile is tinted the way the Settings cards tint theirs: the
+        // accent at 10% behind, 20% for the edge.
+        let edition key name tagline icon (accent: string) available =
+            let tint (alpha: string) = SolidColorBrush(Color.Parse("#" + alpha + accent.TrimStart('#')))
+            { Key = key
+              Name = name
+              Tagline = tagline
+              Icon = StreamGeometry.Parse(icon)
+              Accent = SolidColorBrush(Color.Parse(accent))
+              AccentSoft = tint "1A"
+              AccentEdge = tint "33"
+              Available = available
+              IsCurrent = (key = activeEdition) }
+
+        [ edition "suite" "DLSS 5 SUITE" "DLSS 5 in your games, on the whole screen and on video"
+              "M 3,4 H 21 V 16 H 3 Z M 5,6 V 14 H 19 V 6 Z M 9,18 H 15 V 20 H 9 Z" "#35D22B" true
+          edition "upscalers" "Upscaler Vault" "Every game's DLSS, FSR and XeSS on the version you pick"
+              "M 12,3 L 21,8 L 12,13 L 3,8 Z M 3,12 L 12,17 L 21,12 L 21,14 L 12,19 L 3,14 Z" "#38BDF8" false
+          edition "enabler" "Enabler Dock" "DLSS and frame generation on cards NVIDIA leaves out"
+              "M 13,2 L 4,14 H 11 L 10,22 L 20,9 H 13 Z" "#F59E0B" false
+          edition "motion" "Motion Forge" "Multi-frame generation that learns each game's motion"
+              "M 3,6 L 11,12 L 3,18 Z M 12,6 L 20,12 L 12,18 Z" "#A78BFA" false
+          edition "storage" "Space Press" "Shrink game installs without changing how they play"
+              "M 4,4 H 20 V 8 H 4 Z M 5,10 H 19 V 20 H 5 Z M 9,12 H 15 V 14 H 9 Z" "#F472B6" false ]
+
+    /// Switches to an edition, or just closes the menu for the current one.
+    member this.SelectEdition(key: string) =
+        match this.Editions |> List.tryFind (fun e -> e.Key = key) with
+        | Some e when e.Available ->
+            if key <> activeEdition then
+                activeEdition <- key
+                this.RaisePropertyChanged("Editions")
+            this.IsEditionMenuOpen <- false
+        | _ -> ()
 
     member this.IsPerformanceMode
         with get () = isPerformanceMode

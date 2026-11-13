@@ -66,6 +66,87 @@
             <Setter Property="Height" Value="268" />
             <Setter Property="BoxShadow" Value="none" />
         </Style>
+
+        <!-- EDITION MENU: the hamburger's three bars. MainWindow.axaml.fs
+             crosses them into an X in step with the panels unfolding. -->
+        <Style Selector="Button.Hamburger Border.Bar">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="1.8" />
+            <Setter Property="CornerRadius" Value="1" />
+            <Setter Property="Background" Value="#CBD5E1" />
+        </Style>
+
+        <!-- EDITION MENU: the panel itself, in the same dense green-tinted glass
+             as the Manage sheet, so it reads as part of the app. -->
+        <Style Selector="Border.EditionMenuCard">
+            <Setter Property="Background">
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#FB121A15" Offset="0.0" />
+                    <GradientStop Color="#FD080D0A" Offset="0.6" />
+                    <GradientStop Color="#FE0C1410" Offset="1.0" />
+                </LinearGradientBrush>
+            </Setter>
+            <Setter Property="BorderBrush">
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#55FFFFFF" Offset="0.0" />
+                    <GradientStop Color="#18FFFFFF" Offset="0.5" />
+                    <GradientStop Color="#4500FF88" Offset="1.0" />
+                </LinearGradientBrush>
+            </Setter>
+            <Setter Property="BorderThickness" Value="1.5" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="BoxShadow" Value="0 22 56 0 #A0000000, 0 1 0 0 #2AFFFFFF" />
+        </Style>
+
+        <!-- EDITION MENU: one row, built like the Settings cards. -->
+        <Style Selector="Button.EditionRow">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#14FFFFFF" />
+            <Setter Property="Background" Value="#08FFFFFF" />
+        </Style>
+        <Style Selector="Button.EditionRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#12FFFFFF" />
+            <Setter Property="BorderBrush" Value="#2CFFFFFF" />
+        </Style>
+        <Style Selector="Button.EditionRow:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1AFFFFFF" />
+        </Style>
+        <Style Selector="Button.EditionRow.Current /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#0E35D22B" />
+            <Setter Property="BorderBrush" Value="#4035D22B" />
+        </Style>
+        <Style Selector="Button.EditionRow.Locked">
+            <Setter Property="Cursor" Value="Arrow" />
+        </Style>
+        <Style Selector="Button.EditionRow.Locked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#08FFFFFF" />
+            <Setter Property="BorderBrush" Value="#14FFFFFF" />
+        </Style>
+
+        <!-- The ACTIVE / SOON tag. -->
+        <Style Selector="Border.EditionTag">
+            <Setter Property="Background" Value="#10FFFFFF" />
+            <Setter Property="BorderBrush" Value="#26FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="7,2" />
+        </Style>
+        <Style Selector="Border.EditionTag TextBlock">
+            <Setter Property="Foreground" Value="#94A3B8" />
+        </Style>
+        <Style Selector="Border.EditionTag.Live">
+            <Setter Property="Background" Value="#1A35D22B" />
+            <Setter Property="BorderBrush" Value="#5535D22B" />
+        </Style>
+        <Style Selector="Border.EditionTag.Live TextBlock">
+            <Setter Property="Foreground" Value="#86EFAC" />
+        </Style>
     </Window.Styles>
 
     <!-- Main Outer Window Frame (Seamless Rounded Glass Frame) -->
@@ -316,6 +397,16 @@
                                     </StackPanel>
                                 </Button>
 
+                                <!-- Edition menu -->
+                                <Button Classes="GlassWindowControlBtn Hamburger" Classes.Open="{Binding IsEditionMenuOpen}"
+                                        Click="OnEditionMenuClicked" ToolTip.Tip="Editions" Margin="0,0,6,0">
+                                    <Panel Width="14" Height="11">
+                                        <Border Classes="Bar Top" VerticalAlignment="Top" />
+                                        <Border Classes="Bar Middle" VerticalAlignment="Center" />
+                                        <Border Classes="Bar Bottom" VerticalAlignment="Bottom" />
+                                    </Panel>
+                                </Button>
+
                                 <Button Classes="GlassWindowControlBtn" Click="OnMinimizeClicked" ToolTip.Tip="{Binding Loc.Minimize}">
                                     <PathIcon Data="M 19,13 H 5 V 11 H 19 V 13 Z" Width="10" Height="10" Foreground="#A1A1AA" VerticalAlignment="Center" />
                                 </Button>
@@ -390,6 +481,16 @@
 
                             <!-- Right: Window Controls -->
                             <StackPanel Grid.Column="2" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <!-- Edition menu -->
+                                <Button Classes="GlassWindowControlBtn Hamburger" Classes.Open="{Binding IsEditionMenuOpen}"
+                                        Click="OnEditionMenuClicked" ToolTip.Tip="Editions" Margin="0,0,6,0">
+                                    <Panel Width="14" Height="11">
+                                        <Border Classes="Bar Top" VerticalAlignment="Top" />
+                                        <Border Classes="Bar Middle" VerticalAlignment="Center" />
+                                        <Border Classes="Bar Bottom" VerticalAlignment="Bottom" />
+                                    </Panel>
+                                </Button>
+
                                 <Button Classes="GlassWindowControlBtn" Click="OnMinimizeClicked" ToolTip.Tip="{Binding Loc.Minimize}">
                                     <PathIcon Data="M 19,13 H 5 V 11 H 19 V 13 Z" Width="10" Height="10" Foreground="#A1A1AA" VerticalAlignment="Center" />
                                 </Button>
@@ -552,6 +653,24 @@
                                                 </StackPanel>
 
                                                 <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsDiscordPresenceOn, Mode=TwoWay}"
+                                                              OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Menu sounds -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1AF472B6"
+                                                        BorderBrush="#33F472B6" BorderThickness="1" VerticalAlignment="Center">
+                                                    <PathIcon Data="M 4,9 H 8 L 13,5 V 19 L 8,15 H 4 Z M 16,9 C 17.3,10.3 17.3,13.7 16,15 M 18.5,6.5 C 21.2,9.2 21.2,14.8 18.5,17.5"
+                                                              Width="14" Height="14" Foreground="#F472B6" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="Menu sounds" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                    <TextBlock Text="A click for each panel as the edition menu unfolds" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsMenuSoundOn, Mode=TwoWay}"
                                                               OnContent="" OffContent="" VerticalAlignment="Center" />
                                             </Grid>
                                         </Border>
@@ -3406,6 +3525,53 @@
                     </StackPanel>
                 </Border>
             </Panel>
+
+            <!-- EDITION MENU: a scrim that closes it when you click anywhere
+                 else, and the concertina of panels that unfolds under the
+                 hamburger. MainWindow.axaml.fs drives the unfold frame by
+                 frame; each panel starts folded up and invisible. -->
+            <Border x:Name="EditionMenuScrim" Background="Transparent" IsVisible="False"
+                    PointerPressed="OnEditionScrimPressed" />
+            <!-- The panel's height is set frame by frame to the bottom of the
+                 last row that has unfolded, so it grows down one row at a time
+                 with them. The inner border clips the rows still folded below. -->
+            <Border x:Name="EditionMenuCard" Classes="EditionMenuCard" Width="340" Height="0" Opacity="0" IsHitTestVisible="False"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,58,18,0">
+                <Border CornerRadius="18" ClipToBounds="True">
+                    <ItemsControl x:Name="EditionMenu" ItemsSource="{Binding Editions}" Margin="8" VerticalAlignment="Top">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="6" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:Edition">
+                                <Button Classes="EditionRow" Classes.Current="{Binding IsCurrent}" Classes.Locked="{Binding !Available}"
+                                        Tag="{Binding Key}" Click="OnEditionRowClicked" Opacity="0" RenderTransformOrigin="50%,0%">
+                                    <Button.RenderTransform>
+                                        <Rotate3DTransform AngleX="-95" Depth="600" />
+                                    </Button.RenderTransform>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                        <Border Width="30" Height="30" CornerRadius="9" Background="{Binding AccentSoft}"
+                                                BorderBrush="{Binding AccentEdge}" BorderThickness="1" VerticalAlignment="Center">
+                                            <PathIcon Data="{Binding Icon}" Width="14" Height="14" Foreground="{Binding Accent}"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                            <TextBlock Text="{Binding Tagline}" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Classes="EditionTag" Classes.Live="{Binding IsCurrent}" VerticalAlignment="Center"
+                                                IsVisible="{Binding Badge, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                            <TextBlock Text="{Binding Badge}" FontSize="9.5" FontWeight="Bold" LetterSpacing="0.6" />
+                                        </Border>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </Border>
         </Panel>
     </Border>
 </Window>

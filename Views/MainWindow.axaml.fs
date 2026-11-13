@@ -27,6 +27,53 @@ type MainWindow() as this =
     /// The Screen Engine pop-out, while it is open.
     let mutable screenEngineWindow: ScreenEngineWindow option = None
 
+    // --- Edition menu unfold state ----------------------------------------
+    // Each panel hangs from its top edge, folded up out of sight, and drops
+    // open in turn like a hinged flap: it falls faster and faster, slaps
+    // flat, bounces back a little and settles - and the next one only starts
+    // as this one lands. That is the halting, one-panel-at-a-time reveal of a
+    // photo wallet falling open, with a click on each slap. Closing folds
+    // them back up, last panel first and quicker.
+    let foldedAngle = -95.0
+    let bounce = 14.0
+    let openStep = 0.11
+    let openDuration = 0.24
+    let landsAt = 0.55
+    let closeStep = 0.04
+    let closeDuration = 0.13
+    // The hamburger crosses into an X over this long, with a little overshoot.
+    let burgerDuration = 0.3
+
+    let editionClock = Stopwatch()
+    let mutable editionOpening = false
+    let mutable editionTimer: DispatcherTimer option = None
+    let mutable editionClicked: bool[] = [||]
+    /// Angle and opacity each panel had when the current close began.
+    let mutable editionFrom: (float * float)[] = [||]
+    /// How far the hamburger was towards an X when the current run began.
+    let mutable burgerFrom = 0.0
+    let mutable burgerNow = 0.0
+    /// The three bars of each hamburger (the top-bar and sidebar layouts each have one).
+    let mutable burgerBars: (Border * Border * Border)[] = [||]
+
+    /// A panel's fold at point u of its own unfold (0 = folded, 1 = open).
+    let openAngle (u: float) =
+        if u <= 0.0 then foldedAngle
+        elif u < landsAt then
+            let k = u / landsAt
+            foldedAngle * (1.0 - k * k)
+        elif u < 1.0 then
+            let v = (u - landsAt) / (1.0 - landsAt)
+            -bounce * sin (Math.PI * v) * (1.0 - v)
+        else 0.0
+
+    let openOpacity (u: float) = Math.Clamp(u / 0.12, 0.0, 1.0)
+
+    let backOut (p: float) =
+        let c1 = 1.70158
+        let q = p - 1.0
+        1.0 + (c1 + 1.0) * q * q * q + c1 * q * q
+
     // --- Kinetic smooth-scroll state --------------------------------------
     // The wheel sets a target offset; a 60 fps timer eases the real offset
     // towards it, so the grid glides instead of jumping line by line.
@@ -613,6 +660,185 @@ type MainWindow() as this =
             this.WindowState <- WindowState.Maximized
 
     member this.OnCloseClicked(sender: obj, e: RoutedEventArgs) = this.Close()
+
+    // =====================================================================
+    // EDITION MENU (top right)
+    // =====================================================================
+    member private this.EditionRows() : Button[] =
+        match this.FindControl<ItemsControl>("EditionMenu") with
+        | null -> [||]
+        | menu ->
+            menu.GetVisualDescendants()
+            |> Seq.choose (fun v ->
+                match v with
+                | :? Button as b when b.Classes.Contains("EditionRow") -> Some b
+                | _ -> None)
+            |> Array.ofSeq
+
+    /// Sets the hamburger's bars at b of the way to an X (0 = three bars).
+    member private this.SetBurger(b: float) =
+        if burgerBars.Length = 0 then
+            burgerBars <-
+                this.GetVisualDescendants()
+                |> Seq.choose (fun v ->
+                    match v with
+                    | :? Button as btn when btn.Classes.Contains("Hamburger") ->
+                        let bars =
+                            btn.GetVisualDescendants()
+                            |> Seq.choose (fun c -> match c with :? Border as bar when bar.Classes.Contains("Bar") -> Some bar | _ -> None)
+                            |> Array.ofSeq
+                        let find cls = bars |> Array.tryFind (fun bar -> bar.Classes.Contains(cls: string))
+                        match find "Top", find "Middle", find "Bottom" with
+                        | Some top, Some mid, Some bottom -> Some(top, mid, bottom)
+                        | _ -> None
+                    | _ -> None)
+                |> Array.ofSeq
+
+        let turn (bar: Border) (angle: float) (shift: float) =
+            match bar.RenderTransform with
+            | :? TransformGroup as g when g.Children.Count = 2 ->
+                (g.Children.[0] :?> RotateTransform).Angle <- angle
+                (g.Children.[1] :?> TranslateTransform).Y <- shift
+            | _ ->
+                let g = TransformGroup()
+                g.Children.Add(RotateTransform(angle))
+                g.Children.Add(TranslateTransform(0.0, shift))
+                bar.RenderTransform <- g
+
+        for (top, mid, bottom) in burgerBars do
+            turn top (45.0 * b) (4.6 * b)
+            turn bottom (-45.0 * b) (-4.6 * b)
+            mid.Opacity <- Math.Clamp(1.0 - b * 1.8, 0.0, 1.0)
+            match mid.RenderTransform with
+            | :? ScaleTransform as s -> s.ScaleX <- Math.Clamp(1.0 - b, 0.1, 1.0)
+            | _ -> mid.RenderTransform <- ScaleTransform(Math.Clamp(1.0 - b, 0.1, 1.0), 1.0)
+        burgerNow <- b
+
+    member private this.EditionFrame() =
+        let rows = this.EditionRows()
+        let n = rows.Length
+        let t = editionClock.Elapsed.TotalSeconds
+
+        let p = Math.Clamp(t / burgerDuration, 0.0, 1.0)
+        let target = if editionOpening then 1.0 else 0.0
+        this.SetBurger(burgerFrom + (target - burgerFrom) * backOut p)
+
+        if n = 0 then
+            if p >= 1.0 then editionTimer |> Option.iter (fun timer -> timer.Stop())
+        else
+            if editionClicked.Length <> n then editionClicked <- Array.zeroCreate n
+            let mutable finished = p >= 1.0
+
+            for i in 0 .. n - 1 do
+                match rows.[i].RenderTransform with
+                | :? Rotate3DTransform as fold ->
+                    if editionOpening then
+                        let u = (t - float i * openStep) / openDuration
+                        if u < 1.0 then finished <- false
+                        fold.AngleX <- openAngle u
+                        rows.[i].Opacity <- openOpacity u
+                        if u >= landsAt && not editionClicked.[i] then
+                            editionClicked.[i] <- true
+                            MenuSound.play i
+                    else
+                        let (a0, o0) = if i < editionFrom.Length then editionFrom.[i] else (0.0, 1.0)
+                        let u = Math.Clamp((t - float (n - 1 - i) * closeStep) / closeDuration, 0.0, 1.0)
+                        if u < 1.0 then finished <- false
+                        let e = u * u
+                        fold.AngleX <- a0 + (foldedAngle - a0) * e
+                        rows.[i].Opacity <- o0 * (1.0 - e)
+                | _ -> ()
+
+            // The panel reaches down to the bottom of whatever has unfolded:
+            // each row counts for as much of its height as it has swung open,
+            // so the glass grows a row at a time, bounce included.
+            match this.FindControl<Border>("EditionMenuCard") with
+            | null -> ()
+            | card ->
+                let reveal (row: Button) =
+                    match row.RenderTransform with
+                    | :? Rotate3DTransform as fold -> Math.Clamp(1.0 - fold.AngleX / foldedAngle, 0.0, 1.0)
+                    | _ -> 1.0
+                let mutable height = card.BorderThickness.Top + card.BorderThickness.Bottom + 16.0
+                for i in 0 .. n - 1 do
+                    let gap = if i > 0 then 6.0 else 0.0
+                    height <- height + reveal rows.[i] * (rows.[i].Bounds.Height + gap)
+                card.Height <- height
+                card.Opacity <- Math.Clamp(reveal rows.[0] * 3.0, 0.0, 1.0)
+
+            if finished then editionTimer |> Option.iter (fun timer -> timer.Stop())
+
+    member private this.RunEditionFrames() =
+        let timer =
+            match editionTimer with
+            | Some timer -> timer
+            | None ->
+                let timer = DispatcherTimer(TimeSpan.FromMilliseconds(16.0), DispatcherPriority.Render, fun _ _ -> this.EditionFrame())
+                editionTimer <- Some timer
+                timer
+        burgerFrom <- burgerNow
+        editionClock.Restart()
+        timer.Start()
+        // The first frame now, not 16 ms from now.
+        this.EditionFrame()
+
+    // The panels always exist - folded flat and invisible while the menu is
+    // shut - so the unfold starts on the very frame of the click instead of
+    // waiting a layout pass for them to be made. Only taking clicks changes.
+    member private this.OpenEditionMenu() =
+        match this.FindControl<Border>("EditionMenuCard"), this.FindControl<Border>("EditionMenuScrim") with
+        | null, _ | _, null -> ()
+        | card, scrim ->
+            card.IsHitTestVisible <- true
+            scrim.IsVisible <- true
+            editionOpening <- true
+            editionClicked <- [||]
+            // Every panel starts folded, wherever a half-finished close left it.
+            for row in this.EditionRows() do
+                match row.RenderTransform with
+                | :? Rotate3DTransform as fold -> fold.AngleX <- foldedAngle
+                | _ -> ()
+                row.Opacity <- 0.0
+            this.RunEditionFrames()
+
+    member private this.CloseEditionMenu() =
+        editionOpening <- false
+        editionFrom <-
+            this.EditionRows()
+            |> Array.map (fun row ->
+                match row.RenderTransform with
+                | :? Rotate3DTransform as fold -> (fold.AngleX, row.Opacity)
+                | _ -> (0.0, row.Opacity))
+        match this.FindControl<Border>("EditionMenuCard") with
+        | null -> ()
+        | card -> card.IsHitTestVisible <- false
+        match this.FindControl<Border>("EditionMenuScrim") with
+        | null -> ()
+        | scrim -> scrim.IsVisible <- false
+        this.RunEditionFrames()
+
+    member this.OnEditionMenuClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm ->
+            vm.IsEditionMenuOpen <- not vm.IsEditionMenuOpen
+            if vm.IsEditionMenuOpen then this.OpenEditionMenu() else this.CloseEditionMenu()
+        | _ -> ()
+
+    /// A click anywhere outside the menu folds it away.
+    member this.OnEditionScrimPressed(sender: obj, e: PointerPressedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm when vm.IsEditionMenuOpen ->
+            vm.IsEditionMenuOpen <- false
+            this.CloseEditionMenu()
+            e.Handled <- true
+        | _ -> ()
+
+    member this.OnEditionRowClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext, sender with
+        | (:? MainViewModel as vm), (:? Control as row) ->
+            vm.SelectEdition(string row.Tag)
+            if not vm.IsEditionMenuOpen then this.CloseEditionMenu()
+        | _ -> ()
 
     // =====================================================================
     // KINETIC SMOOTH SCROLLING
