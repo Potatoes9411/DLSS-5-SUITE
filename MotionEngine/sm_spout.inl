@@ -9,7 +9,7 @@
 // pictures to each other without a copy through memory: the sender puts each
 // frame into a texture the card shares, and says in a few named pieces of
 // shared memory what it is called and where the texture is. OBS Studio takes
-// it with the Spout2 plugin ("Spout2 Capture", sender "MFG SUPER MOTION"),
+// it with the Spout2 plugin ("Spout2 Capture", sender "Motion Forge"),
 // and records every frame the screen is shown - real and in between.
 //
 // A Spout texture is a Direct3D 11 one shared the old way (a handle that is a
@@ -38,7 +38,7 @@ static bool SpoutWanted()
     return smOpt.spout.load() != 0 && !Dlss5LinkOn();
 }
 
-static const char kSpoutName[] = "MFG SUPER MOTION";
+static const char kSpoutName[] = "Motion Forge";
 static const DWORD kSpoutNameBytes = 256;
 
 struct SpoutTextureInfo

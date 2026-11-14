@@ -6,7 +6,6 @@
 // What is XeSS's own is here and in the two files it brings in:
 //   xe_api.h    Intel's two libraries, as far as the engine calls them
 //   xe_tap.h    the tap on the swap chain the library shows its frames in
-//   xe_guise.h  a card of Intel's own that the libraries turn away, shown to them as another maker's
 // Everything around it is the engine's and the same for both generators: the
 // source, the real frames, the presenter with its pacing, VRR, HDR and Low
 // Latency, the rebuilding of small frames at the picture's size, what stays
@@ -80,15 +79,12 @@
 // the engine's finer field instead. The depth is flat, the camera stands
 // still. SM_XE_NO_FIELD=1 (to compare): told nothing.
 //
-// The unlock plugin (XeFGUnlock.asi, the user's own, beside the libraries)
-// lets the library make more than one frame in between on cards that are not
-// Intel's. It patches the library about a second after it is loaded, so both
-// are loaded when the engine starts, and XeReady waits for it only when that
-// second is not over yet. Without it (or with a build of the library it does
-// not know) one frame is made a pair and the others go by that one.
+// (MFG SUPER MOTION loaded an unlock plugin, XeFGUnlock.asi, that patches the
+// library so it makes more than one frame in between on other makers' cards.
+// DLSS 5 SUITE does not load it - XeStart - so g_xe.plugin stays empty: one
+// frame is made a pair and the others go by that one.)
 #include "xe_api.h"
 #include "xe_tap.h"
-#include "xe_guise.h"
 #include <deque>
 #include <DirectXMath.h>
 #include <DirectXPackedVector.h>
@@ -270,47 +266,51 @@ static bool XeTakes(XeApi &api, ID3D12Device *device)
     return takes;
 }
 
-// The same for a card of Intel's own they turn away - an integrated UHD or
-// Iris Xe: "unsupported card", "unsupported driver" - once it is shown to them
-// as another maker's (xe_guise.h). Its shaders run there all the same: on a
-// UHD 730 a frame in between of 896x504 is whole 10.7 ms after it was asked
-// for, one of 448x252 after 4.6 (tests\xeprobe.exe card=1 guise=1 tap=3).
-// True: it runs so, and stays shown so. False: the card is what it was.
-static bool XeTakesInGuise(XeApi &api, ID3D12Device *device, IDXGIAdapter1 *card)
+// DLSS 5 SUITE: XeSS MFG's two libraries are the user's own (libxess_fg.dll and libxell.dll from Intel's XeSS
+// SDK), which SUITE's Motion Forge page copies into %LOCALAPPDATA%\DLSS5Suite\Motion\user\xess\. Each must
+// carry Intel's signature before it is mapped (lf_signature.h, TrustIntelDll). False: not there, or not Intel's.
+static bool XeFolder(std::wstring &folder, std::string &missing)
 {
-    DXGI_ADAPTER_DESC1 desc = {};
-    if (card == nullptr || FAILED(xe_guise::True(card, &desc)) || desc.VendorId != 0x8086 || !xe_guise::Put(card)) return false;
-    if (XeTakes(api, device)) return true;
-    xe_guise::Off();
-    return false;
+    wchar_t path[MAX_PATH] = {};
+    if (!SuiteMotionPath(path, L"user\\xess", true)) { missing = "no folder for XeSS's files"; return false; }
+    folder = path;
+    for (const wchar_t *name : { L"libxess_fg.dll", L"libxell.dll" })
+    {
+        const std::wstring file = folder + name;
+        char text[160];
+        if (GetFileAttributesW(file.c_str()) == INVALID_FILE_ATTRIBUTES)
+        { _snprintf_s(text, sizeof(text), _TRUNCATE, "%ls was not picked in the app", name); missing = text; return false; }
+        if (!TrustIntelDll(file.c_str()))
+        { _snprintf_s(text, sizeof(text), _TRUNCATE, "%ls is not signed by Intel", name); missing = text; return false; }
+    }
+    return true;
 }
 
 // Does Intel's library make frames on this card? Asked of the library itself
 // (--cards, for the app's "Preferred GPU"): it takes NVIDIA's and AMD's cards
-// and Intel's Arc as they are, and older graphics of Intel's own in the guise
-// of another maker's.
+// and Intel's Arc as they are. (MFG SUPER MOTION also showed older graphics of
+// Intel's own to it as another maker's - xe_guise.h; SUITE leaves that out:
+// the library's own answer stands.)
 static bool XeRunsOn(IDXGIAdapter1 *card)
 {
     static XeApi api;
     static int loaded = -1;
     if (loaded < 0)
     {
-        wchar_t path[MAX_PATH] = {};
-        GetModuleFileNameW(nullptr, path, MAX_PATH);
-        if (auto slash = wcsrchr(path, L'\\')) *(slash + 1) = 0;
+        std::wstring folder;
         std::string missing;
-        loaded = XeApiLoad(api, (std::wstring(path) + L"xess\\").c_str(), missing) ? 1 : 0;
+        loaded = XeFolder(folder, missing) && XeApiLoad(api, folder.c_str(), missing) ? 1 : 0;
     }
     if (loaded != 1 || card == nullptr) return false;
     winrt::com_ptr<ID3D12Device> device;
     if (FAILED(D3D12CreateDevice(card, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(device.put()))) || !device) return false;
-    if (XeTakes(api, device.get())) return true;
-    const bool in_guise = XeTakesInGuise(api, device.get(), card);
-    xe_guise::Off();        // only asked: the next card is asked as it is
-    return in_guise;
+    return XeTakes(api, device.get());
 }
 
-// The libraries and the plugin, once. False: XeSS MFG cannot run here.
+// The libraries, once. False: XeSS MFG cannot run here.
+// (MFG SUPER MOTION loaded an unlock plugin first - XeFGUnlock.asi, a third party's, which patches Intel's
+// library in memory so it makes more than one frame a pair on other makers' cards. SUITE does not load it:
+// Intel's library runs as Intel ships it, one frame in between a pair, the rest going by that one.)
 static bool XeStart()
 {
     if (g_xe.loaded) return true;
@@ -318,26 +318,10 @@ static bool XeStart()
     if (FAILED(lfCore.device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &model, sizeof(model))) ||
         model.HighestShaderModel < D3D_SHADER_MODEL_6_4)
     { Trace("[dlssg] unavailable: XeSS MFG needs a card with Shader Model 6.4"); return false; }
-    wchar_t path[MAX_PATH] = {};
-    GetModuleFileNameW(nullptr, path, MAX_PATH);
-    if (auto slash = wcsrchr(path, L'\\')) *(slash + 1) = 0;
-    const std::wstring folder = std::wstring(path) + L"xess\\";
-    // The plugin first: it watches for the library being loaded.
-    g_xe.plugin = LoadLibraryExW((folder + L"XeFGUnlock.asi").c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
-    if (g_xe.plugin)
-        if (auto begin = reinterpret_cast<void (*)()>(GetProcAddress(g_xe.plugin, "InitializeASI"))) begin();
+    std::wstring folder;
     std::string missing;
-    if (!XeApiLoad(g_xe.api, folder.c_str(), missing))
+    if (!XeFolder(folder, missing) || !XeApiLoad(g_xe.api, folder.c_str(), missing))
     { Trace("[dlssg] unavailable: XeSS MFG's files - %s", missing.c_str()); return false; }
-    // A card of Intel's own that the libraries turn away as it is (an Arc they take: nothing is done then).
-    {
-        winrt::com_ptr<IDXGIAdapter1> card;
-        if (lfCard.adapter) lfCard.adapter->QueryInterface(__uuidof(IDXGIAdapter1), card.put_void());
-        DXGI_ADAPTER_DESC1 desc = {};
-        if (card && SUCCEEDED(xe_guise::True(card.get(), &desc)) && desc.VendorId == 0x8086 && !XeTakes(g_xe.api, lfCore.device) &&
-            XeTakesInGuise(g_xe.api, lfCore.device, card.get()))
-            Trace("[xess] Intel's libraries turn this card away as it is: it is shown to them as another maker's, and they run on it");
-    }
     g_xe.loaded = true;
     g_xe.loaded_at = GetTickCount64();
     xefg_swapchain_version_t fg_version = {};
@@ -358,7 +342,7 @@ static DWORD WINAPI XeWindowThread(LPVOID made)
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = DefWindowProcW;
     wc.hInstance = GetModuleHandleW(nullptr);
-    wc.lpszClassName = L"SuperMotionXeSS";
+    wc.lpszClassName = L"MotionForgeXeSS";
     RegisterClassExW(&wc);
     g_xe.window = CreateWindowExW(WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW, wc.lpszClassName, L"", WS_POPUP, 0, 0,
                                   static_cast<int>(g_xe.w), static_cast<int>(g_xe.h), nullptr, nullptr, wc.hInstance, nullptr);

@@ -179,3 +179,23 @@ static bool TrustUserDll(const wchar_t *path, const char *what)
     (void)what;
     return TrustLoadDll(path);
 }
+
+// DLSS 5 SUITE: XeSS MFG's libraries are the user's own too (SUITE's data folder, user\xess\), so they get the
+// same kind of check before they are mapped - a valid Authenticode signature by Intel Corporation, chained to
+// a root in this machine's own store - and are then held open.
+static bool TrustIntelDll(const wchar_t *path)
+{
+    if (!lf_trust::WindowsAccepts(path)) return false;
+    lf_trust::Store store;
+    lf_trust::Cert signer = lf_trust::SigningCertificate(path, store);
+    if (!signer || !lf_trust::ReachesMachineRoot(signer.get())) return false;
+    const DWORD chars = CertGetNameStringW(signer.get(), CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nullptr, nullptr, 0);
+    if (chars == 0) return false;
+    std::wstring name(chars, L'\0');
+    if (CertGetNameStringW(signer.get(), CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nullptr, &name[0], chars) == 0) return false;
+    if (wcscmp(name.c_str(), L"Intel Corporation") != 0) return false;
+    signer.reset();
+    store.reset();
+    lf_trust::HoldOpen(path);
+    return true;
+}

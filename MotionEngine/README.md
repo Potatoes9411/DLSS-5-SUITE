@@ -1,3 +1,5 @@
+> **In DLSS 5 SUITE** this is Motion Forge's engine: MFG SUPER MOTION's engine by NODIX TECH (PolyForm Strict 1.0.0, folded in with his permission), built by `build.cmd` as `MotionForgeEngine.exe`. What SUITE changed is listed at the top of `sm_engine.cpp`; in short, no GPL code (`lf_dlssg_ada.h`), no RTX 20/30 compatibility package and no patching of NVIDIA's or Intel's libraries, and the runtimes are the user's own or downloaded on request. The text below is NODIX TECH's and describes his build (`nvngx.dll`, `out\`, `runtime\`).
+
 # MFG SUPER MOTION engine
 
 Three generators can make the frames in between: DLSS MFG (`generator=0`, the default, NVIDIA RTX cards), XeSS MFG (`generator=1`, any card Intel's library runs on) and MSM FG (`generator=2`, the engine's own, any card at all). Everything below is the same for all three except the generator itself; what is XeSS's own is in [XeSS MFG](docs/XESS-MFG.md), what is MSM FG's in [MSM FG](docs/MSM-FG.md).

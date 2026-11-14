@@ -52,12 +52,12 @@ static DWORD WINAPI ShowThread(LPVOID)
     wc.cbSize        = sizeof(wc);
     wc.lpfnWndProc   = ShowWndProc;
     wc.hInstance     = GetModuleHandleW(nullptr);
-    wc.lpszClassName = L"SuperMotionOutput";
+    wc.lpszClassName = L"MotionForgeOutput";
     RegisterClassExW(&wc);
 
     lfShow.hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT,
-        wc.lpszClassName, L"MFG SUPER MOTION Output", WS_POPUP,
+        wc.lpszClassName, L"Motion Forge Output", WS_POPUP,
         lfShow.x, lfShow.y, static_cast<int>(lfShow.bw), static_cast<int>(lfShow.bh),
         nullptr, nullptr, wc.hInstance, nullptr);
     if (lfShow.hwnd == nullptr)
@@ -379,7 +379,7 @@ static void ShowStayOnTop()
     wchar_t cls[64];
 
     if (GetClassNameW(top, cls, 64) > 0
-        && wcscmp(cls, L"SuperMotionOutput") == 0)
+        && wcscmp(cls, L"MotionForgeOutput") == 0)
         return;
     RECT r = {};
     if (GetWindowRect(top, &r) && r.right == r.left && r.bottom == r.top)

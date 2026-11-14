@@ -451,13 +451,12 @@ void NetWordsMain(uint3 id : SV_DispatchThreadID)
     }
 #define AI_TRY(call, what) do { if (OrtStatus *st_ = (call)) return Fail(what, st_); } while (0)
 
+    // DLSS 5 SUITE: ONNX Runtime, DirectML and the network are not shipped beside the engine; SUITE's Motion Forge
+    // page downloads them on request into %LOCALAPPDATA%\DLSS5Suite\Motion\ai\ (Services/MotionEngine.fs, MotionAi).
     static std::wstring Folder()
     {
-        wchar_t self[MAX_PATH];
-        GetModuleFileNameW(nullptr, self, MAX_PATH);
-        std::wstring dir(self);
-        dir.resize(dir.find_last_of(L'\\') + 1);
-        return dir + L"ai\\";
+        wchar_t dir[MAX_PATH] = {};
+        return SuiteMotionPath(dir, L"ai", true) ? std::wstring(dir) : std::wstring();
     }
 
     // A buffer of `count` numbers; `shape` given: the network's half floats, with its view of them.

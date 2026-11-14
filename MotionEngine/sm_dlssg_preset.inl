@@ -18,7 +18,7 @@ namespace dlssgpreset
     struct Profile { unsigned char bytes[4116]; };      // NVDRS_PROFILE v1: its name at 4
     template <typename T> static void Version(T &s) { memset(&s, 0, sizeof(s)); const unsigned v = static_cast<unsigned>(sizeof(s)) | (1u << 16); memcpy(s.bytes, &v, 4); }
     static constexpr unsigned kOverride = 0x10E41E03, kPreset = 0x10E41DF1;
-    static const wchar_t kProfileName[] = L"MFG SUPER MOTION engine";
+    static const wchar_t kProfileName[] = L"DLSS 5 SUITE Motion Forge engine";
 
     // preset: 0 the driver's own, 1 A (Balanced), 2 B (Quality), 3 C (Performance).
     static void Apply(int preset)

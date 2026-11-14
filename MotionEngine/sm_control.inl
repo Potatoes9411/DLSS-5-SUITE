@@ -255,7 +255,7 @@ static struct ControlState
     std::mutex lock;
     std::vector<std::string> lines;
     std::atomic<bool> stop{false};
-    HANDLE stop_event = nullptr;    // Local\SuperMotionEngineStop: set by anyone who wants the engine gone
+    HANDLE stop_event = nullptr;    // Local\DLSS5SuiteMotionStop: set by anyone who wants the engine gone
     HANDLE instance = nullptr;
 } g_control;
 
@@ -283,10 +283,10 @@ static DWORD WINAPI ControlThread(LPVOID)
 // One engine at a time; a second one tells the first to stop and takes over.
 static bool ControlStart(bool read_stdin)
 {
-    g_control.stop_event = CreateEventW(nullptr, TRUE, FALSE, L"Local\\SuperMotionEngineStop");
+    g_control.stop_event = CreateEventW(nullptr, TRUE, FALSE, L"Local\\DLSS5SuiteMotionStop");
     for (int tries = 0; tries < 40; ++tries)
     {
-        g_control.instance = CreateMutexW(nullptr, TRUE, L"Local\\SuperMotionEngine");
+        g_control.instance = CreateMutexW(nullptr, TRUE, L"Local\\DLSS5SuiteMotion");
         if (g_control.instance != nullptr && GetLastError() != ERROR_ALREADY_EXISTS) break;
         if (g_control.instance) { CloseHandle(g_control.instance); g_control.instance = nullptr; }
         if (g_control.stop_event) SetEvent(g_control.stop_event);

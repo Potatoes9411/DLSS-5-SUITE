@@ -32,8 +32,17 @@
 //   lf_vrr, lf_latency, lf_hdr_show, lf_counter   VRR, Low Latency, HDR, the FPS counter
 //   lf_timing       optional timings (LF_PHASE=1)
 //   sm_loop         the loop that ties them together
-// Built as nvngx.dll (build.cmd): NGX's runtimes check that file name of
-// their caller.
+// MFG SUPER MOTION built this as nvngx.dll (NGX's runtimes check that file name of their caller). DLSS 5 SUITE
+// builds it as MotionForgeEngine.exe (build.cmd) - what it is - in its own engine\motion\ folder; DLSS MFG
+// says in the log and on its status line if the runtime refuses that name.
+//
+// DLSS 5 SUITE changes, so they can be found again when NODIX TECH's engine moves on:
+//   - lf_dlssg_ada.h (GPL-3.0) and lf_dlssg_compat.inl (the RTX 20/30 package) are out: lf_dlssg_card.inl
+//   - nvngx_dlssg.dll and XeSS's libraries are the user's own, from SUITE's data folder (lf_dlssg.inl, xe_mfg.inl)
+//   - the files it keeps live under %LOCALAPPDATA%\DLSS5Suite\Motion (sm_options.h, SuiteMotionPath)
+//   - --rtss-quiet (sm_rtss.inl: RivaTuner's profile written from here) is out
+//   - xe_guise.h (an Intel card shown to Intel's library as another maker's) is out
+//   - its named objects and its window say Motion Forge, so it never meets an MFG SUPER MOTION running too
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -104,7 +113,6 @@
 #include "lf_counter.inl"
 #include "sm_banner.inl"
 #include "sm_learn.inl"
-#include "sm_rtss.inl"
 #include "sm_dlssg_preset.inl"
 #include "lf_hdr_show.inl"
 #include "lf_ofa.inl"
@@ -213,7 +221,6 @@ int wmain(int argc, wchar_t **argv)
         else if (wcscmp(argv[i], L"--video") == 0 && i + 1 < argc) { video = argv[++i]; ReadStartFile(video); }
         else if (wcscmp(argv[i], L"--cards") == 0) { CardsTell(); return 0; }      // for the app's "Preferred GPU" (lf_gpu_core.inl)
         else if (wcscmp(argv[i], L"--vrr") == 0) { VrrTell(); return 0; }          // for the app's VRR switch (lf_vrr.inl)
-        else if (wcscmp(argv[i], L"--rtss-quiet") == 0) { rtss::Quiet(); return 0; }
         else if (wcscmp(argv[i], L"--warm-shaders") == 0) { const ULONGLONG t0 = GetTickCount64(); const int n = ShaderWarmAll(); printf("warm %d shaders %.1f s\n", n, (GetTickCount64() - t0) / 1000.0); return 0; }   // (round 84: the app, once after an update)
         else if (wcschr(argv[i], L'=') != nullptr)
         {
@@ -244,7 +251,7 @@ int wmain(int argc, wchar_t **argv)
         if (smOpt.frame_log.load() || (GetEnvironmentVariableA("SM_FRAME_LOG", v, sizeof(v)) > 0 && v[0] == '1')) FramesOpen();
     }
     g_generator_locked = true;
-    Trace("MFG SUPER MOTION engine, built %s %s", __DATE__, __TIME__);
+    Trace("Motion Forge engine (MFG SUPER MOTION by NODIX TECH), built %s %s", __DATE__, __TIME__);
     SetUnhandledExceptionFilter(CrashFilter);
     SetConsoleCtrlHandler(ConsoleStop, TRUE);
     KeepChildrenWithUs();
@@ -257,25 +264,8 @@ int wmain(int argc, wchar_t **argv)
         Status("@state stopped");
         return 1;
     }
-    // Round 85: XeSS MFG on the tensor cores - on an RTX 20/30 the compatibility package's XeSS-FG engine (Intel's model
-    // on its own CUDA runner), reached as DLSS MFG is: from here the engine runs DLSS MFG's road with that engine in it.
-    if (XeSelected() && smOpt.xess_tensor.load())
-    {
-        const int sm = FgComputeCapability();
-        // (Round 86: every RTX - 20 and 30 on the package's own kernels, 40 and 50 by its route for them; GTX and other makers'
-        // cards have no tensor cores for it.)
-        if (sm == 75 || sm == 86 || sm == 89 || sm >= 100) { g_generator = 0; g_xess_tensor = true; Trace("[xess] XeSS MFG on the tensor cores (SM%d): the compatibility package's XeSS-FG engine", sm); }
-        else Trace("[xess] XeSS MFG on the tensor cores needs an RTX card (this card: SM%d) - Intel's library is used", sm);
-    }
-    // RTX 20/30: the compatibility package is in place before NGX starts and
-    // before any other thread of ours runs.
-    if (NgxSelected())
-    {
-        wchar_t directory[MAX_PATH] = {};
-        GetModuleFileNameW(nullptr, directory, MAX_PATH);
-        if (auto slash = wcsrchr(directory, L'\\')) *(slash + 1) = 0;
-        if (!FgPrepareCompatibility(directory, true)) g_fg.failed = true;
-    }
+    // (DLSS 5 SUITE: MFG SUPER MOTION laid out its RTX 20/30 compatibility package here, and took XeSS MFG "on the
+    // tensor cores" through it. Neither is in this engine - lf_dlssg_card.inl says why. xess_tensor is read and passed over.)
     if (!ControlStart(read_stdin))
     {
         Status("@error busy Another engine is still running");

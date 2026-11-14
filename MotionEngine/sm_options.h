@@ -166,26 +166,50 @@ static bool MotionGiven()
     return !MsmSelected() && smOpt.motion.load() != 2;
 }
 
-// The folder the engine keeps its own files in (the log, NGX's cache, the
-// RTX 20/30 compatibility files): %LOCALAPPDATA%\MFG SUPER MOTION\Engine, the temporary
-// folder when that cannot be made.
-static void EngineDataPath(wchar_t (&path)[MAX_PATH])
+// DLSS 5 SUITE (Motion Forge): every file of the engine's lives under SUITE's own
+// data folder, %LOCALAPPDATA%\DLSS5Suite\Motion, so it never shares a folder (or a
+// learnt .aml, or a log) with an MFG SUPER MOTION installed beside it. `sub` is
+// the folder under it ("Engine", "Learned", "ai", "user\xess"); the path ends in
+// a backslash when `slash`. Empty when LOCALAPPDATA is not there or too long.
+static bool SuiteMotionPath(wchar_t (&path)[MAX_PATH], const wchar_t *sub, bool slash)
 {
     path[0] = 0;
     wchar_t base[MAX_PATH] = {};
     const DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", base, MAX_PATH);
-    if (n && n < MAX_PATH - 32)
+    if (!n || n >= MAX_PATH - 64) return false;
+    wcscpy_s(path, base);
+    wcscat_s(path, L"\\DLSS5Suite");
+    CreateDirectoryW(path, nullptr);
+    wcscat_s(path, L"\\Motion");
+    CreateDirectoryW(path, nullptr);
+    if (sub && sub[0])
     {
-        wcscpy_s(path, base);
-        wcscat_s(path, L"\\MFG SUPER MOTION");
-        CreateDirectoryW(path, nullptr);
-        wcscat_s(path, L"\\Engine");
-        if (CreateDirectoryW(path, nullptr) || GetLastError() == ERROR_ALREADY_EXISTS) return;
+        // (Each level made in turn: "user\xess" needs "user" first.)
+        for (const wchar_t *at = sub; *at;)
+        {
+            const wchar_t *end = wcschr(at, L'\\');
+            const size_t len = end ? size_t(end - at) : wcslen(at);
+            if (wcslen(path) + len + 2 >= MAX_PATH) { path[0] = 0; return false; }
+            wcscat_s(path, L"\\");
+            wcsncat_s(path, at, len);
+            CreateDirectoryW(path, nullptr);
+            at = end ? end + 1 : at + len;
+        }
     }
+    if (slash) wcscat_s(path, L"\\");
+    return true;
+}
+
+// The folder the engine keeps its own files in (the log, NGX's cache, the
+// start file): SUITE's %LOCALAPPDATA%\DLSS5Suite\Motion\Engine, the temporary
+// folder when that cannot be made.
+static void EngineDataPath(wchar_t (&path)[MAX_PATH])
+{
+    if (SuiteMotionPath(path, L"Engine", false) && GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) return;
     const DWORD size = GetTempPathW(MAX_PATH, path);
     if (size && size < MAX_PATH - 24)
     {
-        wcscat_s(path, L"SuperMotionEngine");
+        wcscat_s(path, L"DLSS5SuiteMotion");
         if (CreateDirectoryW(path, nullptr) || GetLastError() == ERROR_ALREADY_EXISTS) return;
     }
     GetCurrentDirectoryW(MAX_PATH, path);

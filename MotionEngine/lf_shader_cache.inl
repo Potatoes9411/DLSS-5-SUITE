@@ -78,7 +78,7 @@ static void ShaderCacheLoad(ShaderCacheState &sc)
     if (len == 0 || len >= MAX_PATH - 64)
     {
         len = GetTempPathW(MAX_PATH, path);
-        if (len > 0 && len < MAX_PATH - 64) wcscat_s(path, L"SuperMotion-shaders");
+        if (len > 0 && len < MAX_PATH - 64) wcscat_s(path, L"DLSS5Suite-Motion-shaders");
         else path[0] = L'\0';
     }
     {

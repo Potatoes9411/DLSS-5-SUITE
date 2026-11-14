@@ -2,9 +2,9 @@
 // runtime (nvngx_dlssg.dll) given the captured colour and a flat depth plane,
 // its frames in between shown by a presenter of its own (lf_fg_pace.inl says
 // when). The motion it finds itself; a field of the engine's is handed to it
-// only when the app asks for one (sm_options.h, MotionGiven). RTX 20/30 go through the compatibility
-// package (lf_dlssg_compat.inl), RTX 40 through the Ada kernel adaptation
-// (lf_dlssg_ada.h), RTX 50 through the runtime as it is.
+// only when the app asks for one (sm_options.h, MotionGiven). DLSS 5 SUITE: the runtime is the user's own
+// file, run as NVIDIA ships it - x2..x6 on RTX 50, x2 on RTX 40 (lf_dlssg_card.inl says why the RTX 20/30
+// package and the RTX 40 adaptation are not here).
 //
 // Two generators, one presenter (round 12). Everything here but the calls
 // into NGX is the engine's own and serves XeSS MFG as well (xe_mfg.inl): the
@@ -20,8 +20,7 @@
 // picture's own size from the two real frames, in the pair's own list, into
 // the pictures DLSS MFG's go into - so from there on a pair of its frames is
 // a pair of DLSS MFG's made at "Flow" 100: shown as they are, nothing rebuilt.
-#include "lf_dlssg_compat.inl"
-#include "lf_dlssg_ada.h"
+#include "lf_dlssg_card.inl"
 
 // Round 45, frames.log (frame_log=1 - the app asks for it in its development build only - or SM_FRAME_LOG=1): every
 // frame shown, one line each - when (seconds since the engine began), the gap since the one before, a real frame or one
@@ -75,7 +74,12 @@ static NVSDK_NGX_Result FgEvaluateBridge(ID3D12GraphicsCommandList *list,
     __except (EXCEPTION_EXECUTE_HANDLER) { Trace("[dlssg] unavailable: evaluate exception 0x%08X", GetExceptionCode()); return NVSDK_NGX_Result_Fail; }
 }
 #define NVSDK_NGX_D3D12_EvaluateFeature_C FgEvaluateBridge
-#include "include/nvsdk_ngx_helpers_dlssg.h"
+// (SUITE: from the NVIDIA DLSS SDK named by DLSS_SDK_DIR - never committed - see build.cmd.)
+#if __has_include(<nvsdk_ngx_helpers_dlssg_d3d.h>)
+#include <nvsdk_ngx_helpers_dlssg_d3d.h>
+#else
+#include <nvsdk_ngx_helpers_dlssg.h>
+#endif
 #undef NVSDK_NGX_D3D12_EvaluateFeature_C
 
 // The picture's movement from the real frame before a pair to the one after,
@@ -1640,80 +1644,24 @@ static bool EnsureFg(Pipeline &v, DXGI_FORMAT format)
     // (XeReady), once the pictures it copies into are there.
     if (NgxSelected() && !g_fg.module)
     {
-        // The BYO library folder next to the worker, then the worker's own
-        // directory: users drop nvngx_dlssg.dll into native\libraries\ to
-        // pick the build they want, and native\ stays the bundled fallback.
-        wchar_t path[MAX_PATH] = {};
-        GetModuleFileNameW(nullptr, path, MAX_PATH);
-        if (auto slash = wcsrchr(path, L'\\')) *(slash + 1) = 0;
-        wchar_t directory[MAX_PATH]; wcscpy_s(directory, path);
-        if (!FgPrepareCompatibility(directory)) return false;
-        wchar_t libraries[MAX_PATH]; wcscpy_s(libraries, directory);
-        wcscat_s(libraries, L"libraries\\");
-        wchar_t lib_path[MAX_PATH]; wcscpy_s(lib_path, libraries);
-        wcscat_s(lib_path, L"nvngx_dlssg.dll");
-        if (GetFileAttributesW(lib_path) != INVALID_FILE_ATTRIBUTES)
-        {
-            // The BYO file is verified (NVIDIA signature, machine-root
-            // chain, product name) before it is mapped - a writable folder
-            // next to the executable is otherwise the easiest DLL plant.
-            if (TrustUserDll(lib_path, "nvngx_dlssg.dll"))
-            {
-                g_fg.module = LoadLibraryW(lib_path);
-                if (g_fg.module)
-                    Trace("[dlssg] FG runtime from native\\libraries\\ (BYO, "
-                        "verified NVIDIA signature)");
-            }
-            else
-                Trace("[dlssg] BYO refused: nvngx_dlssg.dll is not a "
-                    "NVIDIA-signed runtime - falling back to the bundled "
-                    "copy (%ls)", lib_path);
-        }
-        if (!g_fg.module)
-        {
-            wcscpy_s(path, directory);
-            wcscat_s(path, L"nvngx_dlssg.dll");
-            g_fg.module = LoadLibraryW(path);
-        }
+        // DLSS 5 SUITE: the runtime is only ever the user's own nvngx_dlssg.dll, which SUITE's Motion Forge page
+        // copies into %LOCALAPPDATA%\DLSS5Suite\Motion\user\ when they pick it (Services/MotionEngine.fs). Nothing
+        // is bundled beside the engine and nothing is changed in the file: it is checked (NVIDIA's signature, a
+        // chain to a machine root, the product name) before it is mapped, and run as it is.
+        wchar_t lib_path[MAX_PATH] = {};
+        if (SuiteMotionPath(lib_path, L"user", true) && wcslen(lib_path) < MAX_PATH - 20)
+            wcscat_s(lib_path, L"nvngx_dlssg.dll");
+        else lib_path[0] = 0;
+        if (!lib_path[0] || GetFileAttributesW(lib_path) == INVALID_FILE_ATTRIBUTES)
+        { Trace("[dlssg] unavailable: no nvngx_dlssg.dll was picked in the app (Motion Forge, DLSS MFG)"); return false; }
+        if (!TrustUserDll(lib_path, "nvngx_dlssg.dll"))
+        { Trace("[dlssg] unavailable: the nvngx_dlssg.dll picked is not NVIDIA-signed (%ls)", lib_path); return false; }
+        g_fg.module = LoadLibraryW(lib_path);
         if (!g_fg.module) { Trace("[dlssg] unavailable: nvngx_dlssg.dll load failed (Windows %lu)", GetLastError()); return false; }
-        if (FgComputeCapability() == 89) {
-            auto base = reinterpret_cast<BYTE *>(g_fg.module);
-            auto dos = reinterpret_cast<IMAGE_DOS_HEADER *>(base);
-            auto nt = reinterpret_cast<IMAGE_NT_HEADERS64 *>(base + dos->e_lfanew);
-            const auto patched = lf_ada::Apply(base, nt->OptionalHeader.SizeOfImage, 89);
-            g_fg_runtime_max = patched.applied ? 5u : 1u;
-            g_fg_count = std::min(g_fg_count, g_fg_runtime_max);
-            Trace("[dlssg] Ada temporal kernels: %u containers, count gate %s; %s", patched.containers, patched.gate ? "opened" : "not found",
-                  patched.applied ? "MFG up to 6x enabled" : "unrecognized runtime, limited to 2x");
-        }
-    }
-    // Round 85: XeSS-FG on the tensor cores - through the NGX core started on the device (NgxStart), where
-    // the compatibility package takes the evaluation over (lf_dlssg_compat.inl, FgXessTensor).
-    if (NgxSelected() && !g_fg.initialized && FgXessTensor())
-    {
-        if (!lfCore.ngx_ready) { Trace("[dlssg] unavailable: XeSS on the tensor cores needs the NGX core, which did not start"); return false; }
-        // (The library defines the overload with a non-const parameter block; the block is only read.)
-        g_fg.create = reinterpret_cast<NrCreateFn>(static_cast<NVSDK_NGX_Result (NVSDK_CONV *)(ID3D12GraphicsCommandList *, NVSDK_NGX_Feature, NVSDK_NGX_Parameter *, NVSDK_NGX_Handle **)>(&NVSDK_NGX_D3D12_CreateFeature));
-        g_fg.release = &NVSDK_NGX_D3D12_ReleaseFeature;
-        g_fg_evaluate = &NVSDK_NGX_D3D12_EvaluateFeature;
-        if (!g_fg.params && NVSDK_NGX_FAILED(NVSDK_NGX_D3D12_AllocateParameters(&g_fg.params))) return false;
-        g_fg.initialized = true;
-        Trace("[dlssg] the generator goes through the NGX core (XeSS-FG on the tensor cores)");
-        // (Round 86, RTX 40: its runtime takes two frames a pair from an Ada card - the package's copy is opened before the
-        // core opens it, and adapted as the engine's own copy is (lf_dlssg_ada.h). Not run on an RTX 40 here; its log says.)
-        if (FgComputeCapability() == 89 && !g_compat_runtime.empty())
-        {
-            if (HMODULE runtime = LoadLibraryW(g_compat_runtime.c_str()))
-            {
-                auto base = reinterpret_cast<BYTE *>(runtime);
-                auto nt = reinterpret_cast<IMAGE_NT_HEADERS64 *>(base + reinterpret_cast<IMAGE_DOS_HEADER *>(base)->e_lfanew);
-                const auto patched = lf_ada::Apply(base, nt->OptionalHeader.SizeOfImage, 89);
-                if (!patched.applied) g_fg_count = std::min(g_fg_count, 1u);
-                Trace("[dlssg] XeSS on the tensor cores, RTX 40: the package's runtime adapted (%u containers, count gate %s) - %s",
-                      patched.containers, patched.gate ? "opened" : "not found", patched.applied ? "up to 4x" : "2x");
-            }
-            else Trace("[dlssg] XeSS on the tensor cores, RTX 40: the package's runtime did not open (%lu) - 2x", GetLastError());
-        }
+        Trace("[dlssg] FG runtime: the user's own nvngx_dlssg.dll (verified NVIDIA signature)");
+        // NVIDIA's runtime, unpatched, makes one frame a pair below RTX 50 (lf_dlssg_card.inl).
+        g_fg_runtime_max = FgNativeMost(FgComputeCapability());
+        g_fg_count = std::min(g_fg_count, g_fg_runtime_max);
     }
     if (NgxSelected() && !g_fg.initialized)
     {

@@ -27,7 +27,7 @@
 // by itself.
 //
 // What is learnt is kept for each game by its program's name:
-// %LOCALAPPDATA%\MFG SUPER MOTION\Learned\<name>.aml, a few lines of text. "Settings" in
+// %LOCALAPPDATA%\DLSS5Suite\Motion\Learned\<name>.aml, a few lines of text. "Settings" in
 // the app lists them and deletes one to have it learnt from the start.
 //
 // What it is used for: where the generator looks. MSM FG (msm_fg.h) finds a
@@ -494,7 +494,7 @@ static DWORD WINAPI LearnThread(LPVOID)
     WNDCLASSW kind = {};
     kind.lpfnWndProc = LearnWindowProc;
     kind.hInstance = GetModuleHandleW(nullptr);
-    kind.lpszClassName = L"MfgSuperMotionHand";
+    kind.lpszClassName = L"MotionForgeHand";
     RegisterClassW(&kind);
     const HWND window = CreateWindowExW(0, kind.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, kind.hInstance, nullptr);
     // The mouse and the keys, also while another window has them.
@@ -1758,15 +1758,9 @@ static void LearnGame(HWND window, unsigned w, unsigned h)
     if (name.size() > 4 && _wcsicmp(name.c_str() + name.size() - 4, L".exe") == 0) name.resize(name.size() - 4);
     for (wchar_t &c : name) if (wcschr(L"<>:\"/\\|?*", c) || c < 32) c = L'_';
     wchar_t folder[MAX_PATH] = L"", next[MAX_PATH] = L"";
-    const DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", folder, MAX_PATH);
-    if (n && n < MAX_PATH - 100 && name.size() < 80)
-    {
-        wcscat_s(folder, L"\\MFG SUPER MOTION");
-        CreateDirectoryW(folder, nullptr);
-        wcscat_s(folder, L"\\Learned");
-        CreateDirectoryW(folder, nullptr);
+    // (SUITE: under DLSS5Suite\Motion\Learned, which the Motion Forge page lists - sm_options.h.)
+    if (name.size() < 80 && SuiteMotionPath(folder, L"Learned", false) && wcslen(folder) < MAX_PATH - 100)
         swprintf_s(next, L"%s\\%s.aml", folder, name.c_str());
-    }
     g.w = w; g.h = h;
     if (wcscmp(next, g.file) == 0) return;
     LearnSave();
