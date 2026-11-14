@@ -35,10 +35,13 @@ module VerifiedDownload =
         finally setupGate.Release() |> ignore
     }
 
-    /// Download a GitHub release asset. A .part file survives interruptions;
-    /// the next run resumes it with HTTP Range and still verifies the complete
-    /// SHA-256 before the final filename becomes visible.
-    let download
+    /// Download a pinned asset from one of the hosts named. A .part file
+    /// survives interruptions; the next run resumes it with HTTP Range and
+    /// still verifies the complete SHA-256 before the final filename becomes
+    /// visible. The host list is the caller's, never a catalog's, so a remote
+    /// list cannot point a download anywhere else.
+    let downloadFrom
+        (hosts: string list)
         (client: HttpClient)
         (name: string)
         (url: string)
@@ -50,7 +53,8 @@ module VerifiedDownload =
         (phaseSize: float) = task {
 
         let uri = Uri(url)
-        if uri.Scheme <> Uri.UriSchemeHttps || not (uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)) then
+        if uri.Scheme <> Uri.UriSchemeHttps
+           || not (hosts |> List.exists (fun h -> uri.Host.Equals(h, StringComparison.OrdinalIgnoreCase))) then
             failwith "Untrusted component download address"
         if digest.Length <> 64 then failwith "Invalid component digest"
 
@@ -125,3 +129,7 @@ module VerifiedDownload =
                     | Some ex -> return raise ex
                     | None -> return failwithf "Download failed for %s" name
     }
+
+    /// Download a GitHub release asset - see downloadFrom.
+    let download client name url digest expectedSize destination progress phaseStart phaseSize =
+        downloadFrom [ "github.com" ] client name url digest expectedSize destination progress phaseStart phaseSize
