@@ -150,6 +150,31 @@
             <Setter Property="BorderBrush" Value="#70FFFFFF" />
         </Style>
 
+        <!-- SPACE PRESS statistics bars. -->
+        <Style Selector="ProgressBar.StatBar">
+            <Setter Property="Height" Value="16" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="#14FFFFFF" />
+        </Style>
+        <Style Selector="ProgressBar.StatBar.Saved">
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Foreground" Value="#34D399" />
+        </Style>
+        <Style Selector="ProgressBar.StatBar.Without">
+            <Setter Property="Foreground" Value="#80F59E0B" />
+        </Style>
+        <Style Selector="ProgressBar.StatBar.Used">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#34D399" />
+        </Style>
+        <Style Selector="ProgressBar.StatBar.Game">
+            <Setter Property="Height" Value="10" />
+            <!-- The track shows the full size; the saved part is what is left of it. -->
+            <Setter Property="Background" Value="#4034D399" />
+            <Setter Property="Foreground" Value="#CBD5E1" />
+        </Style>
+
         <!-- The ACTIVE / SOON tag. -->
         <Style Selector="Border.EditionTag">
             <Setter Property="Background" Value="#10FFFFFF" />
@@ -2058,7 +2083,7 @@
                                     </Border>
                                     <Border Grid.Column="2" Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,12">
                                         <StackPanel Spacing="3">
-                                            <TextBlock Text="GAMES SQUISHED" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                            <TextBlock Text="SQUISHED" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
                                             <TextBlock Text="{Binding SquishedCountText}" FontSize="20" FontWeight="Bold" Foreground="#F5F5F7" />
                                         </StackPanel>
                                     </Border>
@@ -2073,6 +2098,24 @@
                                 <!-- How to squish -->
                                 <Border Grid.Row="1" Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="14,10">
                                     <StackPanel Spacing="10">
+                                    <!-- What to look at, and how to find it -->
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                                        <Border Grid.Column="0" CornerRadius="16" Padding="3" Background="#18FFFFFF" BorderBrush="#26FFFFFF" BorderThickness="1">
+                                            <StackPanel Orientation="Horizontal" Spacing="2">
+                                                <Button Classes="SegmentedTab" Classes.Active="{Binding IsGamesView}" Tag="games" Click="OnSpacePressTabClicked" Content="GAMES" />
+                                                <Button Classes="SegmentedTab" Classes.Active="{Binding IsAppsView}" Tag="apps" Click="OnSpacePressTabClicked" Content="APPS" />
+                                                <Button Classes="SegmentedTab" Classes.Active="{Binding IsStatsView}" Tag="stats" Click="OnSpacePressTabClicked" Content="STATISTICS" />
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBox Grid.Column="1" Text="{Binding SearchText, Mode=TwoWay}" PlaceholderText="Search..." IsVisible="{Binding IsListView}" Width="300" MinHeight="36" VerticalContentAlignment="Center"
+                                                 FontSize="12" VerticalAlignment="Center" MaxWidth="320" HorizontalAlignment="Left" />
+                                        <ComboBox Grid.Column="2" Classes="GlassComboBox" Width="210" ItemsSource="{Binding SortOptions}"
+                                                  SelectedIndex="{Binding SortIndex, Mode=TwoWay}" IsVisible="{Binding IsListView}" />
+                                        <Button Grid.Column="3" Classes="AppleSecondaryBtn" Click="OnSpacePressAddFolderClicked" IsVisible="{Binding IsListView}"
+                                                Cursor="Hand" Padding="14,8" ToolTip.Tip="Add any folder to squish - a game or app Space Press did not find">
+                                            <TextBlock Text="ADD FOLDER" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                        </Button>
+                                    </Grid>
                                     <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*" ColumnSpacing="14">
                                         <TextBlock Grid.Column="0" Text="Speed" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                         <ComboBox Grid.Column="1" Classes="GlassComboBox" Width="300" ItemsSource="{Binding SpeedOptions}"
@@ -2106,6 +2149,7 @@
                                             <TextBlock Text="{Binding BatchText}" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
                                         </Button>
                                     </Grid>
+                                    <TextBlock Text="{Binding Notice}" IsVisible="{Binding HasNotice}" FontSize="11.5" Foreground="#FBBF24" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
 
@@ -2134,9 +2178,11 @@
                                     </Grid>
                                 </Border>
 
-                                <!-- The library -->
-                                <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                                    <ItemsControl ItemsSource="{Binding Rows}">
+                                <!-- The library (games or apps, searched and sorted) -->
+                                <TextBlock Grid.Row="3" Text="Nothing here yet." IsVisible="{Binding HasNoRows}" FontSize="12.5" Foreground="#94A3B8"
+                                           HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,30,0,0" />
+                                <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding IsListView}">
+                                    <ItemsControl ItemsSource="{Binding VisibleRows}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <StackPanel Spacing="6" />
@@ -2147,7 +2193,11 @@
                                                 <Button Classes="StorageRow" Classes.Selected="{Binding IsSelected}" Click="OnSpacePressRowClicked">
                                                     <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="14">
                                                         <Border Width="38" Height="50" CornerRadius="8" ClipToBounds="True" Background="#1AFFFFFF">
-                                                            <Image Source="{Binding Cover}" IsVisible="{Binding HasCover}" Stretch="UniformToFill" />
+                                                            <Panel>
+                                                                <TextBlock Text="{Binding Initial}" IsVisible="{Binding !HasCover}" FontSize="18" FontWeight="Bold"
+                                                                           Foreground="#94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                <Image Source="{Binding Cover}" IsVisible="{Binding HasCover}" Stretch="UniformToFill" />
+                                                            </Panel>
                                                         </Border>
                                                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" />
@@ -2167,6 +2217,97 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+                                </ScrollViewer>
+
+                                <!-- Statistics: what squishing has done, per drive and per game -->
+                                <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding IsStatsView}">
+                                    <StackPanel Spacing="12">
+                                        <!-- The headline -->
+                                        <Border Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="18,14">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="SPACE SAVED SO FAR" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                                    <TextBlock Text="{Binding ReclaimedText}" FontSize="30" FontWeight="Bold" Foreground="#34D399" VerticalAlignment="Bottom" />
+                                                    <TextBlock Text="{Binding SavedShareText}" FontSize="12.5" Foreground="#CBD5E1" VerticalAlignment="Bottom" Margin="0,0,0,6" />
+                                                </StackPanel>
+                                                <ProgressBar Classes="StatBar Saved" Minimum="0" Maximum="100" Value="{Binding SavedSharePercent}" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Each drive: full now, and full without Space Press -->
+                                        <Border Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="18,14">
+                                            <StackPanel Spacing="12">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <TextBlock Text="YOUR DRIVES" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <Border Width="12" Height="12" CornerRadius="3" Background="#34D399" VerticalAlignment="Center" />
+                                                            <TextBlock Text="Used now" FontSize="11" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <Border Width="12" Height="12" CornerRadius="3" Background="#80F59E0B" VerticalAlignment="Center" />
+                                                            <TextBlock Text="Without Space Press" FontSize="11" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Grid>
+                                                <ItemsControl ItemsSource="{Binding DriveStats}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Spacing="14" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:DriveStat">
+                                                            <StackPanel Spacing="6">
+                                                                <Grid ColumnDefinitions="*,Auto">
+                                                                    <TextBlock Text="{Binding Name}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                                    <TextBlock Grid.Column="1" Text="{Binding SavedText}" FontSize="12.5" FontWeight="Bold" Foreground="#34D399" />
+                                                                </Grid>
+                                                                <!-- The amber bar is how full the drive would be without
+                                                                     squishing; the green one on top is how full it is. The
+                                                                     amber that shows past the green is the space saved. -->
+                                                                <Panel Height="16">
+                                                                    <ProgressBar Classes="StatBar Without" Minimum="0" Maximum="100" Value="{Binding WithoutPercent}" />
+                                                                    <ProgressBar Classes="StatBar Used" Minimum="0" Maximum="100" Value="{Binding UsedPercent}" />
+                                                                </Panel>
+                                                                <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
+                                                                <TextBlock Text="Without Space Press this drive would be over full." IsVisible="{Binding WouldOverflow}"
+                                                                           FontSize="11" FontWeight="SemiBold" Foreground="#FBBF24" />
+                                                            </StackPanel>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Each game: full size, and what it takes now -->
+                                        <Border Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="18,14">
+                                            <StackPanel Spacing="10">
+                                                <TextBlock Text="MOST SPACE SAVED" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                                <TextBlock Text="Nothing squished yet - squish a game and it shows up here." IsVisible="{Binding !HasTopSaved}"
+                                                           FontSize="12" Foreground="#94A3B8" />
+                                                <ItemsControl ItemsSource="{Binding TopSaved}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Spacing="9" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:StorageRowViewModel">
+                                                            <Grid ColumnDefinitions="240,*,190" ColumnSpacing="14">
+                                                                <TextBlock Text="{Binding Title}" FontSize="12.5" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                                <!-- The full track is the game's full size; the filled
+                                                                     part is what it takes now. -->
+                                                                <ProgressBar Grid.Column="1" Classes="StatBar Game" Minimum="0" Maximum="100" Value="{Binding OnDiskPercent}" VerticalAlignment="Center" />
+                                                                <TextBlock Grid.Column="2" Text="{Binding SavedText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#34D399"
+                                                                           HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
                                 </ScrollViewer>
 
                                 <!-- The selected game, and what to do with it -->

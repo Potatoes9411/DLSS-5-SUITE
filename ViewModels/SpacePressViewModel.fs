@@ -51,8 +51,25 @@ type SpacePressSettings =
       /// "AUTO", "GENTLE", "BALANCED" or "FULL"; missing reads as Auto.
       Speed: string }
 
-/// One game in the Space Press list.
-type StorageRowViewModel(card: GameCardViewModel) =
+/// Something Space Press can squish: a library game, an installed app, or a
+/// folder the user added.
+type StorageEntry =
+    { Key: string
+      Title: string
+      Folder: string
+      /// Shown under the title: the launcher, "APP" or "FOLDER".
+      Source: string
+      /// The exe's name without ".exe", to spot it running ("" if unknown).
+      ProcessName: string
+      CoverPath: string
+      IsApp: bool }
+
+/// A folder added by hand. Public on purpose: System.Text.Json writes a
+/// private F# record as "{}".
+type SpacePressFolder = { Path: string; IsApp: bool }
+
+/// One row in the Space Press list.
+type StorageRowViewModel(entry: StorageEntry) =
     inherit ViewModelBase()
 
     let mutable info: FolderInfo option = None
@@ -68,15 +85,26 @@ type StorageRowViewModel(card: GameCardViewModel) =
 
     let brush (hex: string) = SolidColorBrush(Color.Parse(hex)) :> IBrush
 
-    member _.Card = card
-    member _.Key = card.Game.AppId
-    member _.Title = card.Title
-    member _.Folder = card.InstallDirectory
-    member _.Launcher = card.LauncherType
+    member _.Entry = entry
+    member _.Key = entry.Key
+    member _.Title = entry.Title
+    member _.Folder = entry.Folder
+    member _.Launcher = entry.Source
+    member _.IsApp = entry.IsApp
+    member _.ProcessName = entry.ProcessName
 
-    /// The exe's name without ".exe", to spot the game running.
-    member _.ProcessName =
-        try Path.GetFileNameWithoutExtension(card.Game.TargetExecutablePath) with _ -> ""
+    /// The first letter, shown when there is no cover (apps and folders).
+    member _.Initial = if String.IsNullOrEmpty(entry.Title) then "?" else entry.Title.Substring(0, 1).ToUpperInvariant()
+
+    member _.OpenFolder() =
+        try Process.Start(ProcessStartInfo(entry.Folder, UseShellExecute = true)) |> ignore with _ -> ()
+
+    /// What squishing this has saved, as a share of its full size (0-100) -
+    /// the length of its bar in the statistics.
+    member _.OnDiskPercent =
+        match info with
+        | Some i when i.OriginalBytes > 0L -> float i.OnDiskBytes / float i.OriginalBytes * 100.0
+        | _ -> 100.0
 
     /// A small copy of the cover, decoded once at the size it is shown and
     /// off the UI thread - making 63 of them on the spot froze the page for a
@@ -87,7 +115,7 @@ type StorageRowViewModel(card: GameCardViewModel) =
         | None ->
             if not thumbnailPending then
                 thumbnailPending <- true
-                let path = card.Game.LocalBannerPath
+                let path = entry.CoverPath
                 Task.Run(fun () ->
                     let small =
                         try
@@ -112,7 +140,7 @@ type StorageRowViewModel(card: GameCardViewModel) =
         with get () = info
         and set value =
             info <- value
-            for name in [ "Info"; "SizeText"; "OriginalText"; "SavedText"; "HasSaved"; "EstimateText"; "StatusText"
+            for name in [ "Info"; "SizeText"; "OriginalText"; "SavedText"; "HasSaved"; "EstimateText"; "StatusText"; "OnDiskPercent"
                           "StatusBackground"; "StatusForeground"; "IsSquished"; "IsPlain" ] do
                 this.RaisePropertyChanged(name)
 
@@ -239,6 +267,19 @@ type StorageRowViewModel(card: GameCardViewModel) =
             | Some { Status = Squished _ } -> brush "#34D399"
             | None -> brush "#94A3B8"
 
+/// One drive in the statistics: how full it is now, and how full it would be
+/// without what Space Press saved on it.
+type DriveStat =
+    { Name: string
+      /// 0-100: used now.
+      UsedPercent: float
+      /// 0-100 (capped): used if nothing were squished.
+      WithoutPercent: float
+      Detail: string
+      SavedText: string
+      /// Without squishing, this drive would not even hold what is on it.
+      WouldOverflow: bool }
+
 /// The Space Press edition: the library, sized up, with squish and unsquish.
 ///
 /// Everything here is meant to go unnoticed while you use the PC: sizes come
@@ -249,6 +290,16 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     inherit ViewModelBase()
 
     let rows = ObservableCollection<StorageRowViewModel>()
+    /// What the list shows: the current tab, searched and sorted.
+    let visibleRows = ObservableCollection<StorageRowViewModel>()
+    let driveStats = ObservableCollection<DriveStat>()
+    let topSaved = ObservableCollection<StorageRowViewModel>()
+    /// "games", "apps" or "stats".
+    let mutable view = "games"
+    let mutable search = ""
+    let mutable sortIndex = 0
+    let mutable appsScanned = false
+    let mutable notice = ""
     let mutable selected: StorageRowViewModel option = None
     let mutable job: Job option = None
     let mutable working: StorageRowViewModel option = None
@@ -267,6 +318,96 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
 
     let settingsPath () = Path.Combine(AppLog.dataFolder (), "SpacePress", "settings.json")
     let cachePath () = Path.Combine(AppLog.dataFolder (), "SpacePress", "sizes.json")
+    let foldersPath () = Path.Combine(AppLog.dataFolder (), "SpacePress", "folders.json")
+
+    let loadFolders () : SpacePressFolder list =
+        try
+            if File.Exists(foldersPath ()) then
+                match JsonSerializer.Deserialize<SpacePressFolder[]>(File.ReadAllText(foldersPath ())) with
+                | null -> []
+                | items -> items |> Array.filter (fun f -> not (isNull f.Path)) |> List.ofArray
+            else []
+        with _ -> []
+
+    let mutable addedFolders = loadFolders ()
+
+    let saveFolders () =
+        try
+            Directory.CreateDirectory(Path.GetDirectoryName(foldersPath ())) |> ignore
+            File.WriteAllText(foldersPath (), JsonSerializer.Serialize(Array.ofList addedFolders))
+        with ex -> AppLog.error "Saving the Space Press folders failed" ex
+
+    let folderKey (path: string) = (try Path.GetFullPath(path) with _ -> path).TrimEnd('\\').ToLowerInvariant()
+
+    let keyOf (prefix: string) (path: string) =
+        prefix + Convert.ToHexString(Security.Cryptography.SHA256.HashData(Text.Encoding.UTF8.GetBytes(folderKey path))).Substring(0, 16).ToLowerInvariant()
+
+    let folderEntry (f: SpacePressFolder) =
+        { Key = keyOf "folder_" f.Path
+          Title = (let n = Path.GetFileName(f.Path.TrimEnd('\\')) in if String.IsNullOrEmpty(n) then f.Path else n)
+          Folder = f.Path
+          Source = "FOLDER"
+          ProcessName = ""
+          CoverPath = ""
+          IsApp = f.IsApp }
+
+    /// Words that mark an uninstall entry as a runtime, driver, launcher or
+    /// tool rather than an app worth squishing - from Squish It's own list.
+    let notAnApp =
+        [ "steamworks"; "redistributable"; "redist"; "directx"; "vcredist"; "visual c++"; "easyanticheat"; "battleye"
+          "epic online services"; "unreal engine prerequisites"; "dotnet"; ".net"; "framework"; "runtime"; "sdk"
+          "steamvr"; "prerequisites"; "prereq"; "installer"; "dependencies"; "ubisoft connect"; "ea app"; "origin"
+          "nvidia"; "intel"; "amd "; "realtek"; "synaptics"; "driver"; "chipset"; "firmware"; "bios"; "defender"
+          "update assistant"; "uninstall"; "setup" ]
+
+    /// Installed Windows programs, from the same uninstall entries that
+    /// Settings > Apps lists. Read only; nothing is opened or changed.
+    let scanApps (gameFolders: HashSet<string>) : StorageEntry list =
+        let found = Dictionary<string, StorageEntry>()
+        let read (root: Microsoft.Win32.RegistryKey) (path: string) =
+            try
+                use uninstall = root.OpenSubKey(path)
+                if not (isNull uninstall) then
+                    for name in uninstall.GetSubKeyNames() do
+                        try
+                            use k = uninstall.OpenSubKey(name)
+                            let text (v: string) = match k.GetValue(v) with :? string as s -> s.Trim() | _ -> ""
+                            let display = text "DisplayName"
+                            let system = match k.GetValue("SystemComponent") with :? int as i -> i = 1 | _ -> false
+                            let lower = display.ToLowerInvariant()
+                            if display <> "" && not system && not (notAnApp |> List.exists lower.Contains) then
+                                let location =
+                                    let l = text "InstallLocation"
+                                    if l <> "" then l.Trim('"')
+                                    else
+                                        let icon = (text "DisplayIcon").Split(',').[0].Trim('"')
+                                        if icon <> "" then (try Path.GetDirectoryName(icon) with _ -> "") else ""
+                                if location <> "" && Directory.Exists(location) && not (isProtected location) then
+                                    let key = folderKey location
+                                    let insideGame = gameFolders |> Seq.exists (fun g -> key = g || key.StartsWith(g + "\\") || g.StartsWith(key + "\\"))
+                                    let hasExe =
+                                        try Directory.EnumerateFiles(location, "*.exe", SearchOption.TopDirectoryOnly) |> Seq.isEmpty |> not
+                                        with _ -> false
+                                    if not insideGame && hasExe && not (found.ContainsKey(key)) then
+                                        let exe =
+                                            let icon = (text "DisplayIcon").Split(',').[0].Trim('"')
+                                            if icon.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) then Path.GetFileNameWithoutExtension(icon) else ""
+                                        found.[key] <-
+                                            { Key = keyOf "app_" location
+                                              Title = display
+                                              Folder = location
+                                              Source = "APP"
+                                              ProcessName = exe
+                                              CoverPath = ""
+                                              IsApp = true }
+                        with _ -> ()
+            with _ -> ()
+        let hklm = Microsoft.Win32.Registry.LocalMachine
+        let hkcu = Microsoft.Win32.Registry.CurrentUser
+        read hklm @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+        read hklm @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+        read hkcu @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+        found.Values |> Seq.sortBy (fun e -> e.Title) |> List.ofSeq
 
     let loadSettings () =
         try
@@ -496,6 +637,16 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     member _.MonitorText = sprintf "Checks every hour · last: %s" lastMonitor
 
     member _.MeasureStatus = measureStatus
+
+    /// A one-line message under the options (apps search, a refused folder).
+    member this.Notice
+        with get () = notice
+        and set (value: string) =
+            notice <- value
+            this.RaisePropertyChanged("Notice")
+            this.RaisePropertyChanged("HasNotice")
+
+    member _.HasNotice = not (String.IsNullOrWhiteSpace(notice))
     member _.IsMeasuring = not (String.IsNullOrWhiteSpace(measureStatus))
 
     // ---- totals across the library ----
@@ -518,7 +669,8 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     member this.BatchText =
         if isBatch then "STOP SQUISH ALL"
         else
-            let n = rows |> Seq.filter (fun r -> r.IsPlain) |> Seq.length
+            let wantApps = (view = "apps")
+            let n = rows |> Seq.filter (fun r -> r.IsPlain && r.IsApp = wantApps) |> Seq.length
             sprintf "SQUISH ALL (%d)" n
 
     member private this.RaiseJob() =
@@ -529,6 +681,7 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     member private this.RaiseTotals() =
         for name in [ "ReclaimedText"; "FootprintText"; "SquishedCountText"; "PotentialText"; "BatchText" ] do
             this.RaisePropertyChanged(name)
+        if view = "stats" then this.RefreshStats()
         this.RaiseJob()
 
     member private this.SetMeasureStatus(text: string) =
@@ -540,37 +693,192 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
         row.Info <- Some info
         lock cacheLock (fun () -> cache.[row.Key] <- toCached info)
 
-    /// One row per library game, sizes from the cache where known.
+    /// Adds rows for entries not listed yet, sizes from the cache where known.
+    ///
+    /// One row per folder. Several library entries can point at the same
+    /// place, and squishing it once per entry walked the same files over and
+    /// over.
+    member private this.AddEntries(entries: StorageEntry seq) =
+        let known = rows |> Seq.map (fun r -> r.Key) |> HashSet
+        let folders = rows |> Seq.map (fun r -> folderKey r.Folder) |> HashSet
+        let added = ResizeArray<StorageRowViewModel>()
+        for e in entries do
+            if not (known.Contains(e.Key)) && Directory.Exists(e.Folder) && folders.Add(folderKey e.Folder) then
+                let row = StorageRowViewModel(e)
+                match cache.TryGetValue(e.Key) with
+                | true, c -> row.Info <- Some(ofCached c)
+                | _ -> ()
+                rows.Add(row)
+                added.Add(row)
+        added
+
+    /// The library's games and the folders added by hand.
     member private this.BuildRows() =
         if not started then
             started <- true
             loadCache ()
 
-        // One row per folder. Several library entries can point at the same
-        // place - Epic's Fab plugin and Quixel Bridge both point at the whole
-        // Unreal Engine install - and squishing it once per entry walked the
-        // same few hundred thousand files over and over.
-        let folderKey (path: string) = (try Path.GetFullPath(path) with _ -> path).TrimEnd('\\').ToLowerInvariant()
-        let known = rows |> Seq.map (fun r -> r.Key) |> HashSet
-        let folders = rows |> Seq.map (fun r -> folderKey r.Folder) |> HashSet
-        for card in library do
-            if not (known.Contains(card.Game.AppId)) && Directory.Exists(card.InstallDirectory)
-               && folders.Add(folderKey card.InstallDirectory) then
-                let row = StorageRowViewModel(card)
-                match cache.TryGetValue(card.Game.AppId) with
-                | true, c -> row.Info <- Some(ofCached c)
-                | _ -> ()
-                rows.Add(row)
+        let games =
+            [ for card in library ->
+                  { Key = card.Game.AppId
+                    Title = card.Title
+                    Folder = card.InstallDirectory
+                    Source = card.LauncherType
+                    ProcessName = (try Path.GetFileNameWithoutExtension(card.Game.TargetExecutablePath) with _ -> "")
+                    CoverPath = card.Game.LocalBannerPath
+                    IsApp = false } ]
+        this.AddEntries(games @ (addedFolders |> List.map folderEntry)) |> ignore
 
     /// Builds the list and measures what is not known yet. Called each time
     /// the edition opens; cheap after the first time.
     member this.Activate() =
         isActive <- true
         this.BuildRows()
+        this.Refilter()
         this.RaiseTotals()
-        let unknown = rows |> Seq.filter (fun r -> r.Info.IsNone) |> List.ofSeq
-        if not unknown.IsEmpty && not this.IsMeasuring then
+        this.MeasureUnknown()
+
+    /// Measures whatever on the current tab has no size yet.
+    member private this.MeasureUnknown() =
+        let wantApps = (view = "apps")
+        let unknown = rows |> Seq.filter (fun r -> r.Info.IsNone && r.IsApp = wantApps) |> List.ofSeq
+        if isActive && not unknown.IsEmpty && not this.IsMeasuring then
             this.Measure(unknown)
+
+    // ---- tabs, search and sort ----
+    member _.VisibleRows = visibleRows
+    member _.IsGamesView = view = "games"
+    member _.IsAppsView = view = "apps"
+    member _.IsStatsView = view = "stats"
+    member _.IsListView = view <> "stats"
+
+    /// Switches between the games, the apps and the statistics.
+    member this.ShowView(name: string) =
+        if name <> view then
+            view <- name
+            for p in [ "IsGamesView"; "IsAppsView"; "IsStatsView"; "IsListView"; "BatchText" ] do
+                this.RaisePropertyChanged(p)
+            if name = "apps" && not appsScanned then this.ScanApps()
+            this.Refilter()
+            if name = "stats" then this.RefreshStats()
+            this.MeasureUnknown()
+
+    member this.SearchText
+        with get () = search
+        and set (value: string) =
+            let v = if isNull value then "" else value
+            if v <> search then
+                search <- v
+                this.RaisePropertyChanged("SearchText")
+                this.Refilter()
+
+    member _.SortOptions =
+        [| "Size: largest first"; "Size: smallest first"; "Name: A-Z"; "Most space saved"; "Could save the most" |]
+
+    member this.SortIndex
+        with get () = sortIndex
+        and set (i: int) =
+            if i >= 0 && i <> sortIndex then
+                sortIndex <- i
+                this.RaisePropertyChanged("SortIndex")
+                this.Refilter()
+
+    /// Rebuilds what the list shows. Not on every measurement - rows jumping
+    /// around while you look at them is worse than a list that is one game
+    /// out of order until the next sort.
+    member this.Refilter() =
+        let wantApps = (view = "apps")
+        let q = search.Trim()
+        let size (r: StorageRowViewModel) = match r.Info with Some i -> i.OnDiskBytes | None -> -1L
+        let estimate (r: StorageRowViewModel) = match r.Info with Some i when i.Status = Plain -> i.EstimatedSavingBytes | _ -> 0L
+        let shown =
+            rows
+            |> Seq.filter (fun r -> r.IsApp = wantApps && (q = "" || r.Title.Contains(q, StringComparison.OrdinalIgnoreCase)))
+            |> fun s ->
+                match sortIndex with
+                | 1 -> s |> Seq.sortBy (fun r -> let b = size r in if b < 0L then Int64.MaxValue else b)
+                | 2 -> s |> Seq.sortBy (fun r -> r.Title.ToLowerInvariant())
+                | 3 -> s |> Seq.sortByDescending (fun r -> r.SavedBytes)
+                | 4 -> s |> Seq.sortByDescending estimate
+                | _ -> s |> Seq.sortByDescending size
+            |> List.ofSeq
+        visibleRows.Clear()
+        for r in shown do visibleRows.Add(r)
+        this.RaisePropertyChanged("HasNoRows")
+
+    member _.HasNoRows = visibleRows.Count = 0
+
+    /// Reads the installed programs once, off the UI thread.
+    member private this.ScanApps() =
+        appsScanned <- true
+        this.Notice <- "Looking for installed apps..."
+        let gameFolders = rows |> Seq.filter (fun r -> not r.IsApp) |> Seq.map (fun r -> folderKey r.Folder) |> HashSet
+        Task.Run(fun () ->
+            let apps = try scanApps gameFolders with _ -> []
+            ui (fun () ->
+                this.Notice <- (if apps.IsEmpty then "No installed apps worth squishing were found." else "")
+                this.AddEntries(apps) |> ignore
+                this.Refilter()
+                this.MeasureUnknown()))
+        |> ignore
+
+    /// A folder picked by hand, added to the tab it was added from.
+    member this.AddFolder(path: string) =
+        if not (String.IsNullOrWhiteSpace(path)) && Directory.Exists(path) then
+            if isProtected path then
+                this.Notice <- "That is a Windows or system folder - Space Press leaves those alone."
+            else
+                let f = { Path = path; IsApp = (view = "apps") }
+                if not (addedFolders |> List.exists (fun x -> folderKey x.Path = folderKey path)) then
+                    addedFolders <- addedFolders @ [ f ]
+                    saveFolders ()
+                let added = this.AddEntries([ folderEntry f ])
+                this.Refilter()
+                if added.Count > 0 then this.Measure(List.ofSeq added)
+
+    // ---- statistics ----
+    member _.DriveStats = driveStats
+    member _.TopSaved = topSaved
+    member _.HasTopSaved = topSaved.Count > 0
+
+    /// How much of everything measured squishing has taken off, 0-100.
+    member _.SavedSharePercent =
+        let saved = rows |> Seq.sumBy (fun r -> r.SavedBytes)
+        let original = rows |> Seq.sumBy (fun r -> match r.Info with Some i -> i.OriginalBytes | None -> 0L)
+        if original <= 0L then 0.0 else float saved / float original * 100.0
+
+    member this.SavedShareText = sprintf "%.1f%% of everything measured" this.SavedSharePercent
+
+    /// Per drive: full now, and full without what was saved on it.
+    member this.RefreshStats() =
+        driveStats.Clear()
+        let byDrive =
+            rows
+            |> Seq.filter (fun r -> r.Info.IsSome)
+            |> Seq.groupBy (fun r -> (try Path.GetPathRoot(r.Folder) with _ -> "").ToUpperInvariant())
+        for (root, items) in byDrive do
+            try
+                let d = DriveInfo(root)
+                if d.IsReady && d.TotalSize > 0L then
+                    let total = d.TotalSize
+                    let used = total - d.TotalFreeSpace
+                    let saved = items |> Seq.sumBy (fun r -> r.SavedBytes)
+                    let without = used + saved
+                    driveStats.Add(
+                        { Name = sprintf "%s  %s" (root.TrimEnd('\\')) (if String.IsNullOrWhiteSpace(d.VolumeLabel) then "" else "· " + d.VolumeLabel)
+                          UsedPercent = float used / float total * 100.0
+                          WithoutPercent = min 100.0 (float without / float total * 100.0)
+                          Detail =
+                            sprintf "%s of %s used now  ·  %s without Space Press  ·  %s free"
+                                (formatBytes used) (formatBytes total) (formatBytes without) (formatBytes d.TotalFreeSpace)
+                          SavedText = sprintf "%s saved" (formatBytes saved)
+                          WouldOverflow = without > total })
+            with _ -> ()
+        topSaved.Clear()
+        for r in rows |> Seq.filter (fun r -> r.HasSaved) |> Seq.sortByDescending (fun r -> r.SavedBytes) |> Seq.truncate 15 do
+            topSaved.Add(r)
+        for p in [ "HasTopSaved"; "SavedSharePercent"; "SavedShareText" ] do
+            this.RaisePropertyChanged(p)
 
     /// Leaving the edition: stop measuring after the game in hand.
     member this.Deactivate() = isActive <- false
@@ -580,7 +888,7 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     /// coming back picks up the ones still unmeasured.
     member this.Measure(targets: StorageRowViewModel list) =
         let total = targets.Length
-        this.SetMeasureStatus(sprintf "Measuring 0 of %d games..." total)
+        this.SetMeasureStatus(sprintf "Measuring 0 of %d..." total)
         let worker =
             Thread(
                 (fun () ->
@@ -591,7 +899,7 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
                             let shown = n
                             ui (fun () ->
                                 row.IsMeasuring <- true
-                                this.SetMeasureStatus(sprintf "Measuring %d of %d games..." shown total))
+                                this.SetMeasureStatus(sprintf "Measuring %d of %d..." shown total))
                             let info = try Some(inBackground (fun () -> analyse row.Folder)) with _ -> None
                             ui (fun () ->
                                 row.IsMeasuring <- false
@@ -767,14 +1075,15 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     member this.SquishAllOrStop() =
         if isBatch then this.StopJob()
         elif not this.IsBusy then
-            rows
+            // The tab being looked at: games or apps.
+            visibleRows
             |> Seq.filter (fun r -> r.IsPlain)
             |> Seq.sortBy (fun r -> match r.Info with Some i -> i.OnDiskBytes | None -> Int64.MaxValue)
             |> List.ofSeq
             |> fun queue -> this.StartBatch(queue, false)
 
     member this.OpenSelectedFolder() =
-        selected |> Option.iter (fun r -> r.Card.OpenGameFolder())
+        selected |> Option.iter (fun r -> r.OpenFolder())
 
     /// Steps a squish aside while a library game runs, and back in after.
     member private this.WatchForGames() =

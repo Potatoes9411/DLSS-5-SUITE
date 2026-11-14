@@ -414,7 +414,7 @@ module StorageCompressor =
     /// How long without input before Auto counts you as away.
     let awayAfterSeconds = 120.0
 
-    let paceOf (speed: Speed) : Pace =
+    let rec paceOf (speed: Speed) : Pace =
         let cores = Environment.ProcessorCount
         let gentle = { Workers = 2; Priority = ProcessPriorityClass.Idle; IoPriority = 0; Background = true; Label = "GENTLE" }
         let full = { Workers = Math.Clamp(cores - 2, 2, 16); Priority = ProcessPriorityClass.Normal; IoPriority = 2; Background = false; Label = "FULL SPEED" }
@@ -423,8 +423,11 @@ module StorageCompressor =
         | Balanced -> { Workers = Math.Clamp(cores / 4, 2, 6); Priority = ProcessPriorityClass.BelowNormal; IoPriority = 1; Background = false; Label = "BALANCED" }
         | FullSpeed -> full
         | Auto ->
+            // Balanced while you are at the PC rather than Gentle: Gentle
+            // was so careful that a big game took hours. Balanced leaves
+            // most of the CPU and the drive's priority to whatever you do.
             if idleSeconds () >= awayAfterSeconds then { full with Label = "FULL SPEED WHILE YOU'RE AWAY" }
-            else { gentle with Label = "GENTLE WHILE YOU USE THE PC" }
+            else { paceOf Balanced with Label = "BALANCED WHILE YOU USE THE PC" }
 
     // ------------------------------------------------------------------
     // A job: one squish or unsquish, pausable and stoppable
@@ -555,22 +558,31 @@ module StorageCompressor =
                     send file)
 
         // Already squished files are done; that shows in their size on disk.
-        let pending = ResizeArray<string * int64>()
+        // One metadata call per file, spread over the pace's workers - an
+        // engine install is a quarter of a million of them.
+        let already = Array.zeroCreate<bool> files.Length
+        let checkedCount = ref 0
         let mutable lastChecked = Environment.TickCount64
-        for i in 0 .. files.Length - 1 do
-            if not job.IsCancelled then
-                let file, size = files.[i], sizes.[i]
-                if size > 8192L && onDisk file size < size then
-                    squished.Add(file)
-                    advance file size 1
-                else
-                    pending.Add((file, size))
-                if Environment.TickCount64 - lastChecked > 250L then
-                    lastChecked <- Environment.TickCount64
-                    followPace ()
+        Parallel.For(0, files.Length, ParallelOptions(MaxDegreeOfParallelism = (paceOf job.Speed).Workers), fun i (state: ParallelLoopState) ->
+            if job.IsCancelled then state.Stop()
+            else
+                already.[i] <- sizes.[i] > 8192L && onDisk files.[i] sizes.[i] < sizes.[i]
+                let n = Interlocked.Increment(&checkedCount.contents)
+                if n % 2000 = 0 then
                     lock lockObj (fun () ->
-                        report { CurrentFile = sprintf "Checking files... %s of %s" ((i + 1).ToString("N0")) (total.ToString("N0"))
-                                 DoneFiles = doneFiles; TotalFiles = total; DoneBytes = doneBytes; TotalBytes = totalBytes })
+                        if Environment.TickCount64 - lastChecked > 250L then
+                            lastChecked <- Environment.TickCount64
+                            report { CurrentFile = sprintf "Checking files... %s of %s" (n.ToString("N0")) (total.ToString("N0"))
+                                     DoneFiles = doneFiles; TotalFiles = total; DoneBytes = doneBytes; TotalBytes = totalBytes }))
+        |> ignore
+        followPace ()
+        let pending = ResizeArray<string * int64>()
+        for i in 0 .. files.Length - 1 do
+            if already.[i] then
+                squished.Add(files.[i])
+                advance files.[i] sizes.[i] 1
+            else
+                pending.Add((files.[i], sizes.[i]))
 
         // compact.exe takes many files at once; keep each command line short
         // and give big files a call of their own so progress keeps moving.

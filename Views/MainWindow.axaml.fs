@@ -866,6 +866,24 @@ type MainWindow() as this =
     member this.OnSpacePressSquishAllClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.SquishAllOrStop())
     member this.OnSpacePressOpenFolderClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.OpenSelectedFolder())
 
+    /// Games / Apps / Statistics; the button's Tag names the view.
+    member this.OnSpacePressTabClicked(sender: obj, e: RoutedEventArgs) =
+        match sender with
+        | :? Control as c -> this.WithSpacePress(fun sp -> sp.ShowView(string c.Tag))
+        | _ -> ()
+
+    member this.OnSpacePressAddFolderClicked(sender: obj, e: RoutedEventArgs) =
+        let options = FolderPickerOpenOptions()
+        options.Title <- "Pick a folder for Space Press to squish"
+        options.AllowMultiple <- false
+        async {
+            let! folders = this.StorageProvider.OpenFolderPickerAsync(options) |> Async.AwaitTask
+            if folders <> null && folders.Count > 0 then
+                let path = folders.[0].Path.LocalPath
+                this.WithSpacePress(fun sp -> sp.AddFolder(path))
+        }
+        |> Async.StartImmediate
+
     member this.OnEditionRowClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext, sender with
         | (:? MainViewModel as vm), (:? Control as row) ->
