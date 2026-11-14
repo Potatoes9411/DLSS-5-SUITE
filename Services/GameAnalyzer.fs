@@ -1352,6 +1352,13 @@ module GameAnalyzer =
     /// and no guessing. Shares the header reader the API detection uses.
     let detectArchitecture (exePath: string) : string = Pe.architecture exePath
 
+    /// The DLLs an image binds, static and delay-load together. Enabler Dock
+    /// picks DLSS Enabler's proxy name from these, with the same reader the
+    /// API detection trusts.
+    let importedLibraries (path: string) : Set<string> =
+        let (bound, delayed) = Pe.importedModules path
+        Seq.append bound delayed |> Seq.map (fun n -> n.ToLowerInvariant()) |> Set.ofSeq
+
     /// Which proxy library ReShade takes over. The slot has to be one the game
     /// itself loads, so it follows the detected API rather than whatever is
     /// lying in the folder: the old check looked for vulkan-1.dll and

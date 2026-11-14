@@ -2365,6 +2365,13 @@
                             <views:UpscalerVaultView DataContext="{Binding UpscalerVault}" />
                         </Border>
 
+                        <!-- 8. ENABLER DOCK VIEW - the enabler edition: DLSS Enabler per game.
+                             The page lives in Views/EnablerDockView.axaml. -->
+                        <Border Classes="PageReveal" Classes.Shown="{Binding IsEnablerDockViewVisible}"
+                                IsVisible="{Binding IsEnablerDockViewVisible}" Padding="20,4,20,16" ClipToBounds="False">
+                            <views:EnablerDockView DataContext="{Binding EnablerDock}" />
+                        </Border>
+
                         <!-- 4. COMMUNITY VIEW - what other people got working.
                              Everything on this page comes from the Worker in
                              front of Cloudflare D1; nothing is fetched until
