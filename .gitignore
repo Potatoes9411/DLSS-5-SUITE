@@ -13,3 +13,6 @@ AvaloniaUI/
 Engine/build/
 Engine/out/
 artifacts/
+
+# Claude Code's working copies for parallel work
+.claude/
