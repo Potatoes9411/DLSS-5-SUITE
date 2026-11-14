@@ -1,0 +1,605 @@
+<!-- The Motion Forge edition's page: MFG SUPER MOTION's Super Motion page by
+     NODIX TECH (frame generation, upscaling, quick settings, the advanced
+     groups, profiles, the learning cache), in SUITE's own cards and controls -
+     the same glass cards, GlassComboBox, toggles and Apple buttons as the
+     Space Press page. Its DataContext is MainViewModel.MotionForge. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DLSS_5_MANAGER.ViewModels"
+             x:Class="DLSS_5_MANAGER.Views.MotionForgeView"
+             x:DataType="vm:MotionForgeViewModel">
+
+    <UserControl.Styles>
+        <!-- One card, as Space Press draws them. -->
+        <Style Selector="Border.MfCard">
+            <Setter Property="Background" Value="#66101418" />
+            <Setter Property="BorderBrush" Value="#26FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="16,14" />
+        </Style>
+        <Style Selector="TextBlock.MfHead">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#94A3B8" />
+            <Setter Property="LetterSpacing" Value="0.6" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style Selector="TextBlock.MfGroup">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#60A5FA" />
+            <Setter Property="LetterSpacing" Value="0.6" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+        <Style Selector="TextBlock.MfLabel">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="#CBD5E1" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.MfHint">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="#94A3B8" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBlock.MfValue">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#F5F5F7" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style Selector="ComboBox.GlassComboBox">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <!-- A toggle with its label: the chips of the original. -->
+        <Style Selector="StackPanel.MfChip">
+            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="Spacing" Value="2" />
+            <Setter Property="Margin" Value="0,0,14,0" />
+        </Style>
+        <Style Selector="StackPanel.MfChip > ToggleSwitch">
+            <Setter Property="OnContent" Value="" />
+            <Setter Property="OffContent" Value="" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="StackPanel.MfChip > TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="#CBD5E1" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBox.MfBox">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.MfStart">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="22,11" />
+            <Setter Property="MinWidth" Value="200" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#40FFFFFF" />
+        </Style>
+        <Style Selector="Button.MfStart:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Opacity" Value="0.92" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12" MaxWidth="1100" Margin="0,12,0,0">
+
+        <!-- START MOTION, what it is doing, and the profile in use -->
+        <Border Grid.Row="0" Classes="MfCard" Padding="18,14">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="18">
+                <StackPanel Spacing="3" VerticalAlignment="Center">
+                    <TextBlock Classes="MfHead" Text="SUPER MOTION" />
+                    <TextBlock Text="{Binding StatusLine}" FontSize="18" FontWeight="Bold" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding LearningText}" FontSize="11.5" Foreground="#60A5FA" IsVisible="{Binding LearningText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Classes="MfHint" Text="Press START MOTION, then click your game before the countdown ends. The shortcut starts and stops it while you play." />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" Width="220">
+                    <TextBlock Classes="MfHead" Text="PROFILE" />
+                    <ComboBox Classes="GlassComboBox" ItemsSource="{Binding ProfileNames}" SelectedIndex="{Binding ProfileIndex, Mode=TwoWay}" />
+                </StackPanel>
+                <Button Grid.Column="2" x:Name="MotionStartButton" Classes="MfStart" Background="{Binding StartBrush}"
+                        Click="OnStartClicked" IsEnabled="{Binding CanStart}" VerticalAlignment="Center"
+                        ToolTip.Tip="Start: then click your game. Running: stop and put the game's window back.">
+                    <TextBlock Text="{Binding StartText}" FontSize="13" FontWeight="Bold" Foreground="#FFFFFF" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- What needs saying: an error, frame generation off, the Screen Engine stopped -->
+        <Border Grid.Row="1" Classes="MfCard" Padding="14,10" IsVisible="{Binding HasStatusNote}" BorderBrush="#40FBBF24">
+            <TextBlock Text="{Binding StatusNote}" FontSize="11.5" Foreground="#FBBF24" TextWrapping="Wrap" />
+        </Border>
+
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12" Margin="0,0,6,8">
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+
+                    <!-- FRAME GENERATION -->
+                    <Border Classes="MfCard" VerticalAlignment="Stretch">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Classes="MfHead" Text="FRAME GENERATION" VerticalAlignment="Center" />
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding FrameGeneration, Mode=TwoWay}" OnContent="" OffContent="" ToolTip.Tip="Off: the picture is shown as captured (upscaling still applies)" />
+                            </Grid>
+                            <Grid ColumnDefinitions="130,*" ColumnSpacing="10">
+                                <TextBlock Classes="MfLabel" Text="Generator" />
+                                <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding Generators}" SelectedIndex="{Binding GeneratorIndex, Mode=TwoWay}" />
+                            </Grid>
+                            <TextBlock Classes="MfHint" Text="{Binding GeneratorNote}" />
+                            <Grid ColumnDefinitions="130,*" ColumnSpacing="10">
+                                <TextBlock Classes="MfLabel" Text="Mode" />
+                                <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding FrameModes}" SelectedIndex="{Binding FrameModeIndex, Mode=TwoWay}"
+                                          ToolTip.Tip="Fixed: the multiplier sets how many frames are shown for each frame of the game. Adaptive: frames at an even pace of the target, whatever the game draws." />
+                            </Grid>
+                            <Grid ColumnDefinitions="130,*" ColumnSpacing="10" IsVisible="{Binding IsFixed}">
+                                <TextBlock Classes="MfLabel" Text="Multiplier" />
+                                <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding Multipliers}" SelectedIndex="{Binding MultiplierIndex, Mode=TwoWay}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="130,*,56" ColumnSpacing="10" IsVisible="{Binding IsCustomMultiplier}"
+                                  ToolTip.Tip="Any multiplier, such as 2.1 or 3.7: the game's own frame rate times it, never above the screen. DLSS MFG and XeSS MFG alternate their pairs (for 2.5: 2, 3, 2, 3 frames in between).">
+                                <TextBlock Classes="MfLabel" Text="Custom multiplier" />
+                                <Slider Grid.Column="1" Minimum="1.1" Maximum="6" TickFrequency="0.1" IsSnapToTickEnabled="True" Value="{Binding CustomMultiplier, Mode=TwoWay}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Classes="MfValue" Text="{Binding CustomMultiplierText}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="130,*" ColumnSpacing="10" IsVisible="{Binding IsAdaptive}">
+                                <TextBlock Classes="MfLabel" Text="Target (fps)" />
+                                <TextBox Grid.Column="1" Classes="MfBox" Text="{Binding AdaptiveTargetText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                         PlaceholderText="{Binding ScreenRefreshText}" ToolTip.Tip="Frames shown a second, at an even pace: 30 to 1000. Empty: the screen's refresh rate." />
+                            </Grid>
+                            <Grid ColumnDefinitions="130,*" ColumnSpacing="10">
+                                <TextBlock Classes="MfLabel" Text="Game type" />
+                                <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding GameTypes}" SelectedIndex="{Binding GameTypeIndex, Mode=TwoWay}"
+                                          ToolTip.Tip="Tells the engine what kind of picture to expect. Custom opens Flow: the share of the picture the motion is worked out at." />
+                            </Grid>
+                            <Grid ColumnDefinitions="130,*,56" ColumnSpacing="10" IsVisible="{Binding IsCustomGame}">
+                                <TextBlock Classes="MfLabel" Text="Flow" />
+                                <Slider Grid.Column="1" Minimum="25" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Flow, Mode=TwoWay}" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Classes="MfValue" Text="{Binding FlowText}" />
+                            </Grid>
+                            <TextBlock Classes="MfHint" Text="{Binding FlowNote}" />
+                            <Grid ColumnDefinitions="130,*" ColumnSpacing="10" IsVisible="{Binding IsDlss}">
+                                <TextBlock Classes="MfLabel" Text="DLSS MFG preset" />
+                                <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding DlssPresets}" SelectedIndex="{Binding DlssPresetIndex, Mode=TwoWay}"
+                                          ToolTip.Tip="Written into the NVIDIA driver's profile of Motion Forge's engine (never a game's). Preset C lowers image quality a lot for a small gain." />
+                            </Grid>
+
+                            <WrapPanel Margin="0,4,0,0">
+                                <StackPanel Classes="MfChip" IsVisible="{Binding IsSmfg}"
+                                            ToolTip.Tip="SMT (Super Motion Triangles): a mesh of triangles finds the motion and the card draws the moved triangles directly - about 40% lighter than SMFG's classic way, and the HUD stays still.">
+                                    <ToggleSwitch IsChecked="{Binding TriangleMesh, Mode=TwoWay}" />
+                                    <TextBlock Text="SMT" />
+                                </StackPanel>
+                                <StackPanel Classes="MfChip" IsVisible="{Binding IsDlssOrXess}"
+                                            ToolTip.Tip="SMT hands the motion it reads to DLSS MFG or XeSS MFG, which still make the frames.">
+                                    <ToggleSwitch IsChecked="{Binding SmtAssist, Mode=TwoWay}" />
+                                    <TextBlock Text="SMT assist" />
+                                </StackPanel>
+                                <StackPanel Classes="MfChip"
+                                            ToolTip.Tip="The smoothest motion: frames go out at a perfectly even pace and about one game frame of delay is kept in hand (about 15 ms at 60 FPS). Off: the lowest delay.">
+                                    <ToggleSwitch IsChecked="{Binding UltraSmooth, Mode=TwoWay}" />
+                                    <TextBlock Text="Super Smooth" />
+                                </StackPanel>
+                                <StackPanel Classes="MfChip"
+                                            ToolTip.Tip="Frames at an even pace that follows the game's average frame rate, so small ups and downs of its FPS are not felt. Off: each pair is filled on its own. (XeSS MFG keeps its own pacing.)">
+                                    <ToggleSwitch IsChecked="{Binding EvenPacing, Mode=TwoWay}" />
+                                    <TextBlock Text="Even pacing" />
+                                </StackPanel>
+                                <StackPanel Classes="MfChip" ToolTip.Tip="Keeps the delay between your input and the screen small.">
+                                    <ToggleSwitch IsChecked="{Binding LowLatency, Mode=TwoWay}" />
+                                    <TextBlock Text="Low latency" />
+                                </StackPanel>
+                                <StackPanel Classes="MfChip"
+                                            ToolTip.Tip="Learns how your mouse, keys and gamepad move the picture in each game (only how far they move and which buttons are held - never what you type), so the generated frames follow fast turns. The first time, follow the short steps shown at the top of the game.">
+                                    <ToggleSwitch IsChecked="{Binding AdaptiveLearning, Mode=TwoWay}" />
+                                    <TextBlock Text="Adaptive Motion Learning" />
+                                </StackPanel>
+                            </WrapPanel>
+
+                            <!-- Adaptive Motion Learning's gear -->
+                            <Border Background="#33000000" CornerRadius="12" Padding="12,8" IsVisible="{Binding AdaptiveLearning}">
+                                <WrapPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="Picks Flow for each game from how fast its picture moves: finer for slow games, lighter and steadier for fast ones. Replaces Game type and Flow once the game is learned.">
+                                        <ToggleSwitch IsChecked="{Binding AdaptiveFlow, Mode=TwoWay}" />
+                                        <TextBlock Text="Adaptive Flow Scale" />
+                                    </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="The study's steps at the top of the game screen. Off: the game is still learned in the background from the way you play, only more slowly.">
+                                        <ToggleSwitch IsChecked="{Binding AmlGuide, Mode=TwoWay}" />
+                                        <TextBlock Text="Study guide on the game screen" />
+                                    </StackPanel>
+                                </WrapPanel>
+                            </Border>
+
+                            <!-- SMT's gear -->
+                            <Border Background="#33000000" CornerRadius="12" Padding="12,10" IsVisible="{Binding ShowSmtGear}">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="MfGroup" Margin="0" Text="SMT SETTINGS" />
+                                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+                                        <Grid ColumnDefinitions="100,*" ToolTip.Tip="Pixels between the mesh's corners. Smaller: finer and dearer. Default 16 px.">
+                                            <TextBlock Classes="MfLabel" Text="Mesh size" />
+                                            <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding TriPitches}" SelectedIndex="{Binding TriPitchIndex, Mode=TwoWay}" />
+                                        </Grid>
+                                        <Grid Grid.Column="1" ColumnDefinitions="100,*" ToolTip.Tip="How many times each corner looks for its motion at every size (3DRS). Default 2.">
+                                            <TextBlock Classes="MfLabel" Text="Search rounds" />
+                                            <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding TriRoundChoices}" SelectedIndex="{Binding TriRoundsIndex, Mode=TwoWay}" />
+                                        </Grid>
+                                        <Grid Grid.Row="1" ColumnDefinitions="100,*" ToolTip.Tip="Extra rounds that place each corner's motion between the search's texels. Default 2.">
+                                            <TextBlock Classes="MfLabel" Text="Fine search" />
+                                            <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding TriFineChoices}" SelectedIndex="{Binding TriFineIndex, Mode=TwoWay}" />
+                                        </Grid>
+                                        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="100,*" ToolTip.Tip="Extra rounds on the full-size frames, to the pixel. Default 2.">
+                                            <TextBlock Classes="MfLabel" Text="Full detail" />
+                                            <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding TriFullChoices}" SelectedIndex="{Binding TriFullIndex, Mode=TwoWay}" />
+                                        </Grid>
+                                        <Grid Grid.Row="2" ColumnDefinitions="100,*" ToolTip.Tip="A corner whose motion does not lead back to where it started is not trusted; how many pixels off still counts. Default 4 px.">
+                                            <TextBlock Classes="MfLabel" Text="Occlusion" />
+                                            <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding TriHomeChoices}" SelectedIndex="{Binding TriHomeIndex, Mode=TwoWay}" />
+                                        </Grid>
+                                        <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="100,*" ToolTip.Tip="How coarse the search starts. 1: lightest. 3: very fast motion, dearer. Default 2.">
+                                            <TextBlock Classes="MfLabel" Text="Search range" />
+                                            <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding TriRangeChoices}" SelectedIndex="{Binding TriRangeIndex, Mode=TwoWay}" />
+                                        </Grid>
+                                        <Grid Grid.Row="3" ColumnDefinitions="100,*" ToolTip.Tip="Rounds that place each corner's motion to a fraction of a pixel - keeps fine texture sharp. Default 2.">
+                                            <TextBlock Classes="MfLabel" Text="Sub-pixel" />
+                                            <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding TriExactChoices}" SelectedIndex="{Binding TriExactIndex, Mode=TwoWay}" />
+                                        </Grid>
+                                        <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="100,*" ToolTip.Tip="A corner on a plain surface takes its neighbours' motion when that fits as well. Default 2.">
+                                            <TextBlock Classes="MfLabel" Text="Smooth plains" />
+                                            <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding TriRelaxChoices}" SelectedIndex="{Binding TriRelaxIndex, Mode=TwoWay}" />
+                                        </Grid>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Spacing="12">
+
+                        <!-- The generator's own files -->
+                        <Border Classes="MfCard" IsVisible="{Binding !IsSmfg}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="MfHead" Text="GENERATOR FILES" />
+                                <TextBlock Text="{Binding FilesText}" FontSize="12" TextWrapping="Wrap"
+                                           Foreground="#CBD5E1" />
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsDlss}">
+                                    <Button Classes="ApplePrimaryBtn" Click="OnPickDlssgClicked" Cursor="Hand" Padding="16,8">
+                                        <TextBlock Text="PICK NVNGX_DLSSG.DLL" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                    </Button>
+                                    <Button Classes="AppleSecondaryBtn" Click="OnRemoveDlssgClicked" IsVisible="{Binding HasDlssgFile}" Cursor="Hand" Padding="14,8">
+                                        <TextBlock Text="REMOVE" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                    </Button>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsXess}">
+                                    <Button Classes="ApplePrimaryBtn" Click="OnPickXessClicked" Cursor="Hand" Padding="16,8">
+                                        <TextBlock Text="PICK XESS FILES" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                    </Button>
+                                    <Button Classes="AppleSecondaryBtn" Click="OnRemoveXessClicked" IsVisible="{Binding HasXessFiles}" Cursor="Hand" Padding="14,8">
+                                        <TextBlock Text="REMOVE" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                    </Button>
+                                </StackPanel>
+                                <StackPanel Spacing="6" IsVisible="{Binding IsSmai}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Classes="ApplePrimaryBtn" Click="OnInstallAiClicked" IsVisible="{Binding !IsAiInstalled}" IsEnabled="{Binding !IsAiBusy}" Cursor="Hand" Padding="16,8"
+                                                ToolTip.Tip="ONNX Runtime and DirectML (Microsoft) and SMFG Net, from NODIX TECH's MFG SUPER MOTION release, each checked by its SHA-256">
+                                            <TextBlock Text="DOWNLOAD SMAI" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                        </Button>
+                                        <TextBlock Classes="MfHint" Text="{Binding AiSizeText}" VerticalAlignment="Center" IsVisible="{Binding !IsAiInstalled}" />
+                                        <Button Classes="AppleSecondaryBtn" Click="OnRemoveAiClicked" IsVisible="{Binding IsAiInstalled}" Cursor="Hand" Padding="14,8">
+                                            <TextBlock Text="REMOVE" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                        </Button>
+                                    </StackPanel>
+                                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding AiProgress}" Height="6" IsVisible="{Binding IsAiBusy}" />
+                                    <TextBlock Classes="MfHint" Text="{Binding AiText}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- UPSCALING -->
+                        <Border Classes="MfCard">
+                            <StackPanel Spacing="10">
+                                <TextBlock Classes="MfHead" Text="UPSCALING" />
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10"
+                                      ToolTip.Tip="Sharpness only sharpens. Integer, Nearest Neighbor and Anime4K enlarge a game running below the screen's resolution. SMSR 1.0: a small network makes the picture twice as large, on any card - sharper, and a few ms every frame.">
+                                    <TextBlock Classes="MfLabel" Text="Upscaler" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding Upscalers}" SelectedIndex="{Binding UpscalerIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*,44" ColumnSpacing="10" IsVisible="{Binding IsSmsr}">
+                                    <TextBlock Classes="MfLabel" Text="SMSR strength" />
+                                    <Slider Grid.Column="1" Minimum="-100" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding SmsrBoost, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Classes="MfValue" Text="{Binding SmsrBoost, StringFormat='{}{0:0}'}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*,44" ColumnSpacing="10" IsVisible="{Binding IsUpscaling}">
+                                    <TextBlock Classes="MfLabel" Text="Sharpness" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Sharpness, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Classes="MfValue" Text="{Binding Sharpness, StringFormat='{}{0:0}'}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*,44" ColumnSpacing="10" IsVisible="{Binding IsUpscaling}">
+                                    <TextBlock Classes="MfLabel" Text="Over sharpness" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding OverSharpness, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Classes="MfValue" Text="{Binding OverSharpness, StringFormat='{}{0:0}'}" />
+                                </Grid>
+                                <StackPanel Classes="MfChip"
+                                            ToolTip.Tip="A picture of another shape than the screen (4:3 on 16:9) stretched over all of it. Off: fitted, with bars.">
+                                    <ToggleSwitch IsChecked="{Binding Stretch, Mode=TwoWay}" />
+                                    <TextBlock Text="Stretch to fill the screen" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- QUICK SETTINGS -->
+                        <Border Classes="MfCard">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="MfHead" Text="QUICK SETTINGS" />
+                                <WrapPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="For a G-SYNC or FreeSync screen: each frame is shown the moment it is ready. Follows the PC until you set it here.">
+                                        <ToggleSwitch IsChecked="{Binding Vrr, Mode=TwoWay}" />
+                                        <TextBlock Text="VRR" />
+                                    </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="Turn on when the game itself is shown in HDR.">
+                                        <ToggleSwitch IsChecked="{Binding Hdr, Mode=TwoWay}" />
+                                        <TextBlock Text="HDR" />
+                                    </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="The HUD, the crosshair and on-screen text stay as sharp and steady as the game drew them.">
+                                        <ToggleSwitch IsChecked="{Binding StillPixels, Mode=TwoWay}" />
+                                        <TextBlock Text="Keep still pixels" />
+                                    </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="Never more frames than your screen shows - the same as a frame limit at its refresh rate.">
+                                        <ToggleSwitch IsChecked="{Binding LimitToScreen, Mode=TwoWay}" />
+                                        <TextBlock Text="Limit to refresh rate" />
+                                    </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="The picture stays while you use a window on another screen.">
+                                        <ToggleSwitch IsChecked="{Binding MultiDisplay, Mode=TwoWay}" />
+                                        <TextBlock Text="Multi-display" />
+                                    </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="The game's own frame rate and the one you see, in a corner of the picture.">
+                                        <ToggleSwitch IsChecked="{Binding FpsCounter, Mode=TwoWay}" />
+                                        <TextBlock Text="FPS counter" />
+                                    </StackPanel>
+                                </WrapPanel>
+                                <Border Background="#33000000" CornerRadius="12" Padding="12,8" IsVisible="{Binding FpsCounter}">
+                                    <StackPanel Spacing="8">
+                                        <Grid ColumnDefinitions="118,*" ColumnSpacing="10">
+                                            <TextBlock Classes="MfLabel" Text="Counter" />
+                                            <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding FpsCounterModes}" SelectedIndex="{Binding FpsCounterModeIndex, Mode=TwoWay}" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="118,*,44" ColumnSpacing="10">
+                                            <TextBlock Classes="MfLabel" Text="Counter size" />
+                                            <Slider Grid.Column="1" Minimum="50" Maximum="200" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding FpsCounterSize, Mode=TwoWay}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Classes="MfValue" Text="{Binding FpsCounterSize, StringFormat='{}{0:0}%'}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ADVANCED -->
+                <Border Classes="MfCard">
+                    <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="MfHead" Text="ADVANCED" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Classes="MfChip" Margin="0">
+                                <TextBlock Text="Show" />
+                                <ToggleSwitch IsChecked="{Binding AdvancedOpen, Mode=TwoWay}" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="22" IsVisible="{Binding AdvancedOpen}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="MfGroup" Text="FRAME PACING" />
+                                <StackPanel Classes="MfChip"
+                                            ToolTip.Tip="SMFG shows one new frame on every refresh of the screen, each made for its refresh, with VSync - even to the eye. Costs: VRR not used for generated frames, about 8 ms more delay.">
+                                    <ToggleSwitch IsChecked="{Binding LockRefresh, Mode=TwoWay}" />
+                                    <TextBlock Text="Lock to screen refresh" />
+                                </StackPanel>
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" ToolTip.Tip="Lower: less delay. Higher: smoother motion.">
+                                    <TextBlock Classes="MfLabel" Text="Queue target" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding QueueTargets}" SelectedIndex="{Binding QueueTargetIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*,56" ColumnSpacing="10" ToolTip.Tip="Caps the frames shown a second. Below 20 is off.">
+                                    <TextBlock Classes="MfLabel" Text="Frame limit" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="360" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FrameLimit, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Classes="MfValue" Text="{Binding FrameLimitText}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10"
+                                      ToolTip.Tip="The game's own frame rate. Auto reads it from the frames; set it if the rate shown jumps around with what you do in the game.">
+                                    <TextBlock Classes="MfLabel" Text="Game FPS" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding GameFpsChoices}" SelectedIndex="{Binding GameFpsIndex, Mode=TwoWay}" />
+                                </Grid>
+
+                                <TextBlock Classes="MfGroup" Text="DISPLAY" />
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10">
+                                    <TextBlock Classes="MfLabel" Text="Sync mode" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding SyncModes}" SelectedIndex="{Binding SyncModeIndex, Mode=TwoWay}" />
+                                </Grid>
+
+                                <TextBlock Classes="MfGroup" Text="EFFECTS" />
+                                <Grid ColumnDefinitions="130,*,44" ColumnSpacing="10"
+                                      ToolTip.Tip="The bright parts glow softly into what is around them, added to each real frame before frames in between are made. Not with HDR10.">
+                                    <TextBlock Classes="MfLabel" Text="Bloom" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding Bloom, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Classes="MfValue" Text="{Binding Bloom, StringFormat='{}{0:0}'}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*,44" ColumnSpacing="10" ToolTip.Tip="Bloom drawn out sideways (anamorphic).">
+                                    <TextBlock Classes="MfLabel" Text="Anamorphic" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding BloomWide, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Classes="MfValue" Text="{Binding BloomWide, StringFormat='{}{0:0}'}" />
+                                </Grid>
+
+                                <TextBlock Classes="MfGroup" Text="MOTION" />
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" IsVisible="{Binding IsDlss}" ToolTip.Tip="How the movement between two frames is found for DLSS MFG.">
+                                    <TextBlock Classes="MfLabel" Text="Motion estimation" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding MotionSources}" SelectedIndex="{Binding MotionSourceIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" IsVisible="{Binding IsXess}" ToolTip.Tip="How the movement between two frames is found for XeSS MFG.">
+                                    <TextBlock Classes="MfLabel" Text="Motion estimation" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding XessMotionSources}" SelectedIndex="{Binding XessMotionSourceIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" IsVisible="{Binding IsSmfg}" ToolTip.Tip="SMFG · Fast is the lightest; the full search looks for the motion more carefully.">
+                                    <TextBlock Classes="MfLabel" Text="SMFG search" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding MsmSearches}" SelectedIndex="{Binding MsmSearchIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <TextBlock Classes="MfHint" Text="SMAI's network finds the motion itself." IsVisible="{Binding IsSmai}" />
+
+                                <TextBlock Classes="MfGroup" Text="SHORTCUT" />
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" ToolTip.Tip="Starts and stops Motion Forge while you play: the game in front is taken at once, no countdown.">
+                                    <TextBlock Classes="MfLabel" Text="Start / stop" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding Hotkeys}" SelectedIndex="{Binding HotkeyIndex, Mode=TwoWay}" />
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Spacing="8">
+                                <TextBlock Classes="MfGroup" Text="CAPTURE" />
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" ToolTip.Tip="How the game's picture is taken - change it only if the output is black or stutters.">
+                                    <TextBlock Classes="MfLabel" Text="Capture API" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding CaptureApis}" SelectedIndex="{Binding CaptureApiIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" ToolTip.Tip="Borderless is best; Scaled to screen stretches a smaller window. The window is put back as it was when Motion Forge stops.">
+                                    <TextBlock Classes="MfLabel" Text="Game window" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding WindowModes}" SelectedIndex="{Binding WindowModeIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" ToolTip.Tip="The time you have to switch to the game after START MOTION.">
+                                    <TextBlock Classes="MfLabel" Text="Countdown" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding Countdowns}" SelectedIndex="{Binding CountdownIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <StackPanel Classes="MfChip" ToolTip.Tip="Every frame shown is shared as a Spout sender named Motion Forge - in OBS: Spout2 Capture.">
+                                    <ToggleSwitch IsChecked="{Binding Spout, Mode=TwoWay}" />
+                                    <TextBlock Text="Spout output (OBS)" />
+                                </StackPanel>
+
+                                <TextBlock Classes="MfGroup" Text="GRAPHICS CARD" />
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" ToolTip.Tip="The card that makes the frames. With two cards, the second can make them so the game keeps the first.">
+                                    <TextBlock Classes="MfLabel" Text="Preferred GPU" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding GpuChoices}" SelectedIndex="{Binding GpuIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" ToolTip.Tip="Realtime lets the frames go first on the card.">
+                                    <TextBlock Classes="MfLabel" Text="GPU priority" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding GpuPriorities}" SelectedIndex="{Binding GpuPriorityIndex, Mode=TwoWay}" />
+                                </Grid>
+
+                                <TextBlock Classes="MfGroup" Text="CROP INPUT" />
+                                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8" ToolTip.Tip="Pixels left out of the game's window on each side (black bars, a frame), 0 to 4000.">
+                                    <TextBox Grid.Column="0" Classes="MfBox" Text="{Binding CropLeft, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" PlaceholderText="Left" />
+                                    <TextBox Grid.Column="1" Classes="MfBox" Text="{Binding CropTop, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" PlaceholderText="Top" />
+                                    <TextBox Grid.Column="2" Classes="MfBox" Text="{Binding CropRight, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" PlaceholderText="Right" />
+                                    <TextBox Grid.Column="3" Classes="MfBox" Text="{Binding CropBottom, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" PlaceholderText="Bottom" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                                    <TextBlock Classes="MfHint" Text="Left" HorizontalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Classes="MfHint" Text="Top" HorizontalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Classes="MfHint" Text="Right" HorizontalAlignment="Center" />
+                                    <TextBlock Grid.Column="3" Classes="MfHint" Text="Bottom" HorizontalAlignment="Center" />
+                                </Grid>
+
+                                <TextBlock Classes="MfGroup" Text="CURSOR" />
+                                <WrapPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="The pointer is kept inside the game's window.">
+                                        <ToggleSwitch IsChecked="{Binding CursorClip, Mode=TwoWay}" />
+                                        <TextBlock Text="Clip" />
+                                    </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="The pointer's speed follows the picture's scale (put back when it stops).">
+                                        <ToggleSwitch IsChecked="{Binding CursorSpeed, Mode=TwoWay}" />
+                                        <TextBlock Text="Adjust speed" />
+                                    </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="The pointer is hidden while it runs.">
+                                        <ToggleSwitch IsChecked="{Binding CursorHide, Mode=TwoWay}" />
+                                        <TextBlock Text="Hide" />
+                                    </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="When the picture is scaled onto the screen, the pointer is scaled with it.">
+                                        <ToggleSwitch IsChecked="{Binding CursorScale, Mode=TwoWay}" />
+                                        <TextBlock Text="Scale" />
+                                    </StackPanel>
+                                </WrapPanel>
+
+                                <TextBlock Classes="MfGroup" Text="ENGINE" />
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="The engine writes engine.log (taken at the next start) - for when something is to be looked into.">
+                                        <ToggleSwitch IsChecked="{Binding EngineLog, Mode=TwoWay}" />
+                                        <TextBlock Text="Keep a log" />
+                                    </StackPanel>
+                                    <Button Classes="EmptyActionBtn" Click="OnOpenLogsClicked" Cursor="Hand" Padding="12,6">
+                                        <TextBlock Text="OPEN LOG FOLDER" FontSize="10.5" FontWeight="Bold" Foreground="#CBD5E1" />
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <!-- PROFILES -->
+                    <Border Classes="MfCard">
+                        <StackPanel Spacing="10">
+                            <TextBlock Classes="MfHead" Text="PROFILES" />
+                            <TextBlock Classes="MfHint" Text="Add copies the profile in use. Default is always kept." />
+                            <TextBox Classes="MfBox" Text="{Binding NewProfileName, Mode=TwoWay}" PlaceholderText="Name for Add or Rename" MaxLength="40" />
+                            <WrapPanel>
+                                <Button Classes="ApplePrimaryBtn" Click="OnAddProfileClicked" IsEnabled="{Binding CanAddProfile}" Cursor="Hand" Padding="14,7" Margin="0,0,8,6">
+                                    <TextBlock Text="ADD" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                </Button>
+                                <Button Classes="AppleSecondaryBtn" Click="OnRenameProfileClicked" Cursor="Hand" Padding="14,7" Margin="0,0,8,6">
+                                    <TextBlock Text="RENAME" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                </Button>
+                                <Button Classes="AppleSecondaryBtn" Click="OnResetProfileClicked" Cursor="Hand" Padding="14,7" Margin="0,0,8,6"
+                                        ToolTip.Tip="Every setting of this profile back to the defaults">
+                                    <TextBlock Text="RESET" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                </Button>
+                                <Button Classes="AppleDangerBtn" Click="OnDeleteProfileClicked" IsEnabled="{Binding CanDeleteProfile}" Cursor="Hand" Padding="14,7" Margin="0,0,8,6">
+                                    <TextBlock Text="DELETE" FontSize="11" FontWeight="Bold" Foreground="#FF6B6B" />
+                                </Button>
+                            </WrapPanel>
+                            <Button Classes="EmptyActionBtn" Click="OnImportClicked" IsVisible="{Binding CanImport}" Cursor="Hand" Padding="12,6" HorizontalAlignment="Left"
+                                    ToolTip.Tip="Copies the profiles and learnt games of the MFG SUPER MOTION installed for this Windows user. Nothing of yours is overwritten.">
+                                <TextBlock Text="IMPORT FROM MFG SUPER MOTION" FontSize="10.5" FontWeight="Bold" Foreground="#CBD5E1" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- LEARNING CACHE -->
+                    <Border Grid.Column="1" Classes="MfCard">
+                        <StackPanel Spacing="8">
+                            <TextBlock Classes="MfHead" Text="ADAPTIVE MOTION LEARNING · CACHE" />
+                            <TextBlock Classes="MfHint" Text="Nothing learnt yet. Turn on Adaptive Motion Learning and play." IsVisible="{Binding NoLearned}" />
+                            <ItemsControl ItemsSource="{Binding Learned}" IsVisible="{Binding HasLearned}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="6" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:LearnedRowViewModel">
+                                        <Border Background="#33000000" CornerRadius="10" Padding="10,6">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="SemiBold" Foreground="#F5F5F7" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding State}" FontSize="11" Foreground="#94A3B8" />
+                                                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding Percent}" Height="4" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="AppleDangerBtn" Click="OnForgetGameClicked" Cursor="Hand" Padding="10,5" VerticalAlignment="Center"
+                                                        ToolTip.Tip="Delete what was learnt for this game - it is learnt again from the start">
+                                                    <TextBlock Text="DELETE" FontSize="10" FontWeight="Bold" Foreground="#FF6B6B" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Condition 1 of NODIX TECH's permission: his credit stays with his work. -->
+                <TextBlock Classes="MfHint" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,2,0,0"
+                           Text="Motion Forge is MFG SUPER MOTION by NODIX TECH, folded into DLSS 5 SUITE with his permission. Copyright (c) 2026 NODIX-TECH." />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

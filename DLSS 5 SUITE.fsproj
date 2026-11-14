@@ -5,7 +5,7 @@
     <!-- The installer lives in Setup/ as its own C# project. Keep the app from
          globbing it: Avalonia compiles every .axaml under a project folder, and
          the installer's windows are not part of the app. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);Setup\**;Tests\**;Engine\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Setup\**;Tests\**;Engine\**;MotionEngine\**</DefaultItemExcludes>
     <TargetFramework>net8.0</TargetFramework>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
@@ -45,10 +45,15 @@
     <Content Include="languages\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Motion Forge's engine, when MotionEngine\build.cmd has built it (never committed): into engine\motion\,
+         so a development build runs it too and publish carries it. -->
+    <Content Include="MotionEngine\build\MotionForgeEngine.exe" Condition="Exists('MotionEngine\build\MotionForgeEngine.exe')" Link="engine\motion\MotionForgeEngine.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="Models\GameItem.fs" />
+    <!-- Motion Forge edition: its settings (MFG SUPER MOTION's profiles). -->
+    <Compile Include="Models\MotionOptions.fs" />
     <Compile Include="Services\AppLog.fs" />
     <Compile Include="Services\DiscordPresence.fs" />
     <Compile Include="Services\MenuSound.fs" />
@@ -85,6 +90,9 @@
     <Compile Include="Services\RtxRemix.fs" />
     <Compile Include="Services\OpenXrLayer.fs" />
     <Compile Include="Services\ScreenEngine.fs" />
+    <!-- Motion Forge edition: one overlay at a time, and its engine. -->
+    <Compile Include="Services\OverlayArbiter.fs" />
+    <Compile Include="Services\MotionEngine.fs" />
     <Compile Include="Services\VideoDlss.fs" />
     <Compile Include="Services\NeuralScreen.fs" />
     <Compile Include="Services\RobloxShadeHost.fs" />
@@ -100,8 +108,10 @@
     <Compile Include="ViewModels\ScreenEngineViewModel.fs" />
     <Compile Include="ViewModels\VideoViewModel.fs" />
     <Compile Include="ViewModels\SpacePressViewModel.fs" />
+    <Compile Include="ViewModels\MotionForgeViewModel.fs" />
     <Compile Include="ViewModels\MainViewModel.fs" />
     <Compile Include="Views\ScreenEngineWindow.axaml.fs" />
+    <Compile Include="Views\MotionForgeView.axaml.fs" />
     <Compile Include="Views\MainWindow.axaml.fs" />
     <Compile Include="ViewLocator.fs" />
     <Compile Include="App.axaml.fs" />
