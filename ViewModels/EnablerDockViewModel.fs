@@ -122,6 +122,7 @@ type EnablerRowViewModel(game: GameItem, knownStreamlineDirs: string[], isCustom
     member _.InstalledVersion = installedVersion
     member _.Proxy = proxy
     member _.Readiness = readiness
+    override this.ToString() = sprintf "%s [%s]" game.Title this.StatusText
 
     /// Could DLSS Enabler run here at all - what "show only" filters on.
     member _.CanRun =
@@ -207,6 +208,11 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
     let mutable iniPath = ""
     let mutable watcher: FileSystemWatcher option = None
     let mutable ignoreWatcherUntil = DateTime.MinValue
+    /// The newest settings waiting to be written. Several quick toggles each
+    /// queue a write; whichever runs takes the latest and the rest find
+    /// nothing, so an older copy can never land last.
+    let writeGate = obj ()
+    let mutable pendingWrite: (string * string[]) option = None
 
     let mutable isFixesOpen = false
     let mutable newFixGame = ""
@@ -260,7 +266,15 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
         let listed = Catalog.sorted catalog.Streamlines
         listed @ (local |> List.filter (fun l -> not (listed |> List.exists (fun e -> e.FileName = l.FileName))))
 
-    let latestEnabler () = Catalog.latestStable (enablerEntries ())
+    /// What "Latest" installs: the newest stable version SUITE can use as
+    /// things stand - pinned or already on disk - or simply the newest when
+    /// unchecked versions are allowed. A default that fails on Install
+    /// would be no default at all.
+    let latestEnabler () =
+        let usable =
+            enablerEntries ()
+            |> List.filter (fun e -> settings.AllowUnchecked || Catalog.isPinned e || isDownloaded e)
+        Catalog.latestStable usable |> Option.orElse (Catalog.latestStable (enablerEntries ()))
     let latestStreamline () = Catalog.sorted (streamlineEntries ()) |> List.tryHead
 
     let shortHash (text: string) =
@@ -269,7 +283,19 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
     /// A folder added on this page, as a library-like game.
     let customGame (folder: string) : GameItem =
         let name = Path.GetFileName(folder.TrimEnd('\\', '/'))
-        let exe, size = try GameScanner.resolvePrimaryExecutable folder name with _ -> "", 0L
+        let exe, size =
+            match (try GameScanner.resolvePrimaryExecutable folder name with _ -> "", 0L) with
+            | e, sz when not (String.IsNullOrWhiteSpace(e)) && File.Exists(e) -> e, sz
+            | _ ->
+                // The library's resolver is strict about what a game looks
+                // like; for a folder picked by hand, its biggest program will do.
+                try
+                    Directory.GetFiles(folder, "*.exe", SearchOption.TopDirectoryOnly)
+                    |> Array.map (fun f -> f, FileInfo(f).Length)
+                    |> Array.sortByDescending snd
+                    |> Array.tryHead
+                    |> Option.defaultValue ("", 0L)
+                with _ -> "", 0L
         { AppId = "enabler_" + shortHash folder
           Title = name
           LauncherTypeName = "CUSTOM"
@@ -317,6 +343,8 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
                 settings <- { settings with AllowUnchecked = value }
                 saveSettings ()
                 this.RaisePropertyChanged("AllowUnchecked")
+                this.RaiseOptions()
+                this.RaiseTotals()
 
     member this.KeepSettings
         with get () = settings.KeepSettings
@@ -349,7 +377,7 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
         if checking then sprintf "%d so far" n else string n
 
     member _.LatestText =
-        match latestEnabler () with
+        match Catalog.latestStable (enablerEntries ()) with
         | Some e -> "v" + string (Catalog.versionOf e.Name)
         | None -> "-"
 
@@ -403,12 +431,22 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
                                     let version, proxyName = match manifest with Some m -> m.Version, m.Proxy | None -> "", ""
                                     let legacy = manifest.IsNone && hasLegacyInstall g sl
                                     let ready = readiness sl
-                                    ui (fun () -> row.SetState(version, proxyName, legacy, ready))
-                                with ex -> AppLog.warn ("Enabler Dock: checking " + row.Title + " failed: " + ex.Message)
+                                    ui (fun () ->
+                                        row.SetState(version, proxyName, legacy, ready)
+                                        this.RaiseTotals()
+                                        this.RaiseSelectionOf(row))
+                                with ex ->
+                                    AppLog.warn ("Enabler Dock: checking " + row.Title + " failed: " + ex.Message)
+                                    // Counted as looked at, so it is not retried forever.
+                                    ui (fun () -> row.SetState("", "", false, NoFrameGen))
                         ui (fun () ->
                             checking <- false
                             this.ApplyFilter()
-                            this.RaiseTotals())),
+                            this.RaiseTotals()
+                            // Rows that joined while this pass ran.
+                            if isActive then
+                                let late = allRows |> Seq.filter (fun r -> not r.IsChecked) |> List.ofSeq
+                                if not late.IsEmpty then this.Check(late))),
                     IsBackground = true,
                     Priority = ThreadPriority.Lowest,
                     Name = "Enabler Dock checking")
@@ -525,6 +563,13 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
     // THE SELECTED GAME
     // =====================================================================
     member _.HasSelected = selected.IsSome
+
+    /// What the buttons and summary say depends on the selected row's state,
+    /// which a background check can settle after the row was picked.
+    member private this.RaiseSelectionOf(row: EnablerRowViewModel) =
+        if selected |> Option.exists (fun s -> obj.ReferenceEquals(s, row)) then
+            for name in [ "CanInstall"; "CanUninstall"; "InstallText"; "SelectedSummary"; "CanRemoveFolder" ] do
+                this.RaisePropertyChanged(name)
     member _.SelectedRow = match selected with Some r -> box r | None -> null
     member _.Blocker = blockerText
     member _.HasBlocker = blockerText <> ""
@@ -537,6 +582,7 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
         row.IsSelected <- true
         this.SetMessage("", false)
         for name in [ "HasSelected"; "SelectedRow" ] do this.RaisePropertyChanged(name)
+        this.RaiseSelectionOf(row)
         this.LoadSelection(row, true)
 
     /// For the test bridge: select the n-th visible row.
@@ -588,8 +634,9 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
                     iniPath <- path
                     this.RaiseIni()
                     this.Watch(exeDir)
-                    for name in [ "Blocker"; "HasBlocker"; "FixNote"; "HasFixNote"; "CanInstall"; "CanUninstall"; "InstallText"; "SelectedSummary" ] do
-                        this.RaisePropertyChanged(name)))
+                    for name in [ "Blocker"; "HasBlocker"; "FixNote"; "HasFixNote" ] do
+                        this.RaisePropertyChanged(name)
+                    this.RaiseSelectionOf(row)))
         |> ignore
         ignore resetChoices
 
@@ -605,9 +652,16 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
     member _.InstallText = if selected |> Option.exists (fun r -> r.IsInstalled) then "REINSTALL" else "INSTALL"
 
     // ---- the three choices ----
+    /// A ComboBox given a new list resets its own selection and writes that
+    /// back; while the lists are re-published those writes are not choices.
     member private this.RaiseOptions() =
-        for name in [ "InjectionOptions"; "InjectionIndex"; "VersionOptions"; "VersionIndex"; "StreamlineOptions"; "StreamlineIndex" ] do
-            this.RaisePropertyChanged(name)
+        let before = loadingSelection
+        loadingSelection <- true
+        try
+            for name in [ "InjectionOptions"; "InjectionIndex"; "VersionOptions"; "VersionIndex"; "StreamlineOptions"; "StreamlineIndex" ] do
+                this.RaisePropertyChanged(name)
+        finally
+            loadingSelection <- before
 
     member _.InjectionOptions =
         ("Auto (from the game)" :: (injectionNames |> List.map id)) |> Array.ofList
@@ -618,7 +672,13 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
                 [ if Catalog.isBeta e.Name then "beta"
                   if not (isDownloaded e) then (if Catalog.isPinned e || e.Url = "" then "download" else "download, unchecked") ]
             if notes.IsEmpty then e.Name else sprintf "%s  (%s)" e.Name (String.Join(", ", notes))
-        let latest = match latestEnabler () with Some e -> sprintf "Latest (%s)" (string (Catalog.versionOf e.Name)) | None -> "Latest"
+        let newest = Catalog.latestStable (enablerEntries ())
+        let latest =
+            match latestEnabler () with
+            | Some e when newest |> Option.exists (fun x -> x.Name <> e.Name) ->
+                sprintf "Latest checked (%s)" (string (Catalog.versionOf e.Name))
+            | Some e -> sprintf "Latest (%s)" (string (Catalog.versionOf e.Name))
+            | None -> "Latest"
         latest :: (enablerEntries () |> List.map label) |> Array.ofList
 
     member _.StreamlineOptions =
@@ -628,7 +688,7 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
     member this.InjectionIndex
         with get () = injectionIndex
         and set (i: int) =
-            if i >= 0 && i <> injectionIndex then
+            if i >= 0 && i <> injectionIndex && not loadingSelection then
                 injectionIndex <- i
                 this.RaisePropertyChanged("InjectionIndex")
                 if not loadingSelection then
@@ -643,7 +703,7 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
     member this.VersionIndex
         with get () = versionIndex
         and set (i: int) =
-            if i >= 0 && i <> versionIndex then
+            if i >= 0 && i <> versionIndex && not loadingSelection then
                 versionIndex <- i
                 this.RaisePropertyChanged("VersionIndex")
                 if not loadingSelection then
@@ -657,7 +717,7 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
     member this.StreamlineIndex
         with get () = streamlineIndex
         and set (i: int) =
-            if i >= 0 && i <> streamlineIndex then
+            if i >= 0 && i <> streamlineIndex && not loadingSelection then
                 streamlineIndex <- i
                 this.RaisePropertyChanged("StreamlineIndex")
                 if not loadingSelection then
@@ -738,7 +798,7 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
                     allRows.Add(row)
                     this.ApplyFilter()
                     this.Select(row)
-                    this.Check([ row ])))
+                    if not checking then this.Check([ row ])))
             |> ignore
 
     /// Drops a folder added here from the list. The game is not touched.
@@ -790,12 +850,16 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
     member private this.Put (section: string) (key: string) (value: string) =
         if iniLines.Length > 0 && iniPath <> "" then
             iniLines <- Ini.set iniLines section key value
-            let lines = iniLines
-            let path = iniPath
+            lock writeGate (fun () -> pendingWrite <- Some(iniPath, iniLines))
             ignoreWatcherUntil <- DateTime.UtcNow.AddMilliseconds(800.0)
             Task.Run(fun () ->
-                try Ini.save path lines
-                with ex -> ui (fun () -> this.SetMessage("Could not save the settings: " + ex.Message, true)))
+                lock writeGate (fun () ->
+                    match pendingWrite with
+                    | Some(path, lines) ->
+                        pendingWrite <- None
+                        try Ini.save path lines
+                        with ex -> ui (fun () -> this.SetMessage("Could not save the settings: " + ex.Message, true))
+                    | None -> ()))
             |> ignore
             this.RaiseIni()
 
@@ -962,12 +1026,16 @@ type EnablerDockViewModel(library: ObservableCollection<GameCardViewModel>) as t
             this.NewFixGame <- ""
             this.NewFixNote <- ""
             this.RaisePropertyChanged("FixRows")
+            // The selected game may be the one the fix is for.
+            selected |> Option.iter (fun r -> this.LoadSelection(r, false))
 
     member this.RemoveFix(index: int) =
         if index >= 0 && index < settings.Fixes.Length then
             settings <- { settings with Fixes = settings.Fixes |> Array.removeAt index }
             saveSettings ()
             this.RaisePropertyChanged("FixRows")
+            // The selected game may be the one the fix is for.
+            selected |> Option.iter (fun r -> this.LoadSelection(r, false))
 
 /// A line in the game fixes list.
 and EnablerFixRow(index: int, game: string, dll: string, note: string, isMine: bool) =
