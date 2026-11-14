@@ -2372,6 +2372,13 @@
                             <views:EnablerDockView DataContext="{Binding EnablerDock}" />
                         </Border>
 
+                        <!-- 9. MOTION FORGE VIEW - the motion edition: MFG SUPER MOTION's frame generation
+                             (NODIX TECH's), its own page in Views/MotionForgeView.axaml. -->
+                        <Border Classes="PageReveal" Classes.Shown="{Binding IsMotionForgeViewVisible}"
+                                IsVisible="{Binding IsMotionForgeViewVisible}" Padding="20,4,20,16" ClipToBounds="False">
+                            <views:MotionForgeView DataContext="{Binding MotionForge}" />
+                        </Border>
+
                         <!-- 4. COMMUNITY VIEW - what other people got working.
                              Everything on this page comes from the Worker in
                              front of Cloudflare D1; nothing is fetched until

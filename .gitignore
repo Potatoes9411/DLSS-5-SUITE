@@ -1,4 +1,4 @@
-﻿bin/
+bin/
 obj/
 publish/
 dist/
@@ -11,6 +11,7 @@ AvaloniaUI/
 
 # C++ engine build output
 Engine/build/
+MotionEngine/build/
 Engine/out/
 artifacts/
 

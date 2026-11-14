@@ -15,6 +15,7 @@
     <Compile Include="GtaDlss5Tests.fs" />
     <Compile Include="UpscalerVaultTests.fs" />
     <Compile Include="DlssEnablerTests.fs" />
+    <Compile Include="MotionForgeTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
