@@ -77,6 +77,8 @@
     <Compile Include="Services\ModInstaller.fs" />
     <Compile Include="Services\GtaDlss5.fs" />
     <Compile Include="Services\DlssUpdater.fs" />
+    <!-- Upscaler Vault edition -->
+    <Compile Include="Services\UpscalerVault.fs" />
     <Compile Include="Services\Diagnosis.fs" />
     <Compile Include="Services\SharedResults.fs" />
     <Compile Include="Services\Autopilot.fs" />
@@ -100,8 +102,12 @@
     <Compile Include="ViewModels\ScreenEngineViewModel.fs" />
     <Compile Include="ViewModels\VideoViewModel.fs" />
     <Compile Include="ViewModels\SpacePressViewModel.fs" />
+    <!-- Upscaler Vault edition -->
+    <Compile Include="ViewModels\UpscalerVaultViewModel.fs" />
     <Compile Include="ViewModels\MainViewModel.fs" />
     <Compile Include="Views\ScreenEngineWindow.axaml.fs" />
+    <!-- Upscaler Vault edition -->
+    <Compile Include="Views\UpscalerVaultView.axaml.fs" />
     <Compile Include="Views\MainWindow.axaml.fs" />
     <Compile Include="ViewLocator.fs" />
     <Compile Include="App.axaml.fs" />

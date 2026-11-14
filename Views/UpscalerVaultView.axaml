@@ -1,0 +1,236 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DLSS_5_MANAGER.ViewModels"
+             x:Class="DLSS_5_MANAGER.Views.UpscalerVaultView"
+             x:DataType="vm:UpscalerVaultViewModel">
+
+    <!-- The Upscaler Vault page. Built from the same pieces as Space Press -
+         glass stat cards, a ControlDock strip for work in progress, list rows
+         like the Settings cards - so it reads as part of SUITE. -->
+    <UserControl.Styles>
+        <Style Selector="Button.VaultRow">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="10,8,12,8" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#26FFFFFF" />
+            <Setter Property="Background" Value="#5C121619" />
+        </Style>
+        <Style Selector="Button.VaultRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#70181E22" />
+            <Setter Property="BorderBrush" Value="#3CFFFFFF" />
+        </Style>
+        <Style Selector="Button.VaultRow.Selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#80202630" />
+            <Setter Property="BorderBrush" Value="#70FFFFFF" />
+        </Style>
+        <Style Selector="Border.VaultStat">
+            <Setter Property="Background" Value="#66101418" />
+            <Setter Property="BorderBrush" Value="#26FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="16,12" />
+        </Style>
+        <Style Selector="TextBlock.VaultCaption">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#94A3B8" />
+            <Setter Property="LetterSpacing" Value="0.6" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12" MaxWidth="1100" Margin="0,12,0,0">
+
+        <!-- Totals -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+            <Border Grid.Column="0" Classes="VaultStat">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="VaultCaption" Text="GAMES WITH UPSCALERS" />
+                    <TextBlock Text="{Binding GamesText}" FontSize="20" FontWeight="Bold" Foreground="#F5F5F7" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Classes="VaultStat">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="VaultCaption" Text="UPSCALER FILES" />
+                    <TextBlock Text="{Binding FilesText}" FontSize="20" FontWeight="Bold" Foreground="#F5F5F7" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Classes="VaultStat">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="VaultCaption" Text="GAMES SWAPPED" />
+                    <TextBlock Text="{Binding ChangedText}" FontSize="20" FontWeight="Bold" Foreground="#7DD3FC" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Classes="VaultStat">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="VaultCaption" Text="NEWER VERSIONS WAITING" />
+                    <TextBlock Text="{Binding UpdatesText}" FontSize="20" FontWeight="Bold" Foreground="#38BDF8" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Where the versions come from -->
+        <Border Grid.Row="1" Classes="VaultStat" Padding="14,10">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="14">
+                <TextBlock Grid.Column="0" Text="Versions" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding CatalogStatus}" FontSize="11.5" Foreground="#94A3B8" TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="Every DLL is checked to be signed by NVIDIA, AMD or Intel before it goes into a game" />
+                    <TextBlock Text="{Binding ScanStatus}" IsVisible="{Binding IsScanning}" FontSize="11" Foreground="#64748B" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <Button Grid.Column="2" Classes="EmptyActionBtn" x:Name="VaultRefreshButton" Click="OnRefreshClicked" IsEnabled="{Binding IsIdle}"
+                        Cursor="Hand" Padding="14,8" ToolTip.Tip="Fetch the version lists again">
+                    <TextBlock Text="REFRESH LIST" FontSize="11" FontWeight="Bold" Foreground="#CBD5E1" />
+                </Button>
+                <Button Grid.Column="3" Classes="EmptyActionBtn" x:Name="VaultRescanButton" Click="OnRescanClicked" IsEnabled="{Binding IsIdle}"
+                        Cursor="Hand" Padding="14,8" ToolTip.Tip="Look through every game again">
+                    <TextBlock Text="LOOK AGAIN" FontSize="11" FontWeight="Bold" Foreground="#CBD5E1" />
+                </Button>
+                <Button Grid.Column="4" Classes="AppleSecondaryBtn" x:Name="VaultAddFolderButton" Click="OnAddFolderClicked"
+                        Cursor="Hand" Padding="16,8" ToolTip.Tip="A game folder SUITE did not find, for this session">
+                    <TextBlock Text="ADD FOLDER" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Work in progress -->
+        <Border Grid.Row="2" Classes="ControlDock" Padding="16,12" IsVisible="{Binding IsBusy}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="{Binding JobTitle}" Classes="VaultCaption" TextTrimming="CharacterEllipsis" />
+                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding JobProgress}" Height="6" />
+                    <TextBlock Text="{Binding JobText}" FontSize="11" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="AppleDangerBtn" Click="OnCancelClicked" Cursor="Hand" Padding="16,8" VerticalAlignment="Center">
+                    <TextBlock Text="CANCEL" FontSize="11" FontWeight="Bold" Foreground="#FF6B6B" />
+                </Button>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3" ColumnDefinitions="*,1.25*" ColumnSpacing="12">
+
+            <!-- The games -->
+            <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="6" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VaultGameRow">
+                            <Button Classes="VaultRow" Classes.Selected="{Binding IsSelected}" Click="OnRowClicked">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                    <Border Width="38" Height="50" CornerRadius="8" ClipToBounds="True" Background="#1AFFFFFF">
+                                        <Image Source="{Binding Cover}" IsVisible="{Binding HasCover}" Stretch="UniformToFill" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding ChipsText}" FontSize="11" Foreground="#7DD3FC" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                        <Border CornerRadius="9" Padding="8,3" Background="#16324A" IsVisible="{Binding IsChanged}" HorizontalAlignment="Right">
+                                            <TextBlock Text="SWAPPED" FontSize="10" FontWeight="Bold" Foreground="#7DD3FC" />
+                                        </Border>
+                                        <TextBlock Text="{Binding CountText}" FontSize="11" Foreground="#94A3B8" HorizontalAlignment="Right" />
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Nothing picked yet -->
+            <Border Grid.Column="1" Classes="VaultStat" Padding="20" IsVisible="{Binding !HasSelected}" VerticalAlignment="Top">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Pick a game" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" />
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#94A3B8"
+                               Text="Each game's DLSS, FSR, XeSS and XeLL files show here with the version in the game. Pick another one - newer or older - and the game's own file is kept beside it, so putting it back is one click. Every DLL is checked to be signed by NVIDIA, AMD or Intel first, and games with an anti-cheat are left alone." />
+                </StackPanel>
+            </Border>
+
+            <!-- The selected game -->
+            <Border Grid.Column="1" Classes="ControlDock" Padding="16,12" IsVisible="{Binding HasSelected}" VerticalAlignment="Top">
+                <StackPanel Spacing="10">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding SelectedTitle}" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" />
+                        <Button Classes="GlassLinkBtn" Click="OnOpenFolderClicked" Cursor="Hand" Padding="0" ToolTip.Tip="Open the game folder">
+                            <TextBlock Text="{Binding SelectedFolder}" FontSize="11" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+                        </Button>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding RefusalText}" IsVisible="{Binding HasRefusal}" FontSize="11.5" Foreground="#FBBF24" TextWrapping="Wrap" />
+
+                    <ScrollViewer MaxHeight="420" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding FileRows}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="8" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:VaultFileRow">
+                                    <Border Classes="VaultStat" Padding="12,10" CornerRadius="12">
+                                        <StackPanel Spacing="8">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                <StackPanel Spacing="1">
+                                                    <TextBlock Text="{Binding Label}" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                    <TextBlock FontSize="10.5" Foreground="#64748B" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Folder}">
+                                                        <Run Text="{Binding FileName}" />
+                                                        <Run Text="  ·  " />
+                                                        <Run Text="{Binding VersionText}" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <Border Grid.Column="1" CornerRadius="9" Padding="9,4" Background="{Binding StateBackground}" VerticalAlignment="Top">
+                                                    <TextBlock Text="{Binding StateText}" Foreground="{Binding StateForeground}" FontSize="10" FontWeight="Bold" />
+                                                </Border>
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding !IsLocked}">
+                                                <ComboBox Classes="GlassComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding Options}"
+                                                          SelectedIndex="{Binding SelectedIndex, Mode=TwoWay}"
+                                                          IsEnabled="{Binding $parent[UserControl].((vm:UpscalerVaultViewModel)DataContext).CanChange}" />
+                                                <Button Grid.Column="1" Classes="ApplePrimaryBtn" Click="OnApplyClicked" Cursor="Hand" Padding="16,8"
+                                                        IsEnabled="{Binding HasChoice}">
+                                                    <TextBlock Text="APPLY" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                                </Button>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <TextBlock Text="{Binding Message}" IsVisible="{Binding HasMessage}" FontSize="11.5" Foreground="#CBD5E1" TextWrapping="Wrap" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="ApplePrimaryBtn" x:Name="VaultUpdateAllButton" Click="OnUpdateAllClicked" Cursor="Hand" Padding="18,8"
+                                ToolTip.Tip="Every file with a newer version on offer, to the newest">
+                            <Button.IsEnabled>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="CanUpdateAll" />
+                                    <Binding Path="CanChange" />
+                                </MultiBinding>
+                            </Button.IsEnabled>
+                            <TextBlock Text="UPDATE ALL" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                        </Button>
+                        <Button Classes="AppleSecondaryBtn" x:Name="VaultRestoreAllButton" Click="OnRestoreAllClicked" Cursor="Hand" Padding="16,8"
+                                ToolTip.Tip="The game's own file back everywhere it was swapped">
+                            <Button.IsEnabled>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="CanRestoreAll" />
+                                    <Binding Path="IsIdle" />
+                                </MultiBinding>
+                            </Button.IsEnabled>
+                            <TextBlock Text="RESTORE ORIGINALS" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
