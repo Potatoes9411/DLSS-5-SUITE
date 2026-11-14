@@ -396,6 +396,10 @@ type MainViewModel() as this =
     /// The Space Press edition (game storage), over the same library.
     let spacePress = SpacePressViewModel(allGames)
 
+    // ---- Enabler Dock edition ----
+    /// The Enabler Dock edition (DLSS Enabler per game), over the same library.
+    let enablerDock = EnablerDockViewModel(allGames)
+
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
@@ -1276,7 +1280,7 @@ type MainViewModel() as this =
           edition "upscalers" "Upscaler Vault" "Every game's DLSS, FSR and XeSS on the version you pick"
               "M 12,3 L 21,8 L 12,13 L 3,8 Z M 3,12 L 12,17 L 21,12 L 21,14 L 12,19 L 3,14 Z" "#38BDF8" false
           edition "enabler" "Enabler Dock" "DLSS and frame generation on cards NVIDIA leaves out"
-              "M 13,2 L 4,14 H 11 L 10,22 L 20,9 H 13 Z" "#34D399" false
+              "M 13,2 L 4,14 H 11 L 10,22 L 20,9 H 13 Z" "#34D399" true
           edition "motion" "Motion Forge" "Multi-frame generation that learns each game's motion"
               "M 3,6 L 11,12 L 3,18 Z M 12,6 L 20,12 L 12,18 Z" "#60A5FA" false
           edition "storage" "Space Press" "Shrink game installs without changing how they play"
@@ -1292,10 +1296,15 @@ type MainViewModel() as this =
     member private _.HomeSection =
         match activeEdition with
         | "storage" -> "storage"
+        | "enabler" -> "enabler" // Enabler Dock edition
         | _ -> "games"
 
     member _.SpacePress = spacePress
     member _.IsSpacePressViewVisible = activeSection = "storage"
+
+    // ---- Enabler Dock edition ----
+    member _.EnablerDock = enablerDock
+    member _.IsEnablerDockViewVisible = activeSection = "enabler"
 
     member private this.RaiseAtmosphere() =
         for name in [ "BgBaseBrush"; "BgOrb1Brush"; "BgOrb2Brush"; "BgVignetteBrush"; "MotifAccentBrush"; "BgNebulaTintBrush"
@@ -1328,6 +1337,8 @@ type MainViewModel() as this =
                     this.RaisePropertyChanged(name)
                 this.ActiveSection <- this.HomeSection
                 if key = "storage" then spacePress.Activate() else spacePress.Deactivate()
+                // Enabler Dock edition: checks games only while its page is open.
+                if key = "enabler" then enablerDock.Activate() else enablerDock.Deactivate()
             this.IsEditionMenuOpen <- false
         | _ -> ()
 
@@ -1590,6 +1601,7 @@ type MainViewModel() as this =
                 this.RaisePropertyChanged("IsVideoViewVisible")
                 this.RaisePropertyChanged("IsVideoTabActive")
                 this.RaisePropertyChanged("IsSpacePressViewVisible")
+                this.RaisePropertyChanged("IsEnablerDockViewVisible") // Enabler Dock edition
                 this.RaisePropertyChanged("SearchPlaceholder")
 
                 // The community grid is server-side, so it is fetched the first

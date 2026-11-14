@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DLSS_5_MANAGER.ViewModels"
+        xmlns:views="using:DLSS_5_MANAGER.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="820"
@@ -2213,6 +2214,13 @@
                                     </StackPanel>
                                 </Border>
                             </Grid>
+                        </Border>
+
+                        <!-- 7. ENABLER DOCK VIEW - the enabler edition: DLSS Enabler per game.
+                             The page lives in Views/EnablerDockView.axaml. -->
+                        <Border Classes="PageReveal" Classes.Shown="{Binding IsEnablerDockViewVisible}"
+                                IsVisible="{Binding IsEnablerDockViewVisible}" Padding="20,4,20,16" ClipToBounds="False">
+                            <views:EnablerDockView DataContext="{Binding EnablerDock}" />
                         </Border>
 
                         <!-- 4. COMMUNITY VIEW - what other people got working.

@@ -1,0 +1,348 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DLSS_5_MANAGER.ViewModels"
+             x:Class="DLSS_5_MANAGER.Views.EnablerDockView"
+             x:DataType="vm:EnablerDockViewModel">
+
+    <!-- ENABLER DOCK: DLSS Enabler per game. Built from the same parts as the
+         Space Press page - the glass cards, the ControlDock, the Apple
+         buttons and the GlassComboBox - so the edition reads as SUITE. -->
+    <UserControl.Styles>
+        <!-- One game in the list, as Space Press's StorageRow. -->
+        <Style Selector="Button.EnablerRow">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="10,8,12,8" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#26FFFFFF" />
+            <Setter Property="Background" Value="#5C121619" />
+        </Style>
+        <Style Selector="Button.EnablerRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#70181E22" />
+            <Setter Property="BorderBrush" Value="#3CFFFFFF" />
+        </Style>
+        <Style Selector="Button.EnablerRow.Selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#80202630" />
+            <Setter Property="BorderBrush" Value="#70FFFFFF" />
+        </Style>
+
+        <!-- Small capitals over each group, as the totals cards. -->
+        <Style Selector="TextBlock.Cap">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="#94A3B8" />
+            <Setter Property="LetterSpacing" Value="0.6" />
+        </Style>
+        <Style Selector="TextBlock.Label">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="#CBD5E1" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.Glass">
+            <Setter Property="Background" Value="#66101418" />
+            <Setter Property="BorderBrush" Value="#26FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12" MaxWidth="1100" Margin="0,12,0,0">
+
+        <!-- Totals -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+            <Border Grid.Column="0" Classes="Glass" Padding="16,12">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="Cap" Text="DLSS ENABLER INSTALLED" />
+                    <TextBlock Text="{Binding InstalledCountText}" FontSize="20" FontWeight="Bold" Foreground="#34D399" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Classes="Glass" Padding="16,12">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="Cap" Text="GAMES THAT CAN RUN IT" />
+                    <TextBlock Text="{Binding ReadyCountText}" FontSize="20" FontWeight="Bold" Foreground="#F5F5F7" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Classes="Glass" Padding="16,12">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="Cap" Text="NEWEST DLSS ENABLER" />
+                    <TextBlock Text="{Binding LatestText}" FontSize="20" FontWeight="Bold" Foreground="#F5F5F7" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Classes="Glass" Padding="16,12">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <StackPanel Spacing="3">
+                        <TextBlock Classes="Cap" Text="VERSION LIST" />
+                        <TextBlock Text="{Binding CatalogText}" FontSize="20" FontWeight="Bold" Foreground="#E2E8F0" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Name="EnablerUpdateList" Classes="EmptyActionBtn" Click="OnUpdateListClicked" Cursor="Hand"
+                            Padding="12,6" VerticalAlignment="Center" ToolTip.Tip="Ask the version list for anything new">
+                        <TextBlock Text="UPDATE" FontSize="10.5" FontWeight="Bold" Foreground="#CBD5E1" />
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- How the page behaves -->
+        <Border Grid.Row="1" Classes="Glass" Padding="14,10">
+            <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="14">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                                ToolTip.Tip="Also list games without NVIDIA Streamline - DLSS Enabler's frame generation needs it">
+                        <ToggleSwitch IsChecked="{Binding ShowAll, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                        <TextBlock Classes="Label" Text="Show every game" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                                ToolTip.Tip="Leave dlss-enabler.ini in the game on uninstall, for next time">
+                        <ToggleSwitch IsChecked="{Binding KeepSettings, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                        <TextBlock Classes="Label" Text="Keep settings on uninstall" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                                ToolTip.Tip="Download versions SUITE has no checksum for. Each is checked to really be DLSS Enabler, and must never change afterwards.">
+                        <ToggleSwitch IsChecked="{Binding AllowUnchecked, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                        <TextBlock Classes="Label" Text="Allow unchecked versions" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8">
+                        <Button Name="EnablerAddFolder" Classes="AppleSecondaryBtn" Click="OnAddFolderClicked" Cursor="Hand" Padding="14,8"
+                                ToolTip.Tip="Add a game folder that is not in the library">
+                            <TextBlock Text="ADD GAME" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                        </Button>
+                        <Button Name="EnablerAddArchive" Classes="AppleSecondaryBtn" Click="OnAddArchiveClicked" Cursor="Hand" Padding="14,8"
+                                ToolTip.Tip="Use a DLSS Enabler or Streamline .rar / .zip you already have">
+                            <TextBlock Text="ADD ARCHIVE" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                        </Button>
+                        <Button Name="EnablerFixes" Classes="ApplePrimaryBtn" Click="OnFixesClicked" Cursor="Hand" Padding="14,8"
+                                ToolTip.Tip="Which name DLSS Enabler loads under, for games that need a particular one">
+                            <TextBlock Text="{Binding FixesButtonText}" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="{Binding CatalogNote}" IsVisible="{Binding HasCatalogNote}" FontSize="11" Foreground="#FBBF24" />
+            </StackPanel>
+        </Border>
+
+        <!-- What is being installed right now -->
+        <Border Grid.Row="2" Classes="ControlDock" Padding="16,12" IsVisible="{Binding HasJob}">
+            <StackPanel Spacing="6">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <TextBlock Classes="Cap" Text="{Binding JobTitle}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Text="{Binding JobProgress, StringFormat='{}{0:0}%'}" FontSize="12" FontWeight="Bold" Foreground="#E2E8F0" />
+                </Grid>
+                <ProgressBar Minimum="0" Maximum="100" Value="{Binding JobProgress}" Height="6" />
+                <TextBlock Text="{Binding JobText}" FontSize="11" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="3" ColumnDefinitions="*,440" ColumnSpacing="12">
+
+            <!-- The library -->
+            <Panel>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EnablerRowViewModel">
+                                <Button Classes="EnablerRow" Classes.Selected="{Binding IsSelected}" Click="OnRowClicked" Margin="0,0,0,6">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                                        <Border Width="38" Height="50" CornerRadius="8" ClipToBounds="True" Background="#1AFFFFFF">
+                                            <Image Source="{Binding Cover}" IsVisible="{Binding HasCover}" Stretch="UniformToFill" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Launcher}" FontSize="11" Foreground="#94A3B8" />
+                                            <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="#A3AEC0" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Width="140" CornerRadius="9" Padding="9,4" Background="{Binding StatusBackground}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusForeground}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" />
+                                        </Border>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock Text="{Binding EmptyText}" IsVisible="{Binding IsEmpty}" TextWrapping="Wrap" FontSize="12.5" Foreground="#94A3B8"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="360" TextAlignment="Center" />
+            </Panel>
+
+            <!-- The selected game, or the game fixes -->
+            <Border Grid.Column="1" Classes="ControlDock" Padding="16,14">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <Panel>
+
+                        <!-- Nothing chosen yet -->
+                        <StackPanel Spacing="8" VerticalAlignment="Center" Margin="0,60,0,0">
+                            <StackPanel.IsVisible>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsDetailOpen" />
+                                    <Binding Path="!HasSelected" />
+                                </MultiBinding>
+                            </StackPanel.IsVisible>
+                            <TextBlock Text="Pick a game" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" />
+                            <TextBlock Text="DLSS Enabler brings DLSS frame generation to cards NVIDIA leaves out. It goes in as one DLL beside the game, under a name the game already loads."
+                                       TextWrapping="Wrap" FontSize="11.5" Foreground="#94A3B8" TextAlignment="Center" />
+                            <TextBlock Text="{Binding Message}" IsVisible="{Binding HasMessage}" Foreground="{Binding MessageBrush}" FontSize="11.5" TextWrapping="Wrap" TextAlignment="Center" />
+                        </StackPanel>
+
+                        <!-- One game -->
+                        <StackPanel Spacing="12">
+                            <StackPanel.IsVisible>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                    <Binding Path="IsDetailOpen" />
+                                    <Binding Path="HasSelected" />
+                                </MultiBinding>
+                            </StackPanel.IsVisible>
+
+                            <StackPanel Spacing="2" DataContext="{Binding SelectedRow}" x:DataType="vm:EnablerRowViewModel">
+                                <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" />
+                                <Button Classes="GlassLinkBtn" Click="OnOpenFolderClicked" Cursor="Hand" Padding="0" ToolTip.Tip="Open the game folder">
+                                    <TextBlock Text="{Binding Folder}" FontSize="11" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+                                </Button>
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding SelectedSummary}" FontSize="12" Foreground="#E2E8F0" TextWrapping="Wrap" />
+
+                            <Border IsVisible="{Binding HasBlocker}" Background="#1FFF4C4C" BorderBrush="#40FF4C4C" BorderThickness="1" CornerRadius="10" Padding="10,8">
+                                <TextBlock Text="{Binding Blocker}" FontSize="11.5" Foreground="#FCA5A5" TextWrapping="Wrap" />
+                            </Border>
+                            <Border IsVisible="{Binding HasFixNote}" Background="#14FBBF24" BorderBrush="#33FBBF24" BorderThickness="1" CornerRadius="10" Padding="10,8">
+                                <TextBlock Text="{Binding FixNote}" FontSize="11.5" Foreground="#FCD34D" TextWrapping="Wrap" />
+                            </Border>
+
+                            <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
+                                <TextBlock Classes="Label" Text="Injection" />
+                                <ComboBox Grid.Column="1" Classes="GlassComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding InjectionOptions}"
+                                          SelectedIndex="{Binding InjectionIndex, Mode=TwoWay}" IsEnabled="{Binding IsIdle}"
+                                          ToolTip.Tip="The name DLSS Enabler loads under. Names the game already uses for its own DLLs are not offered." />
+                                <TextBlock Grid.Row="1" Classes="Label" Text="Version" />
+                                <ComboBox Grid.Row="1" Grid.Column="1" Classes="GlassComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding VersionOptions}"
+                                          SelectedIndex="{Binding VersionIndex, Mode=TwoWay}" IsEnabled="{Binding IsIdle}" />
+                                <TextBlock Grid.Row="2" Classes="Label" Text="Streamline" />
+                                <ComboBox Grid.Row="2" Grid.Column="1" Classes="GlassComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding StreamlineOptions}"
+                                          SelectedIndex="{Binding StreamlineIndex, Mode=TwoWay}" IsEnabled="{Binding IsIdle}"
+                                          ToolTip.Tip="NVIDIA Streamline beside the game. Auto puts in the newest and never replaces a newer one." />
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Name="EnablerInstall" Classes="ApplePrimaryBtn" Click="OnInstallClicked" IsEnabled="{Binding CanInstall}" Cursor="Hand" Padding="18,8">
+                                    <TextBlock Text="{Binding InstallText}" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                </Button>
+                                <Button Name="EnablerUninstall" Classes="AppleDangerBtn" Click="OnUninstallClicked" IsEnabled="{Binding CanUninstall}" Cursor="Hand" Padding="16,8">
+                                    <TextBlock Text="UNINSTALL" FontSize="11" FontWeight="Bold" Foreground="#FF6B6B" />
+                                </Button>
+                                <Button Name="EnablerRemoveFolder" Classes="EmptyActionBtn" Click="OnRemoveFolderClicked" IsVisible="{Binding CanRemoveFolder}" Cursor="Hand" Padding="14,8"
+                                        ToolTip.Tip="Take this added folder off the list. The game itself is not touched.">
+                                    <TextBlock Text="REMOVE FROM LIST" FontSize="11" FontWeight="Bold" Foreground="#CBD5E1" />
+                                </Button>
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding Message}" IsVisible="{Binding HasMessage}" Foreground="{Binding MessageBrush}" FontSize="11.5" TextWrapping="Wrap" />
+
+                            <!-- dlss-enabler.ini, live -->
+                            <Border Classes="Glass" Padding="12,10" IsVisible="{Binding HasSettings}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="Cap" Text="{Binding SettingsVersion}" />
+                                    <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
+                                        <TextBlock Classes="Label" Text="Menu key" />
+                                        <ComboBox Grid.Column="1" Classes="GlassComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding ToggleKeyOptions}"
+                                                  SelectedIndex="{Binding ToggleKeyIndex, Mode=TwoWay}" ToolTip.Tip="Opens DLSS Enabler's menu in the game" />
+                                        <TextBlock Grid.Row="1" Classes="Label" Text="HUD detection" />
+                                        <ComboBox Grid.Row="1" Grid.Column="1" Classes="GlassComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding HudOptions}"
+                                                  SelectedIndex="{Binding HudIndex, Mode=TwoWay}" />
+                                        <TextBlock Grid.Row="2" Classes="Label" Text="Overdrive" />
+                                        <ComboBox Grid.Row="2" Grid.Column="1" Classes="GlassComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding OverdriveOptions}"
+                                                  SelectedIndex="{Binding OverdriveIndex, Mode=TwoWay}" />
+                                    </Grid>
+                                    <WrapPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="2" Margin="0,0,14,0" ToolTip.Tip="Frame rate and frame generation readout in the game">
+                                            <ToggleSwitch IsChecked="{Binding Monitoring, Mode=TwoWay}" OnContent="" OffContent="" />
+                                            <TextBlock Classes="Label" Text="Monitoring" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="2" Margin="0,0,14,0" ToolTip.Tip="Reduces ghosting behind moving objects">
+                                            <ToggleSwitch IsChecked="{Binding GhostBuster, Mode=TwoWay}" OnContent="" OffContent="" />
+                                            <TextBlock Classes="Label" Text="GhostBuster" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="2" Margin="0,0,14,0" ToolTip.Tip="Load DLSS frame generation even when the game does not ask for it">
+                                            <ToggleSwitch IsChecked="{Binding ForceFrameGen, Mode=TwoWay}" OnContent="" OffContent="" />
+                                            <TextBlock Classes="Label" Text="Force frame gen" />
+                                        </StackPanel>
+                                    </WrapPanel>
+                                    <TextBlock Classes="Cap" Text="IF THE GAME WILL NOT START" Margin="0,4,0,0" />
+                                    <WrapPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="2" Margin="0,0,14,0" ToolTip.Tip="Start DLSS Enabler earlier, for games that load the renderer before it is ready">
+                                            <ToggleSwitch IsChecked="{Binding EarlyInit, Mode=TwoWay}" OnContent="" OffContent="" />
+                                            <TextBlock Classes="Label" Text="Early start" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="2" Margin="0,0,14,0" ToolTip.Tip="Turn off DLSS Enabler's own in-game menu">
+                                            <ToggleSwitch IsChecked="{Binding DisableUi, Mode=TwoWay}" OnContent="" OffContent="" />
+                                            <TextBlock Classes="Label" Text="No in-game menu" />
+                                        </StackPanel>
+                                    </WrapPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Name="EnablerResetSettings" Classes="AppleSecondaryBtn" Click="OnResetSettingsClicked" Cursor="Hand" Padding="14,7"
+                                                ToolTip.Tip="This version's defaults; your current file is kept in SUITE's backups">
+                                            <TextBlock Text="DEFAULTS" FontSize="10.5" FontWeight="Bold" Foreground="#E2E8F0" />
+                                        </Button>
+                                        <Button Name="EnablerCopySettings" Classes="AppleSecondaryBtn" Click="OnCopySettingsClicked" Cursor="Hand" Padding="14,7"
+                                                ToolTip.Tip="These options onto every other game with DLSS Enabler from SUITE">
+                                            <TextBlock Text="COPY TO ALL GAMES" FontSize="10.5" FontWeight="Bold" Foreground="#E2E8F0" />
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Game fixes -->
+                        <StackPanel Spacing="10" IsVisible="{Binding IsFixesOpen}">
+                            <TextBlock Text="Game fixes" FontSize="16" FontWeight="Bold" Foreground="#FFFFFF" />
+                            <TextBlock Text="Some games only load DLSS Enabler under one name. Yours come first; the rest come with the version list."
+                                       TextWrapping="Wrap" FontSize="11.5" Foreground="#94A3B8" />
+                            <Border Classes="Glass" Padding="12,10">
+                                <StackPanel Spacing="8">
+                                    <TextBox Classes="AppleInput" Watermark="Game name" Text="{Binding NewFixGame, Mode=TwoWay}" />
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <ComboBox Classes="GlassComboBox" HorizontalAlignment="Stretch" ItemsSource="{Binding FixDllOptions}"
+                                                  SelectedIndex="{Binding NewFixDllIndex, Mode=TwoWay}" />
+                                        <Button Grid.Column="1" Name="EnablerAddFix" Classes="ApplePrimaryBtn" Click="OnAddFixClicked" Cursor="Hand" Padding="16,8">
+                                            <TextBlock Text="ADD" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                        </Button>
+                                    </Grid>
+                                    <TextBox Classes="AppleInput" Watermark="Note shown when installing (optional)" Text="{Binding NewFixNote, Mode=TwoWay}" />
+                                </StackPanel>
+                            </Border>
+                            <ItemsControl ItemsSource="{Binding FixRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:EnablerFixRow">
+                                        <Border Classes="Glass" Padding="12,8" Margin="0,0,0,6">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <StackPanel Spacing="2">
+                                                    <TextBlock FontSize="12.5" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis">
+                                                        <Run Text="{Binding Game}" />
+                                                        <Run Text="  →  " Foreground="#64748B" />
+                                                        <Run Text="{Binding Dll}" Foreground="#7DD3FC" />
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding Note}" IsVisible="{Binding HasNote}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="EmptyActionBtn" Click="OnRemoveFixClicked" IsVisible="{Binding IsMine}"
+                                                        Cursor="Hand" Padding="10,5" VerticalAlignment="Center">
+                                                    <TextBlock Text="REMOVE" FontSize="10" FontWeight="Bold" Foreground="#CBD5E1" />
+                                                </Button>
+                                                <TextBlock Grid.Column="1" Text="{Binding Source}" IsVisible="{Binding !IsMine}" FontSize="10" Foreground="#64748B" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Panel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
