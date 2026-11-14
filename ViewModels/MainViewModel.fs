@@ -393,6 +393,9 @@ type MainViewModel() as this =
     /// DLSS 5 on a video, picture by picture, saved as a new file.
     let video = VideoViewModel()
 
+    /// The Space Press edition (game storage), over the same library.
+    let spacePress = SpacePressViewModel(allGames)
+
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
@@ -601,6 +604,7 @@ type MainViewModel() as this =
     let mutable bgOrb2Brush: IBrush = null
     let mutable bgVignetteBrush: IBrush = null
     let mutable motifAccentBrush: IBrush = SolidColorBrush(Color.Parse("#35D22B"))
+    let mutable shownAtmosphere = "Neon Emerald"
 
     /// What the space backdrop is filled with when the atmosphere is not
     /// Neon Emerald. Deeper than the motif accent, because the accent is
@@ -615,6 +619,8 @@ type MainViewModel() as this =
     let mutable isPerformanceMode = false
     let mutable isEditionMenuOpen = false
     let mutable activeEdition = "suite"
+    /// The atmosphere the user chose, held while an edition shows its own.
+    let mutable userAtmosphere = ""
 
     /// The in-game overlay, and the look it wears. Deployed with every install
     /// on the routes that can host it - see `ModInstaller.overlaySupported`.
@@ -773,6 +779,9 @@ type MainViewModel() as this =
             bgNebulaTintBrush <- SolidColorBrush(Color.Parse("#35D22B"))
             motifAccentBrush <- SolidColorBrush(Color.Parse("#35D22B"))
 
+        // What is on screen - an edition can show an atmosphere that is not
+        // the one the user saved, so the images follow this, not the setting.
+        shownAtmosphere <- selectedColorAtmosphere
         publishAccent ()
 
     /// A settings card answers for itself whether the query is about it.
@@ -1080,8 +1089,8 @@ type MainViewModel() as this =
     /// shows the same plate as a mask filled with its own colour, so the
     /// backdrop follows the interface instead of leaving a green wash
     /// under a crimson or ice-blue one.
-    member this.IsEmeraldAtmosphere = (selectedColorAtmosphere = "Neon Emerald")
-    member this.IsTintedAtmosphere = (selectedColorAtmosphere <> "Neon Emerald")
+    member this.IsEmeraldAtmosphere = (shownAtmosphere = "Neon Emerald")
+    member this.IsTintedAtmosphere = (shownAtmosphere <> "Neon Emerald")
 
     /// Decodes a backdrop image once, then hands out the same one forever.
     ///
@@ -1109,7 +1118,7 @@ type MainViewModel() as this =
     /// The atmosphere's asset suffix. One place decides it, so the nebula and
     /// the mark can never disagree about which theme is on screen.
     member private this.AtmosphereSlug =
-        match selectedColorAtmosphere with
+        match shownAtmosphere with
         | "Obsidian Onyx" -> "_onyx"
         | "Supernova Flare" -> "_supernova"
         | "Cyber Nebula" -> "_cyber"
@@ -1260,24 +1269,65 @@ type MainViewModel() as this =
               Available = available
               IsCurrent = (key = activeEdition) }
 
+        // Each accent is the one its edition's atmosphere uses, so the menu
+        // row and the re-skinned window agree.
         [ edition "suite" "DLSS 5 SUITE" "DLSS 5 in your games, on the whole screen and on video"
               "M 3,4 H 21 V 16 H 3 Z M 5,6 V 14 H 19 V 6 Z M 9,18 H 15 V 20 H 9 Z" "#35D22B" true
           edition "upscalers" "Upscaler Vault" "Every game's DLSS, FSR and XeSS on the version you pick"
               "M 12,3 L 21,8 L 12,13 L 3,8 Z M 3,12 L 12,17 L 21,12 L 21,14 L 12,19 L 3,14 Z" "#38BDF8" false
           edition "enabler" "Enabler Dock" "DLSS and frame generation on cards NVIDIA leaves out"
-              "M 13,2 L 4,14 H 11 L 10,22 L 20,9 H 13 Z" "#F59E0B" false
+              "M 13,2 L 4,14 H 11 L 10,22 L 20,9 H 13 Z" "#34D399" false
           edition "motion" "Motion Forge" "Multi-frame generation that learns each game's motion"
-              "M 3,6 L 11,12 L 3,18 Z M 12,6 L 20,12 L 12,18 Z" "#A78BFA" false
+              "M 3,6 L 11,12 L 3,18 Z M 12,6 L 20,12 L 12,18 Z" "#60A5FA" false
           edition "storage" "Space Press" "Shrink game installs without changing how they play"
-              "M 4,4 H 20 V 8 H 4 Z M 5,10 H 19 V 20 H 5 Z M 9,12 H 15 V 14 H 9 Z" "#F472B6" false ]
+              "M 4,4 H 20 V 8 H 4 Z M 5,10 H 19 V 20 H 5 Z M 9,12 H 15 V 14 H 9 Z" "#E2E8F0" true ]
+
+    member _.ActiveEdition = activeEdition
+    member _.IsSuiteEdition = activeEdition = "suite"
+
+    member this.EditionTitle =
+        this.Editions |> List.tryFind (fun e -> e.IsCurrent) |> Option.map (fun e -> e.Name.ToUpperInvariant()) |> Option.defaultValue ""
+
+    /// The page an edition opens on, and the one Settings returns to.
+    member private _.HomeSection =
+        match activeEdition with
+        | "storage" -> "storage"
+        | _ -> "games"
+
+    member _.SpacePress = spacePress
+    member _.IsSpacePressViewVisible = activeSection = "storage"
+
+    member private this.RaiseAtmosphere() =
+        for name in [ "BgBaseBrush"; "BgOrb1Brush"; "BgOrb2Brush"; "BgVignetteBrush"; "MotifAccentBrush"; "BgNebulaTintBrush"
+                      "IsEmeraldAtmosphere"; "IsTintedAtmosphere"; "NvidiaMarkSource"; "NebulaSource" ] do
+            this.RaisePropertyChanged(name)
 
     /// Switches to an edition, or just closes the menu for the current one.
+    /// An edition shows its own atmosphere while it is active; the user's own
+    /// choice is put back, unchanged and never overwritten, on the way out.
     member this.SelectEdition(key: string) =
         match this.Editions |> List.tryFind (fun e -> e.Key = key) with
         | Some e when e.Available ->
             if key <> activeEdition then
+                if activeEdition = "suite" then userAtmosphere <- selectedColorAtmosphere
                 activeEdition <- key
-                this.RaisePropertyChanged("Editions")
+                let look =
+                    match key with
+                    | "storage" -> Some "Midnight Titanium"
+                    | "upscalers" -> Some "Frost Glacier"
+                    | "enabler" -> Some "Emerald Horizon"
+                    | "motion" -> Some "Deep Astral"
+                    | _ -> None
+                match look with
+                | Some atmosphere ->
+                    applyAtmosphere atmosphere
+                    selectedColorAtmosphere <- userAtmosphere
+                | None -> applyAtmosphere userAtmosphere
+                this.RaiseAtmosphere()
+                for name in [ "Editions"; "ActiveEdition"; "IsSuiteEdition"; "EditionTitle" ] do
+                    this.RaisePropertyChanged(name)
+                this.ActiveSection <- this.HomeSection
+                if key = "storage" then spacePress.Activate() else spacePress.Deactivate()
             this.IsEditionMenuOpen <- false
         | _ -> ()
 
@@ -1539,6 +1589,7 @@ type MainViewModel() as this =
                 this.RaisePropertyChanged("IsCommunityTabActive")
                 this.RaisePropertyChanged("IsVideoViewVisible")
                 this.RaisePropertyChanged("IsVideoTabActive")
+                this.RaisePropertyChanged("IsSpacePressViewVisible")
                 this.RaisePropertyChanged("SearchPlaceholder")
 
                 // The community grid is server-side, so it is fetched the first
@@ -1550,7 +1601,7 @@ type MainViewModel() as this =
 
     member this.IsSettingsOpen
         with get () = isSettingsOpen
-        and set value = this.ActiveSection <- (if value then "settings" else "games")
+        and set value = this.ActiveSection <- (if value then "settings" else this.HomeSection)
 
     /// One box, four jobs - it says which one it is doing right now.
     member this.SearchPlaceholder =
@@ -1710,7 +1761,7 @@ type MainViewModel() as this =
         | None -> ()
 
     member this.ToggleSettings() =
-        this.ActiveSection <- (if activeSection = "settings" then "games" else "settings")
+        this.ActiveSection <- (if activeSection = "settings" then this.HomeSection else "settings")
 
     // ---------------------------------------------------------------------
     // LIBRARY
@@ -1979,6 +2030,18 @@ type MainViewModel() as this =
     // ---------------------------------------------------------------------
     // SCANNING & LIBRARY MUTATION
     // ---------------------------------------------------------------------
+    /// Runs a long background job below normal priority, so reading every
+    /// game's files never takes time from drawing the window. The thread is a
+    /// pool thread, so its priority is put back afterwards.
+    static member private Gently(work: unit -> 'T) : 'T =
+        let thread = Threading.Thread.CurrentThread
+        let before = thread.Priority
+        try
+            thread.Priority <- Threading.ThreadPriority.BelowNormal
+            work ()
+        finally
+            thread.Priority <- before
+
     member this.StartScanAsync() =
         this.CloseSettings()
         if not isScanning then
@@ -2009,9 +2072,10 @@ type MainViewModel() as this =
                     // and pressing Install are instant from now on.
                     let analysisFinished =
                         (not scanStopRequested)
-                        && AnalysisStore.refreshManyUntil (fun () -> scanStopRequested) combined (fun index total title ->
-                            Dispatcher.UIThread.Post(fun () ->
-                                this.ScanStatusText <- sprintf "Analyzing %d/%d - %s" index total title))
+                        && MainViewModel.Gently(fun () ->
+                            AnalysisStore.refreshManyUntil (fun () -> scanStopRequested) combined (fun index total title ->
+                                Dispatcher.UIThread.Post(fun () ->
+                                    this.ScanStatusText <- sprintf "Analyzing %d/%d - %s" index total title)))
 
                     Dispatcher.UIThread.Post(fun () ->
                         allGames.Clear()
@@ -2061,9 +2125,10 @@ type MainViewModel() as this =
             this.ScanStatusText <- "Analyzing games..."
 
             System.Threading.Tasks.Task.Run(fun () ->
-                AnalysisStore.refreshManyUntil (fun () -> scanStopRequested) pending (fun index total title ->
-                    Dispatcher.UIThread.Post(fun () ->
-                        this.ScanStatusText <- sprintf "Analyzing %d/%d - %s" index total title))
+                MainViewModel.Gently(fun () ->
+                    AnalysisStore.refreshManyUntil (fun () -> scanStopRequested) pending (fun index total title ->
+                        Dispatcher.UIThread.Post(fun () ->
+                            this.ScanStatusText <- sprintf "Analyzing %d/%d - %s" index total title)))
                 |> ignore
 
                 Dispatcher.UIThread.Post(fun () ->

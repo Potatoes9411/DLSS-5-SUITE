@@ -57,6 +57,7 @@
     <Compile Include="Services\ExtrasStore.fs" />
     <Compile Include="Services\GameAnalyzer.fs" />
     <Compile Include="Services\AntiCheat.fs" />
+    <Compile Include="Services\StorageCompressor.fs" />
     <Compile Include="Services\IconExtractor.fs" />
     <Compile Include="Services\GameScanner.fs" />
     <Compile Include="Services\GameLauncher.fs" />
@@ -97,6 +98,7 @@
     <Compile Include="ViewModels\CommunityViewModel.fs" />
     <Compile Include="ViewModels\ScreenEngineViewModel.fs" />
     <Compile Include="ViewModels\VideoViewModel.fs" />
+    <Compile Include="ViewModels\SpacePressViewModel.fs" />
     <Compile Include="ViewModels\MainViewModel.fs" />
     <Compile Include="Views\ScreenEngineWindow.axaml.fs" />
     <Compile Include="Views\MainWindow.axaml.fs" />

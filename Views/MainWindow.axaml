@@ -129,6 +129,27 @@
             <Setter Property="BorderBrush" Value="#14FFFFFF" />
         </Style>
 
+        <!-- SPACE PRESS: one game in the list, built like the Settings cards. -->
+        <Style Selector="Button.StorageRow">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="10,8,12,8" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#26FFFFFF" />
+            <Setter Property="Background" Value="#5C121619" />
+        </Style>
+        <Style Selector="Button.StorageRow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#70181E22" />
+            <Setter Property="BorderBrush" Value="#3CFFFFFF" />
+        </Style>
+        <Style Selector="Button.StorageRow.Selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#80202630" />
+            <Setter Property="BorderBrush" Value="#70FFFFFF" />
+        </Style>
+
         <!-- The ACTIVE / SOON tag. -->
         <Style Selector="Border.EditionTag">
             <Setter Property="Background" Value="#10FFFFFF" />
@@ -280,11 +301,13 @@
 
                         <!-- Middle: Clean Text Navigation (Games only) -->
                         <StackPanel Grid.Row="1" Spacing="4">
-                            <Button Classes="SegmentedTab" Classes.Active="{Binding IsGamesTabActive}" Click="OnTabGamesClicked"
+                            <Button Classes="SegmentedTab Active" Content="{Binding EditionTitle}" IsVisible="{Binding !IsSuiteEdition}" IsHitTestVisible="False"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
+                            <Button Classes="SegmentedTab" Classes.Active="{Binding IsGamesTabActive}" Click="OnTabGamesClicked" IsVisible="{Binding IsSuiteEdition}"
                                     Content="{Binding Loc.Games}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
-                            <Button Classes="SegmentedTab" Classes.Active="{Binding IsEmulatorsTabActive}" Click="OnTabEmulatorsClicked"
+                            <Button Classes="SegmentedTab" Classes.Active="{Binding IsEmulatorsTabActive}" Click="OnTabEmulatorsClicked" IsVisible="{Binding IsSuiteEdition}"
                                     Content="{Binding Loc.TabEmulators}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
-                            <Button Classes="SegmentedTab" Classes.Active="{Binding IsVideoTabActive}" Click="OnTabVideoClicked"
+                            <Button Classes="SegmentedTab" Classes.Active="{Binding IsVideoTabActive}" Click="OnTabVideoClicked" IsVisible="{Binding IsSuiteEdition}"
                                     Content="VIDEO" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Padding="12,9" />
                             <!-- COMMUNITY: hidden in this build.
                                  The feature talks to NODIX TECH's own Cloudflare Worker and the
@@ -335,13 +358,14 @@
                                 </Border.BorderBrush>
 
                                 <StackPanel Orientation="Horizontal" Spacing="2">
-                                    <Button Classes="SegmentedTab" Classes.Active="{Binding IsGamesTabActive}" Click="OnTabGamesClicked" Content="{Binding Loc.Games}" />
-                                    <Button Classes="SegmentedTab" Classes.Active="{Binding IsEmulatorsTabActive}" Click="OnTabEmulatorsClicked" Content="{Binding Loc.TabEmulators}" />
-                                    <Button Classes="SegmentedTab" Classes.Active="{Binding IsVideoTabActive}" Click="OnTabVideoClicked" Content="VIDEO" />
+                                    <Button Classes="SegmentedTab Active" Content="{Binding EditionTitle}" IsVisible="{Binding !IsSuiteEdition}" IsHitTestVisible="False" />
+                                    <Button Classes="SegmentedTab" Classes.Active="{Binding IsGamesTabActive}" Click="OnTabGamesClicked" Content="{Binding Loc.Games}" IsVisible="{Binding IsSuiteEdition}" />
+                                    <Button Classes="SegmentedTab" Classes.Active="{Binding IsEmulatorsTabActive}" Click="OnTabEmulatorsClicked" Content="{Binding Loc.TabEmulators}" IsVisible="{Binding IsSuiteEdition}" />
+                                    <Button Classes="SegmentedTab" Classes.Active="{Binding IsVideoTabActive}" Click="OnTabVideoClicked" Content="VIDEO" IsVisible="{Binding IsSuiteEdition}" />
                                     <Button Classes="SegmentedTab" Classes.Active="{Binding IsCommunityTabActive}" Click="OnTabCommunityClicked" Content="{Binding Loc.TabCommunity}" IsVisible="False" />
 
                                     <!-- Add Game / Folder Button (+) -->
-                                    <Button Classes="SegmentedTab" x:Name="BtnAddGame" ToolTip.Tip="{Binding Loc.AddGame}" Padding="12,7">
+                                    <Button Classes="SegmentedTab" x:Name="BtnAddGame" ToolTip.Tip="{Binding Loc.AddGame}" Padding="12,7" IsVisible="{Binding IsSuiteEdition}">
                                         <Button.Flyout>
                                             <MenuFlyout Placement="BottomEdgeAlignedLeft"
                                                         HorizontalOffset="-10" VerticalOffset="10">
@@ -357,13 +381,13 @@
                                     </Button>
 
                                     <!-- Search Button -->
-                                    <Button Classes="SegmentedTab" x:Name="BtnSearch" Click="OnSearchClicked" ToolTip.Tip="{Binding Loc.SearchGames}" Padding="12,7">
+                                    <Button Classes="SegmentedTab" x:Name="BtnSearch" Click="OnSearchClicked" ToolTip.Tip="{Binding Loc.SearchGames}" Padding="12,7" IsVisible="{Binding IsSuiteEdition}">
                                         <PathIcon Data="M 15.5,14 H 14.71 L 14.43,13.73 A 6.47,6.47 0 0 0 16,9.5 A 6.5,6.5 0 1 0 9.5,16 C 11.11,16 12.59,15.41 13.73,14.43 L 14,14.71 V 15.5 L 19,20.49 L 20.49,19 L 15.5,14 Z M 9.5,14 C 7.01,14 5,11.99 5,9.5 C 5,7.01 7.01,5 9.5,5 C 12,5 14,7.01 14,9.5 C 14,11.99 12,14 9.5,14 Z"
                                                   Width="13" Height="13" Foreground="#94A3B8" VerticalAlignment="Center" />
                                     </Button>
 
                                     <!-- Expanding Search Input Box -->
-                                    <TextBox x:Name="SearchInputBox"
+                                    <TextBox x:Name="SearchInputBox" IsVisible="{Binding IsSuiteEdition}"
                                              Classes="GlassSearchBox"
                                              Text="{Binding SearchText, Mode=TwoWay}"
                                              IsHitTestVisible="{Binding IsSearchOpen}"
@@ -445,7 +469,7 @@
                                 </Border.BorderBrush>
 
                                 <StackPanel Orientation="Horizontal" Spacing="2">
-                                    <Button Classes="SegmentedTab" ToolTip.Tip="{Binding Loc.AddGame}" Padding="12,7">
+                                    <Button Classes="SegmentedTab" ToolTip.Tip="{Binding Loc.AddGame}" Padding="12,7" IsVisible="{Binding IsSuiteEdition}">
                                         <Button.Flyout>
                                             <MenuFlyout Placement="BottomEdgeAlignedLeft"
                                                         HorizontalOffset="-10" VerticalOffset="10">
@@ -460,12 +484,12 @@
                                                   Width="13" Height="13" Foreground="#94A3B8" VerticalAlignment="Center" />
                                     </Button>
 
-                                    <Button Classes="SegmentedTab" Click="OnSearchClicked" ToolTip.Tip="{Binding Loc.SearchGames}" Padding="12,7">
+                                    <Button Classes="SegmentedTab" Click="OnSearchClicked" ToolTip.Tip="{Binding Loc.SearchGames}" Padding="12,7" IsVisible="{Binding IsSuiteEdition}">
                                         <PathIcon Data="M 15.5,14 H 14.71 L 14.43,13.73 A 6.47,6.47 0 0 0 16,9.5 A 6.5,6.5 0 1 0 9.5,16 C 11.11,16 12.59,15.41 13.73,14.43 L 14,14.71 V 15.5 L 19,20.49 L 20.49,19 L 15.5,14 Z M 9.5,14 C 7.01,14 5,11.99 5,9.5 C 5,7.01 7.01,5 9.5,5 C 12,5 14,7.01 14,9.5 C 14,11.99 12,14 9.5,14 Z"
                                                   Width="13" Height="13" Foreground="#94A3B8" VerticalAlignment="Center" />
                                     </Button>
 
-                                    <TextBox x:Name="SearchInputBoxSidebar"
+                                    <TextBox x:Name="SearchInputBoxSidebar" IsVisible="{Binding IsSuiteEdition}"
                                              Classes="GlassSearchBox"
                                              Text="{Binding SearchText, Mode=TwoWay}"
                                              IsHitTestVisible="{Binding IsSearchOpen}"
@@ -2009,6 +2033,153 @@
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>
+                        </Border>
+
+                        <!-- 6. SPACE PRESS VIEW - the storage edition: every game sized up,
+                             squished or unsquished by Windows' own file compression. -->
+                        <Border Classes="PageReveal" Classes.Shown="{Binding IsSpacePressViewVisible}"
+                                IsVisible="{Binding IsSpacePressViewVisible}" Padding="20,4,20,16" ClipToBounds="False">
+                            <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12" MaxWidth="1100" Margin="0,12,0,0"
+                                  DataContext="{Binding SpacePress}" x:DataType="vm:SpacePressViewModel">
+
+                                <!-- Totals -->
+                                <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+                                    <Border Grid.Column="0" Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,12">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="SPACE SAVED" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                            <TextBlock Text="{Binding ReclaimedText}" FontSize="20" FontWeight="Bold" Foreground="#34D399" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,12">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="LIBRARY ON DISK" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                            <TextBlock Text="{Binding FootprintText}" FontSize="20" FontWeight="Bold" Foreground="#F5F5F7" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,12">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="GAMES SQUISHED" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                            <TextBlock Text="{Binding SquishedCountText}" FontSize="20" FontWeight="Bold" Foreground="#F5F5F7" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="3" Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="16,12">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="COULD STILL SAVE" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                            <TextBlock Text="{Binding PotentialText, StringFormat='about {0}'}" FontSize="20" FontWeight="Bold" Foreground="#E2E8F0" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- How to squish -->
+                                <Border Grid.Row="1" Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="14,10">
+                                    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="14">
+                                        <TextBlock Grid.Column="0" Text="Method" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                        <ComboBox Grid.Column="1" Classes="GlassComboBox" Width="270" ItemsSource="{Binding AlgorithmOptions}"
+                                                  SelectedIndex="{Binding AlgorithmIndex, Mode=TwoWay}" IsEnabled="{Binding !IsBusy}" />
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                                                    ToolTip.Tip="Videos, images and archives are packed already - squishing them gains nothing">
+                                            <ToggleSwitch IsChecked="{Binding SkipMedia, Mode=TwoWay}" IsEnabled="{Binding !IsBusy}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            <TextBlock Text="Skip media" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                                                    ToolTip.Tip="Game packs (.pak, .rpf and the like) are mostly compressed already">
+                                            <ToggleSwitch IsChecked="{Binding SkipPackages, Mode=TwoWay}" IsEnabled="{Binding !IsBusy}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            <TextBlock Text="Skip game packs" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="4" Text="{Binding MeasureStatus}" IsVisible="{Binding IsMeasuring}" FontSize="11.5"
+                                                   Foreground="#94A3B8" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                        <Button Grid.Column="5" Classes="ApplePrimaryBtn" Click="OnSpacePressSquishAllClicked" Cursor="Hand" Padding="16,8"
+                                                ToolTip.Tip="Squish every game that is not squished yet, smallest first, one after another">
+                                            <TextBlock Text="{Binding BatchText}" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                        </Button>
+                                    </Grid>
+                                </Border>
+
+                                <!-- The library -->
+                                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding Rows}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Spacing="6" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:StorageRowViewModel">
+                                                <Button Classes="StorageRow" Classes.Selected="{Binding IsSelected}" Click="OnSpacePressRowClicked">
+                                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="14">
+                                                        <Border Width="38" Height="50" CornerRadius="8" ClipToBounds="True" Background="#1AFFFFFF">
+                                                            <Image Source="{Binding Cover}" IsVisible="{Binding HasCover}" Stretch="UniformToFill" />
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Launcher}" FontSize="11" Foreground="#94A3B8" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                            <TextBlock Text="{Binding SavedText}" IsVisible="{Binding HasSaved}" FontSize="11.5" FontWeight="SemiBold" Foreground="#34D399" HorizontalAlignment="Right" />
+                                                            <TextBlock Text="{Binding EstimateText}" FontSize="11" Foreground="#94A3B8" HorizontalAlignment="Right" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="3" Text="{Binding SizeText}" Width="80" TextAlignment="Right" FontSize="14" FontWeight="Bold"
+                                                                   Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                        <Border Grid.Column="4" Width="150" CornerRadius="9" Padding="9,4" Background="{Binding StatusBackground}" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusForeground}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" />
+                                                        </Border>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+
+                                <!-- The selected game, and what to do with it -->
+                                <Border Grid.Row="3" Classes="ControlDock" Padding="16,12" IsVisible="{Binding HasSelected}">
+                                    <StackPanel Spacing="10" DataContext="{Binding SelectedRow}" x:DataType="vm:StorageRowViewModel">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="Bold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" />
+                                                <Button Classes="GlassLinkBtn" Click="OnSpacePressOpenFolderClicked" Cursor="Hand" Padding="0" ToolTip.Tip="Open the game folder">
+                                                    <TextBlock Text="{Binding Folder}" FontSize="11" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+                                                </Button>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                                                <StackPanel Spacing="1">
+                                                    <TextBlock Text="NOW" FontSize="9.5" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                                    <TextBlock Text="{Binding SizeText}" FontSize="14" FontWeight="Bold" Foreground="#F5F5F7" />
+                                                </StackPanel>
+                                                <StackPanel Spacing="1">
+                                                    <TextBlock Text="FULL SIZE" FontSize="9.5" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                                    <TextBlock Text="{Binding OriginalText}" FontSize="14" FontWeight="Bold" Foreground="#CBD5E1" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <StackPanel Spacing="4" IsVisible="{Binding IsWorking}">
+                                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="6" />
+                                            <TextBlock Text="{Binding ProgressText}" FontSize="11" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+
+                                        <TextBlock Text="{Binding Message}" IsVisible="{Binding HasMessage}" FontSize="11.5" Foreground="#FBBF24" TextWrapping="Wrap" />
+
+                                        <StackPanel Orientation="Horizontal" Spacing="8" DataContext="{Binding $parent[Grid].DataContext}" x:DataType="vm:SpacePressViewModel">
+                                            <Button Classes="ApplePrimaryBtn" Click="OnSpacePressSquishClicked" IsEnabled="{Binding CanSquish}" Cursor="Hand" Padding="18,8">
+                                                <TextBlock Text="SQUISH IT" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                            </Button>
+                                            <Button Classes="AppleSecondaryBtn" Click="OnSpacePressUnsquishClicked" IsEnabled="{Binding CanUnsquish}" Cursor="Hand" Padding="16,8">
+                                                <TextBlock Text="UNSQUISH" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                            </Button>
+                                            <Button Classes="AppleSecondaryBtn" Click="OnSpacePressPauseClicked" IsVisible="{Binding CanControl}" Cursor="Hand" Padding="16,8">
+                                                <TextBlock Text="{Binding PauseText}" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                            </Button>
+                                            <Button Classes="AppleDangerBtn" Click="OnSpacePressStopClicked" IsVisible="{Binding CanControl}" Cursor="Hand" Padding="16,8">
+                                                <TextBlock Text="STOP" FontSize="11" FontWeight="Bold" Foreground="#FF6B6B" />
+                                            </Button>
+                                            <Button Classes="EmptyActionBtn" Click="OnSpacePressRefreshClicked" IsVisible="{Binding !CanControl}" Cursor="Hand" Padding="14,8"
+                                                    ToolTip.Tip="Measure this game again">
+                                                <TextBlock Text="RE-MEASURE" FontSize="11" FontWeight="Bold" Foreground="#CBD5E1" />
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                         </Border>
 
                         <!-- 4. COMMUNITY VIEW - what other people got working.

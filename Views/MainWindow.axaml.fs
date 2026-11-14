@@ -36,13 +36,13 @@ type MainWindow() as this =
     // them back up, last panel first and quicker.
     let foldedAngle = -95.0
     let bounce = 14.0
-    let openStep = 0.11
-    let openDuration = 0.24
+    let openStep = 0.08
+    let openDuration = 0.2
     let landsAt = 0.55
-    let closeStep = 0.04
-    let closeDuration = 0.13
+    let closeStep = 0.03
+    let closeDuration = 0.11
     // The hamburger crosses into an X over this long, with a little overshoot.
-    let burgerDuration = 0.3
+    let burgerDuration = 0.24
 
     let editionClock = Stopwatch()
     let mutable editionOpening = false
@@ -832,6 +832,28 @@ type MainWindow() as this =
             this.CloseEditionMenu()
             e.Handled <- true
         | _ -> ()
+
+    // ---- Space Press ----
+    member private this.WithSpacePress(f: SpacePressViewModel -> unit) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> f vm.SpacePress
+        | _ -> ()
+
+    member this.OnSpacePressRowClicked(sender: obj, e: RoutedEventArgs) =
+        match sender with
+        | :? Control as c ->
+            match c.DataContext with
+            | :? StorageRowViewModel as row -> this.WithSpacePress(fun sp -> sp.Select(row))
+            | _ -> ()
+        | _ -> ()
+
+    member this.OnSpacePressSquishClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.SquishSelected())
+    member this.OnSpacePressUnsquishClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.UnsquishSelected())
+    member this.OnSpacePressPauseClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.PauseOrResume())
+    member this.OnSpacePressStopClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.StopJob())
+    member this.OnSpacePressRefreshClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.Refresh())
+    member this.OnSpacePressSquishAllClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.SquishAllOrStop())
+    member this.OnSpacePressOpenFolderClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.OpenSelectedFolder())
 
     member this.OnEditionRowClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext, sender with
