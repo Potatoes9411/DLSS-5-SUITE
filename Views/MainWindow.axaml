@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DLSS_5_MANAGER.ViewModels"
+        xmlns:mf="using:DLSS_5_MANAGER.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="820"
@@ -2213,6 +2214,13 @@
                                     </StackPanel>
                                 </Border>
                             </Grid>
+                        </Border>
+
+                        <!-- 7. MOTION FORGE VIEW - the motion edition: MFG SUPER MOTION's frame generation
+                             (NODIX TECH's), its own page in Views/MotionForgeView.axaml. -->
+                        <Border Classes="PageReveal" Classes.Shown="{Binding IsMotionForgeViewVisible}"
+                                IsVisible="{Binding IsMotionForgeViewVisible}" Padding="20,4,20,16" ClipToBounds="False">
+                            <mf:MotionForgeView DataContext="{Binding MotionForge}" />
                         </Border>
 
                         <!-- 4. COMMUNITY VIEW - what other people got working.

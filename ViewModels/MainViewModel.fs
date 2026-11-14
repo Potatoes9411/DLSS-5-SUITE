@@ -396,6 +396,9 @@ type MainViewModel() as this =
     /// The Space Press edition (game storage), over the same library.
     let spacePress = SpacePressViewModel(allGames)
 
+    // MOTION FORGE (edition "motion"): MFG SUPER MOTION's frame generation, its own engine and page.
+    let motionForge = MotionForgeViewModel()
+
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
@@ -1278,7 +1281,7 @@ type MainViewModel() as this =
           edition "enabler" "Enabler Dock" "DLSS and frame generation on cards NVIDIA leaves out"
               "M 13,2 L 4,14 H 11 L 10,22 L 20,9 H 13 Z" "#34D399" false
           edition "motion" "Motion Forge" "Multi-frame generation that learns each game's motion"
-              "M 3,6 L 11,12 L 3,18 Z M 12,6 L 20,12 L 12,18 Z" "#60A5FA" false
+              "M 3,6 L 11,12 L 3,18 Z M 12,6 L 20,12 L 12,18 Z" "#60A5FA" true
           edition "storage" "Space Press" "Shrink game installs without changing how they play"
               "M 4,4 H 20 V 8 H 4 Z M 5,10 H 19 V 20 H 5 Z M 9,12 H 15 V 14 H 9 Z" "#E2E8F0" true ]
 
@@ -1292,10 +1295,15 @@ type MainViewModel() as this =
     member private _.HomeSection =
         match activeEdition with
         | "storage" -> "storage"
+        | "motion" -> "motion" // MOTION FORGE
         | _ -> "games"
 
     member _.SpacePress = spacePress
     member _.IsSpacePressViewVisible = activeSection = "storage"
+
+    // MOTION FORGE
+    member _.MotionForge = motionForge
+    member _.IsMotionForgeViewVisible = activeSection = "motion"
 
     member private this.RaiseAtmosphere() =
         for name in [ "BgBaseBrush"; "BgOrb1Brush"; "BgOrb2Brush"; "BgVignetteBrush"; "MotifAccentBrush"; "BgNebulaTintBrush"
@@ -1328,6 +1336,7 @@ type MainViewModel() as this =
                     this.RaisePropertyChanged(name)
                 this.ActiveSection <- this.HomeSection
                 if key = "storage" then spacePress.Activate() else spacePress.Deactivate()
+                if key = "motion" then motionForge.Activate() else motionForge.Deactivate() // MOTION FORGE
             this.IsEditionMenuOpen <- false
         | _ -> ()
 
@@ -1590,6 +1599,7 @@ type MainViewModel() as this =
                 this.RaisePropertyChanged("IsVideoViewVisible")
                 this.RaisePropertyChanged("IsVideoTabActive")
                 this.RaisePropertyChanged("IsSpacePressViewVisible")
+                this.RaisePropertyChanged("IsMotionForgeViewVisible") // MOTION FORGE
                 this.RaisePropertyChanged("SearchPlaceholder")
 
                 // The community grid is server-side, so it is fetched the first

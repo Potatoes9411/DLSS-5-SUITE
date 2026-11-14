@@ -79,6 +79,11 @@ type ScreenEngineViewModel() as this =
         // after SUITE closes, including the Environment.Exit before an update,
         // where its locked executable would break the install.
         AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> host.Stop(); nsHost.Stop(); robloxHost.Stop())
+        // MOTION FORGE: one overlay at a time - Motion Forge starting stops this page's engines (Services/OverlayArbiter.fs).
+        OverlayArbiter.register "screen" (fun () ->
+            let running = this.IsRunning
+            if running then Dispatcher.UIThread.Post(fun () -> this.Stop())
+            running)
         monitors <- listMonitors ()
         windows <- listVisibleWindows ()
 
@@ -958,6 +963,7 @@ type ScreenEngineViewModel() as this =
 
     member this.Start() =
         hasPendingChanges <- false
+        OverlayArbiter.claim "screen" |> ignore // MOTION FORGE: stops Motion Forge's overlay first
         if useRobloxShadeHost then
             host.Stop()
             nsHost.Stop()

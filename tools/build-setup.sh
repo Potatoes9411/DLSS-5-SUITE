@@ -60,6 +60,17 @@ else
     echo "warning: mod files/neuralscreen is missing - the NeuralScreen method will be unavailable" >&2
 fi
 
+# MOTION FORGE: its engine is built from MotionEngine/ (VS 2022 Build Tools and the
+# DLSS SDK, as the screen engine) before the publish, which carries it into
+# publish/engine/motion/ through the .fsproj. A failed build stops here, as the
+# screen engine's does; SKIP_MOTION_ENGINE=1 builds the setup without it.
+if [ "$SKIP_MOTION_ENGINE" = "1" ]; then
+    echo "--- Motion Forge engine skipped (SKIP_MOTION_ENGINE=1) ---"
+else
+    echo "--- building Motion Forge engine ---"
+    cmd //c "$(printf '%s' "$APP/MotionEngine/build.cmd" | sed 's#/#\\#g')"
+fi
+
 echo "--- publishing application ---"
 rm -rf "$APP/publish"
 dotnet publish "$APP/DLSS 5 SUITE.fsproj" -c Release -r win-x64 --self-contained true $VERSION_PROPS -o "$APP/publish"
@@ -78,6 +89,10 @@ else
     cp "$APP/Engine/build/FullScreenWrapperForDLSS5.exe" "$APP/publish/engine/"
     cp "$APP/Engine/build/nvngx_dlss.dll" "$APP/publish/engine/"
     cp "$APP/Engine/LICENSE" "$APP/publish/engine/LICENSE.txt"
+    # MOTION FORGE: NODIX TECH's licence and copyright beside his engine.
+    if [ -f "$APP/publish/engine/motion/MotionForgeEngine.exe" ]; then
+        cp "$APP/MotionEngine/LICENSE.txt" "$APP/MotionEngine/Copyright.txt" "$APP/publish/engine/motion/"
+    fi
 
     # NVIDIA Streamline 2.14.16, for the overlay's NVIDIA DLSS Frame Generation. The
     # engine loads it from beside itself and checks NVIDIA's signature first. It
