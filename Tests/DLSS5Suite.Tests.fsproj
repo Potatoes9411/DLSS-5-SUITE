@@ -13,6 +13,7 @@
     <Compile Include="ScreenEngineTests.fs" />
     <Compile Include="VideoDlssTests.fs" />
     <Compile Include="GtaDlss5Tests.fs" />
+    <Compile Include="DlssEnablerTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
