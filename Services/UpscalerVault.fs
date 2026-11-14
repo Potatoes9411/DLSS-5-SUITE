@@ -314,9 +314,12 @@ module UpscalerVault =
         |> List.filter (fun o ->
             o.FamilyKey = familyKey
             && (if o.FileName <> "" then o.FileName.Equals(fileName, StringComparison.OrdinalIgnoreCase) else urlFits fileName o.Url))
+        // Each version's key is worked out once: comparing by regex inside
+        // the sort ran it thousands of times and stalled the page.
         |> List.groupBy (fun o -> versionKey o.Version)
-        |> List.map (fun (_, same) -> same |> List.minBy (fun o -> sourceRank o.Source))
-        |> List.sortWith (fun a b -> compareVersions b.Version a.Version)
+        |> List.map (fun (key, same) -> key, (same |> List.minBy (fun o -> sourceRank o.Source)))
+        |> List.sortByDescending fst
+        |> List.map snd
 
     // ----------------------------------------------------------- file state
 
