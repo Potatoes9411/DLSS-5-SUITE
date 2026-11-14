@@ -102,8 +102,12 @@
     <Compile Include="ViewModels\ScreenEngineViewModel.fs" />
     <Compile Include="ViewModels\VideoViewModel.fs" />
     <Compile Include="ViewModels\SpacePressViewModel.fs" />
+    <!-- Upscaler Vault edition -->
+    <Compile Include="ViewModels\UpscalerVaultViewModel.fs" />
     <Compile Include="ViewModels\MainViewModel.fs" />
     <Compile Include="Views\ScreenEngineWindow.axaml.fs" />
+    <!-- Upscaler Vault edition -->
+    <Compile Include="Views\UpscalerVaultView.axaml.fs" />
     <Compile Include="Views\MainWindow.axaml.fs" />
     <Compile Include="ViewLocator.fs" />
     <Compile Include="App.axaml.fs" />

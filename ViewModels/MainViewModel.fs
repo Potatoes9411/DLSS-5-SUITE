@@ -396,6 +396,10 @@ type MainViewModel() as this =
     /// The Space Press edition (game storage), over the same library.
     let spacePress = SpacePressViewModel(allGames)
 
+    // ---- Upscaler Vault edition ----
+    /// The Upscaler Vault edition (every game's upscaler DLLs), same library.
+    let upscalerVault = UpscalerVaultViewModel(allGames)
+
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
@@ -1274,7 +1278,7 @@ type MainViewModel() as this =
         [ edition "suite" "DLSS 5 SUITE" "DLSS 5 in your games, on the whole screen and on video"
               "M 3,4 H 21 V 16 H 3 Z M 5,6 V 14 H 19 V 6 Z M 9,18 H 15 V 20 H 9 Z" "#35D22B" true
           edition "upscalers" "Upscaler Vault" "Every game's DLSS, FSR and XeSS on the version you pick"
-              "M 12,3 L 21,8 L 12,13 L 3,8 Z M 3,12 L 12,17 L 21,12 L 21,14 L 12,19 L 3,14 Z" "#38BDF8" false
+              "M 12,3 L 21,8 L 12,13 L 3,8 Z M 3,12 L 12,17 L 21,12 L 21,14 L 12,19 L 3,14 Z" "#38BDF8" true
           edition "enabler" "Enabler Dock" "DLSS and frame generation on cards NVIDIA leaves out"
               "M 13,2 L 4,14 H 11 L 10,22 L 20,9 H 13 Z" "#34D399" false
           edition "motion" "Motion Forge" "Multi-frame generation that learns each game's motion"
@@ -1292,10 +1296,15 @@ type MainViewModel() as this =
     member private _.HomeSection =
         match activeEdition with
         | "storage" -> "storage"
+        | "upscalers" -> "upscalers" // Upscaler Vault edition
         | _ -> "games"
 
     member _.SpacePress = spacePress
     member _.IsSpacePressViewVisible = activeSection = "storage"
+
+    // ---- Upscaler Vault edition ----
+    member _.UpscalerVault = upscalerVault
+    member _.IsUpscalerVaultViewVisible = activeSection = "upscalers"
 
     member private this.RaiseAtmosphere() =
         for name in [ "BgBaseBrush"; "BgOrb1Brush"; "BgOrb2Brush"; "BgVignetteBrush"; "MotifAccentBrush"; "BgNebulaTintBrush"
@@ -1328,6 +1337,8 @@ type MainViewModel() as this =
                     this.RaisePropertyChanged(name)
                 this.ActiveSection <- this.HomeSection
                 if key = "storage" then spacePress.Activate() else spacePress.Deactivate()
+                // Upscaler Vault edition
+                if key = "upscalers" then upscalerVault.Activate() else upscalerVault.Deactivate()
             this.IsEditionMenuOpen <- false
         | _ -> ()
 
@@ -1590,6 +1601,7 @@ type MainViewModel() as this =
                 this.RaisePropertyChanged("IsVideoViewVisible")
                 this.RaisePropertyChanged("IsVideoTabActive")
                 this.RaisePropertyChanged("IsSpacePressViewVisible")
+                this.RaisePropertyChanged("IsUpscalerVaultViewVisible") // Upscaler Vault edition
                 this.RaisePropertyChanged("SearchPlaceholder")
 
                 // The community grid is server-side, so it is fetched the first
