@@ -125,6 +125,10 @@ type MainWindow() as this =
     // never line up and the brightening lands on different parts of the sky.
     let twinkleTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds(50.0))
     let twinkleClock = Stopwatch.StartNew()
+    /// When the last tick ran. Shooting stars move by the time that really
+    /// passed - a fixed step per tick made them crawl in slow motion whenever
+    /// the app was busy and a tick came late.
+    let mutable lastTwinkle = 0.0
     // ---- Viewport fade ---------------------------------------------------
     // Cards fade, shrink and settle as they cross the edges of the scroller
     // instead of appearing at full strength the instant they are realised.
@@ -313,6 +317,10 @@ type MainWindow() as this =
 
             if motionOn then
                 let t = twinkleClock.Elapsed.TotalSeconds
+                // Capped, so coming back from a long stall does not jump a
+                // star straight to the end of its run.
+                let step = Math.Clamp(t - lastTwinkle, 0.0, 0.25)
+                lastTwinkle <- t
 
                 for i in 0 .. starPlates.Length - 1 do
                     if i < twinklePlan.Length then
@@ -353,7 +361,7 @@ type MainWindow() as this =
                                 (0.0, dur, sx, sy,
                                  cos angle * travel, sin angle * travel, nextAt)
                     else
-                        let e = elapsed + 0.05
+                        let e = elapsed + step
                         let p = e / duration
 
                         if p >= 1.0 then

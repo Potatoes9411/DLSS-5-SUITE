@@ -108,6 +108,15 @@ module StorageCompressor =
         [<DllImport("ntdll.dll")>]
         extern int NtResumeProcess(nativeint processHandle)
 
+        [<DllImport("ntdll.dll")>]
+        extern int NtSetInformationProcess(nativeint processHandle, int infoClass, int& info, int length)
+
+        [<DllImport("kernel32.dll")>]
+        extern nativeint GetCurrentThread()
+
+        [<DllImport("kernel32.dll")>]
+        extern bool SetThreadPriority(nativeint thread, int priority)
+
     let private InvalidHandle = nativeint -1
     let private AttributeCompressed = 0x800u
     let private InvalidAttributes = 0xFFFFFFFFu
@@ -211,7 +220,9 @@ module StorageCompressor =
              "\\windowsapps\\"; "\\nvidia corporation\\"; "\\drivers\\"; "\\driverstore\\" ]
            |> List.exists p.Contains
 
-    /// The reason a folder cannot be squished right now, or None.
+    /// The reason a folder cannot be squished, or None. Whether the game is
+    /// running is asked by name by the caller - looking inside every process
+    /// on the PC to find out was slow enough to freeze the window.
     let refusal (folder: string) : string option =
         if String.IsNullOrWhiteSpace(folder) || not (Directory.Exists(folder)) then
             Some "The game folder was not found."
@@ -221,16 +232,16 @@ module StorageCompressor =
             let format = try DriveInfo(Path.GetPathRoot(folder)).DriveFormat with _ -> ""
             if not (format.Equals("NTFS", StringComparison.OrdinalIgnoreCase)) then
                 Some(sprintf "This drive is %s. Windows can only squish files on NTFS drives." (if format = "" then "not NTFS" else format))
-            else
-                let prefix = Path.GetFullPath(folder).TrimEnd('\\') + "\\"
-                let running =
-                    Process.GetProcesses()
-                    |> Array.exists (fun p ->
-                        try
-                            let file = p.MainModule.FileName
-                            not (isNull file) && file.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-                        with _ -> false)
-                if running then Some "The game is running - close it first." else None
+            else None
+
+    /// Is a program with this name running? Names only - cheap.
+    let isRunning (processName: string) =
+        if String.IsNullOrWhiteSpace(processName) then false
+        else
+            let found = Process.GetProcessesByName(processName)
+            let any = found.Length > 0
+            for p in found do p.Dispose()
+            any
 
     let private skipped (skipMedia: bool) (skipPackages: bool) (file: string) =
         let ext = Path.GetExtension(file)
@@ -239,25 +250,6 @@ module StorageCompressor =
         || (skipMedia && mediaFiles.Contains(ext))
         || (skipPackages && packageFiles.Contains(ext))
         || antiCheatFolders |> List.exists lower.Contains
-
-    /// Shannon entropy of a file's first 64 KB, in bits per byte. Above ~7.85
-    /// the data is already packed and squishing it would only waste time.
-    let private entropy (path: string) =
-        try
-            use stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
-            let buffer = Array.zeroCreate<byte> 65536
-            let read = stream.Read(buffer, 0, buffer.Length)
-            if read = 0 then 0.0
-            else
-                let counts = Array.zeroCreate<int> 256
-                for i in 0 .. read - 1 do counts.[int buffer.[i]] <- counts.[int buffer.[i]] + 1
-                counts
-                |> Array.sumBy (fun c ->
-                    if c = 0 then 0.0
-                    else
-                        let p = float c / float read
-                        -p * Math.Log2(p))
-        with _ -> 0.0
 
     let private allFiles (folder: string) =
         try
@@ -361,6 +353,9 @@ module StorageCompressor =
             else None
         with _ -> None
 
+    /// True when Space Press squished this folder (and has not undone it).
+    let hasRecord (folder: string) = try File.Exists(recordPath folder) with _ -> false
+
     let private dropRecord (folder: string) =
         try File.Delete(recordPath folder) with _ -> ()
 
@@ -400,16 +395,53 @@ module StorageCompressor =
                 with _ -> ()
             processes.Clear()
 
-    /// Leave a core free so the rest of the PC stays responsive.
-    let private workers () = max 1 (Environment.ProcessorCount - 1)
+    /// A few at once at most. Squishing is mostly disk work; more processes
+    /// than this only fight over the drive and make everything else wait.
+    let private workers () = Math.Clamp(Environment.ProcessorCount / 4, 1, 4)
 
     let private compactExe () =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "compact.exe")
 
+    /// Puts a compact.exe at the back of every queue: idle CPU priority and
+    /// very low disk priority, so a game or the app always goes first.
+    let private makeGentle (p: Process) =
+        try p.PriorityClass <- ProcessPriorityClass.Idle with _ -> ()
+        try
+            // ProcessIoPriority = 33; 0 is "very low".
+            let mutable veryLow = 0
+            Native.NtSetInformationProcess(p.Handle, 33, &veryLow, 4) |> ignore
+        with _ -> ()
+
+    /// Runs work on the calling thread in Windows' background mode: lowest
+    /// CPU, disk and memory priority. For the long walks over game folders.
+    let inBackground (work: unit -> 'T) : 'T =
+        let thread = Native.GetCurrentThread()
+        let began = Native.SetThreadPriority(thread, 0x00010000)
+        try work ()
+        finally
+            if began then Native.SetThreadPriority(thread, 0x00020000) |> ignore
+
     /// Squishes every eligible file in a folder. Returns false when stopped.
+    ///
+    /// Nothing here opens a file - compact.exe reads each one once and that is
+    /// all. An antivirus scans every file a program opens, so a check that
+    /// opened them first doubled the work and made the whole PC drag.
     let squish (folder: string) (algorithm: Algorithm) (skipMedia: bool) (skipPackages: bool) (job: Job) (report: Progress -> unit) : bool =
-        let files = allFiles folder |> Array.filter (fun f -> not (skipped skipMedia skipPackages f))
-        let sizes = files |> Array.map (fun f -> try FileInfo(f).Length with _ -> 0L)
+        // Listing: sizes come with the directory listing itself - asking for
+        // each file's size separately was a call per file, and an engine
+        // install has hundreds of thousands. Counted out loud as it goes.
+        let listed = ResizeArray<string * int64>()
+        let mutable lastListed = Environment.TickCount64
+        try
+            for info in DirectoryInfo(folder).EnumerateFiles("*", EnumerationOptions(RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint)) do
+                if not job.IsCancelled && not (skipped skipMedia skipPackages info.FullName) then
+                    listed.Add((info.FullName, info.Length))
+                    if Environment.TickCount64 - lastListed > 250L then
+                        lastListed <- Environment.TickCount64
+                        report { CurrentFile = sprintf "Listing files... %s found" (listed.Count.ToString("N0")); DoneFiles = 0; TotalFiles = 0; DoneBytes = 0L; TotalBytes = 0L }
+        with _ -> ()
+        let files = listed |> Seq.map fst |> Array.ofSeq
+        let sizes = listed |> Seq.map snd |> Array.ofSeq
         let totalBytes = Array.sum sizes
         let total = files.Length
         let mutable doneBytes = 0L
@@ -418,28 +450,34 @@ module StorageCompressor =
         let squished = ConcurrentBag<string>()
         let lockObj = obj ()
 
+        let send (file: string) =
+            report { CurrentFile = file; DoneFiles = doneFiles; TotalFiles = total; DoneBytes = doneBytes; TotalBytes = totalBytes }
+
         let advance (file: string) (bytes: int64) (count: int) =
             lock lockObj (fun () ->
                 doneBytes <- doneBytes + bytes
                 doneFiles <- doneFiles + count
                 let now = Environment.TickCount64
-                if now - lastReport >= 50L || doneFiles >= total then
+                if now - lastReport >= 100L || doneFiles >= total then
                     lastReport <- now
-                    report { CurrentFile = file; DoneFiles = doneFiles; TotalFiles = total; DoneBytes = doneBytes; TotalBytes = totalBytes })
+                    send file)
 
-        // What still needs doing: already squished files are done, and big
-        // files that are already packed are not worth the time.
+        // Already squished files are done; that shows in their size on disk.
         let pending = ResizeArray<string * int64>()
+        let mutable lastChecked = Environment.TickCount64
         for i in 0 .. files.Length - 1 do
-            let file, size = files.[i], sizes.[i]
-            // Already squished shows in the size on disk - no need to open it.
-            if size > 8192L && onDisk file size < size then
-                squished.Add(file)
-                advance file size 1
-            elif size > 5242880L && entropy file > 7.85 then
-                advance file size 1
-            else
-                pending.Add((file, size))
+            if not job.IsCancelled then
+                let file, size = files.[i], sizes.[i]
+                if size > 8192L && onDisk file size < size then
+                    squished.Add(file)
+                    advance file size 1
+                else
+                    pending.Add((file, size))
+                if Environment.TickCount64 - lastChecked > 250L then
+                    lastChecked <- Environment.TickCount64
+                    lock lockObj (fun () ->
+                        report { CurrentFile = sprintf "Checking files... %s of %s" ((i + 1).ToString("N0")) (total.ToString("N0"))
+                                 DoneFiles = doneFiles; TotalFiles = total; DoneBytes = doneBytes; TotalBytes = totalBytes })
 
         // compact.exe takes many files at once; keep each command line short
         // and give big files a call of their own so progress keeps moving.
@@ -464,6 +502,9 @@ module StorageCompressor =
             else
                 job.Gate.Wait()
                 if not job.IsCancelled then
+                    // Say what is being worked on before it starts, so a single
+                    // multi-gigabyte file does not look like nothing is happening.
+                    lock lockObj (fun () -> send (fst (List.head batch)))
                     let psi = ProcessStartInfo(compactExe ())
                     for a in [ "/c"; "/i"; "/q"; "/a"; "/exe:" + arg ] do psi.ArgumentList.Add(a)
                     for (file, _) in batch do psi.ArgumentList.Add(file)
@@ -472,7 +513,7 @@ module StorageCompressor =
                     psi.RedirectStandardOutput <- true
                     try
                         use p = Process.Start(psi)
-                        try p.PriorityClass <- ProcessPriorityClass.BelowNormal with _ -> ()
+                        makeGentle p
                         job.Processes.[p.Id] <- p
                         p.StandardOutput.ReadToEnd() |> ignore
                         p.WaitForExit()
@@ -484,9 +525,11 @@ module StorageCompressor =
                         advance (fst (List.last batch)) (batch |> List.sumBy snd) batch.Length))
         |> ignore
 
-        // Record what was asked of Windows, so unsquish knows where to look,
-        // even after a stop - those files may well be squished already.
-        if not squished.IsEmpty then saveRecord folder algorithm (squished.ToArray())
+        // Record a finished squish, so unsquish knows where to look and the
+        // hourly check knows to keep it squished. A stopped one records
+        // nothing: the user chose to stop, and unsquish finds squished files
+        // without a record anyway.
+        if not squished.IsEmpty && not job.IsCancelled then saveRecord folder algorithm (squished.ToArray())
         not job.IsCancelled
 
     /// Stores every squished file in a folder plainly again. Returns false

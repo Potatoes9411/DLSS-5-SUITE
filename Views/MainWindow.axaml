@@ -2039,7 +2039,7 @@
                              squished or unsquished by Windows' own file compression. -->
                         <Border Classes="PageReveal" Classes.Shown="{Binding IsSpacePressViewVisible}"
                                 IsVisible="{Binding IsSpacePressViewVisible}" Padding="20,4,20,16" ClipToBounds="False">
-                            <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12" MaxWidth="1100" Margin="0,12,0,0"
+                            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="12" MaxWidth="1100" Margin="0,12,0,0"
                                   DataContext="{Binding SpacePress}" x:DataType="vm:SpacePressViewModel">
 
                                 <!-- Totals -->
@@ -2072,7 +2072,13 @@
 
                                 <!-- How to squish -->
                                 <Border Grid.Row="1" Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="14,10">
-                                    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="14">
+                                    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="14">
+                                        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                                                    ToolTip.Tip="{Binding MonitorText}">
+                                            <ToggleSwitch IsChecked="{Binding MonitorOn, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            <TextBlock Text="Keep squished" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center"
+                                                       ToolTip.Tip="Every hour, quietly re-checks your games and squishes again whatever a game update put back - never while you play" />
+                                        </StackPanel>
                                         <TextBlock Grid.Column="0" Text="Method" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                         <ComboBox Grid.Column="1" Classes="GlassComboBox" Width="270" ItemsSource="{Binding AlgorithmOptions}"
                                                   SelectedIndex="{Binding AlgorithmIndex, Mode=TwoWay}" IsEnabled="{Binding !IsBusy}" />
@@ -2086,17 +2092,42 @@
                                             <ToggleSwitch IsChecked="{Binding SkipPackages, Mode=TwoWay}" IsEnabled="{Binding !IsBusy}" OnContent="" OffContent="" VerticalAlignment="Center" />
                                             <TextBlock Text="Skip game packs" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                         </StackPanel>
-                                        <TextBlock Grid.Column="4" Text="{Binding MeasureStatus}" IsVisible="{Binding IsMeasuring}" FontSize="11.5"
-                                                   Foreground="#94A3B8" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                        <Button Grid.Column="5" Classes="ApplePrimaryBtn" Click="OnSpacePressSquishAllClicked" Cursor="Hand" Padding="16,8"
+                                        <TextBlock Grid.Column="5" Text="{Binding MeasureStatus}" IsVisible="{Binding IsMeasuring}" FontSize="11.5"
+                                                   Foreground="#94A3B8" VerticalAlignment="Center" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
+                                        <Button Grid.Column="6" Classes="ApplePrimaryBtn" Click="OnSpacePressSquishAllClicked" Cursor="Hand" Padding="16,8"
                                                 ToolTip.Tip="Squish every game that is not squished yet, smallest first, one after another">
                                             <TextBlock Text="{Binding BatchText}" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
                                         </Button>
                                     </Grid>
                                 </Border>
 
+                                <!-- What is being squished right now, whichever game is selected -->
+                                <Border Grid.Row="2" Classes="ControlDock" Padding="16,12" IsVisible="{Binding HasJob}">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="{Binding JobHeader}" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                        <StackPanel Spacing="6" DataContext="{Binding WorkingRow}" x:DataType="vm:StorageRowViewModel">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="Bold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Progress, StringFormat='{}{0:0}%'}" FontSize="14" FontWeight="Bold" Foreground="#E2E8F0" />
+                                            </Grid>
+                                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="6" />
+                                            <TextBlock Text="{Binding ProgressText}" FontSize="11" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Button Classes="AppleSecondaryBtn" Click="OnSpacePressPauseClicked" Cursor="Hand" Padding="16,8">
+                                                <TextBlock Text="{Binding PauseText}" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                            </Button>
+                                            <Button Classes="AppleDangerBtn" Click="OnSpacePressStopClicked" Cursor="Hand" Padding="16,8">
+                                                <TextBlock Text="STOP" FontSize="11" FontWeight="Bold" Foreground="#FF6B6B" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
                                 <!-- The library -->
-                                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                                     <ItemsControl ItemsSource="{Binding Rows}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -2131,7 +2162,7 @@
                                 </ScrollViewer>
 
                                 <!-- The selected game, and what to do with it -->
-                                <Border Grid.Row="3" Classes="ControlDock" Padding="16,12" IsVisible="{Binding HasSelected}">
+                                <Border Grid.Row="4" Classes="ControlDock" Padding="16,12" IsVisible="{Binding HasSelected}">
                                     <StackPanel Spacing="10" DataContext="{Binding SelectedRow}" x:DataType="vm:StorageRowViewModel">
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
                                             <StackPanel Spacing="2">
@@ -2166,13 +2197,7 @@
                                             <Button Classes="AppleSecondaryBtn" Click="OnSpacePressUnsquishClicked" IsEnabled="{Binding CanUnsquish}" Cursor="Hand" Padding="16,8">
                                                 <TextBlock Text="UNSQUISH" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
                                             </Button>
-                                            <Button Classes="AppleSecondaryBtn" Click="OnSpacePressPauseClicked" IsVisible="{Binding CanControl}" Cursor="Hand" Padding="16,8">
-                                                <TextBlock Text="{Binding PauseText}" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
-                                            </Button>
-                                            <Button Classes="AppleDangerBtn" Click="OnSpacePressStopClicked" IsVisible="{Binding CanControl}" Cursor="Hand" Padding="16,8">
-                                                <TextBlock Text="STOP" FontSize="11" FontWeight="Bold" Foreground="#FF6B6B" />
-                                            </Button>
-                                            <Button Classes="EmptyActionBtn" Click="OnSpacePressRefreshClicked" IsVisible="{Binding !CanControl}" Cursor="Hand" Padding="14,8"
+                                            <Button Classes="EmptyActionBtn" Click="OnSpacePressRefreshClicked" IsVisible="{Binding !IsBusy}" Cursor="Hand" Padding="14,8"
                                                     ToolTip.Tip="Measure this game again">
                                                 <TextBlock Text="RE-MEASURE" FontSize="11" FontWeight="Bold" Foreground="#CBD5E1" />
                                             </Button>
