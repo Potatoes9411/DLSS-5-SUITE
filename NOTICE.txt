@@ -58,3 +58,18 @@ TRADEMARKS
 
 NVIDIA, DLSS and the NVIDIA eye logo are trademarks of NVIDIA Corporation.
 This project is not affiliated with, endorsed by, or sponsored by NVIDIA.
+
+MOTION FORGE (MFG SUPER MOTION)
+-------------------------------
+
+The Motion Forge edition is MFG SUPER MOTION by NODIX TECH, folded into this
+build with his permission (2026-11-13). Its engine source is in MotionEngine/,
+with his licence (PolyForm Strict 1.0.0, MotionEngine/LICENSE.txt) and his
+copyright notice (MotionEngine/Copyright.txt). Copyright (c) 2026 NODIX-TECH.
+https://github.com/NODIX-TECH/MFG-SUPER-MOTION
+
+  Not included: lf_dlssg_ada.h (GPL-3.0) and the dlssg_for_sm86 package; no
+  NVIDIA or Intel library is patched. NVIDIA's nvngx_dlssg.dll and Intel's
+  XeSS libraries are the user's own files. SMAI's ONNX Runtime (MIT),
+  DirectML (Microsoft DirectML licence) and network (RIFE, MIT) are
+  downloaded on request, with their licence files, from NODIX TECH's release.

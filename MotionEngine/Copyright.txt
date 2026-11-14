@@ -1,0 +1,103 @@
+MFG SUPER MOTION
+Copyright and Licensing Notice
+
+Copyright (c) 2026 NODIX-TECH.
+All rights reserved except for rights expressly granted by the applicable license.
+
+
+======================================================================
+ORIGINAL NODIX-TECH MATERIAL
+======================================================================
+
+Unless explicitly identified otherwise, original source code, application
+code, algorithms, implementation, user-interface designs, documentation,
+graphics, assets and other original material created specifically for
+MFG SUPER MOTION by NODIX-TECH are copyright (c) 2026 NODIX-TECH.
+
+Original NODIX-TECH portions of MFG SUPER MOTION are licensed under:
+
+PolyForm Strict License 1.0.0
+
+https://polyformproject.org/licenses/strict/1.0.0
+
+The complete license terms are provided in the LICENSE file located at
+the root of this repository.
+
+
+======================================================================
+SCOPE OF THE LICENSE
+======================================================================
+
+The PolyForm Strict License applies only to software and other material
+for which NODIX-TECH owns or controls the applicable rights.
+
+Publication of the source code does not transfer copyright ownership.
+
+No additional permission to modify, redistribute, repackage, rebrand,
+sublicense, sell or create derivative versions of original NODIX-TECH
+software is granted except where expressly provided by the applicable
+license or required by law.
+
+
+======================================================================
+THIRD-PARTY MATERIAL
+======================================================================
+
+MFG SUPER MOTION may contain, use, communicate with, dynamically load,
+link against, adapt, reference or otherwise interoperate with third-party
+software and technologies.
+
+NODIX-TECH does not claim ownership of third-party:
+
+- Source code
+- Libraries
+- SDKs
+- APIs
+- Headers
+- Runtimes
+- Drivers
+- Binaries
+- Algorithms
+- Trademarks
+- Graphics
+- Documentation
+- Other external works
+
+Third-party material does NOT become licensed under PolyForm Strict merely
+because it is included in, used by, supported by, or referenced by
+MFG SUPER MOTION.
+
+Each third-party component remains governed by its own applicable
+copyright, license and distribution terms.
+
+This includes, where applicable, technologies and software originating
+from NVIDIA Corporation, Intel Corporation, and other third parties.
+
+For attribution and third-party licensing information, see:
+
+THIRD-PARTY-NOTICES.txt
+
+
+======================================================================
+NO TRANSFER OF THIRD-PARTY RIGHTS
+======================================================================
+
+Nothing in the MFG SUPER MOTION license, source repository, documentation
+or copyright notices should be interpreted as granting rights over
+third-party intellectual property beyond those granted by the applicable
+third-party owner or license.
+
+Likewise, use of third-party technology by MFG SUPER MOTION does not
+transfer ownership of original NODIX-TECH material to those third parties.
+
+
+======================================================================
+PROJECT
+======================================================================
+
+MFG SUPER MOTION
+Developed by NODIX-TECH
+
+https://github.com/NODIX-TECH/MFG-SUPER-MOTION
+
+Copyright (c) 2026 NODIX-TECH.
