@@ -47,7 +47,9 @@ type SpacePressSettings =
       SkipPackages: bool
       /// Off switch for the hourly check. Stored as "off" so a settings file
       /// from before the check existed reads as on.
-      MonitorOff: bool }
+      MonitorOff: bool
+      /// "AUTO", "GENTLE", "BALANCED" or "FULL"; missing reads as Auto.
+      Speed: string }
 
 /// One game in the Space Press list.
 type StorageRowViewModel(card: GameCardViewModel) =
@@ -62,6 +64,7 @@ type StorageRowViewModel(card: GameCardViewModel) =
     let mutable isSelected = false
     let mutable message = ""
     let mutable thumbnail: Bitmap option = None
+    let mutable thumbnailPending = false
 
     let brush (hex: string) = SolidColorBrush(Color.Parse(hex)) :> IBrush
 
@@ -75,27 +78,35 @@ type StorageRowViewModel(card: GameCardViewModel) =
     member _.ProcessName =
         try Path.GetFileNameWithoutExtension(card.Game.TargetExecutablePath) with _ -> ""
 
-    /// A small copy of the cover, made once. The list shows 38x50 covers;
-    /// drawing the full-size artwork scaled down on every frame made the page
-    /// heavy to scroll.
-    member _.Cover: Bitmap =
+    /// A small copy of the cover, decoded once at the size it is shown and
+    /// off the UI thread - making 63 of them on the spot froze the page for a
+    /// second when it opened. Null until it is ready, then the row updates.
+    member this.Cover: Bitmap =
         match thumbnail with
         | Some t -> t
         | None ->
-            let full = card.BannerImage
-            if isNull full then null
-            else
-                let small =
-                    try
-                        let size = full.PixelSize
-                        let width = 80
-                        let height = max 1 (int (float size.Height * float width / float (max 1 size.Width)))
-                        full.CreateScaledBitmap(PixelSize(width, height), BitmapInterpolationMode.HighQuality)
-                    with _ -> full
-                thumbnail <- Some small
-                small
+            if not thumbnailPending then
+                thumbnailPending <- true
+                let path = card.Game.LocalBannerPath
+                Task.Run(fun () ->
+                    let small =
+                        try
+                            if String.IsNullOrWhiteSpace(path) || not (File.Exists(path)) then None
+                            else
+                                use stream = File.OpenRead(path)
+                                Some(Bitmap.DecodeToWidth(stream, 80, BitmapInterpolationMode.HighQuality))
+                        with _ -> None
+                    Dispatcher.UIThread.Post(fun () ->
+                        match small with
+                        | Some s ->
+                            thumbnail <- Some s
+                            this.RaisePropertyChanged("Cover")
+                            this.RaisePropertyChanged("HasCover")
+                        | None -> ()))
+                |> ignore
+            null
 
-    member _.HasCover = card.HasBannerImage
+    member _.HasCover = thumbnail.IsSome
 
     member this.Info
         with get () = info
@@ -273,6 +284,10 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     let mutable skipMedia = initial |> Option.map (fun s -> s.SkipMedia) |> Option.defaultValue true
     let mutable skipPackages = initial |> Option.map (fun s -> s.SkipPackages) |> Option.defaultValue true
     let mutable monitorOn = initial |> Option.map (fun s -> not s.MonitorOff) |> Option.defaultValue true
+    let mutable speed =
+        initial
+        |> Option.bind (fun s -> speeds |> List.tryFind (fun x -> speedName x = s.Speed))
+        |> Option.defaultValue Auto
 
     let saveSettings () =
         try
@@ -281,7 +296,8 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
                 { Algorithm = algorithmName algorithm
                   SkipMedia = skipMedia
                   SkipPackages = skipPackages
-                  MonitorOff = not monitorOn }
+                  MonitorOff = not monitorOn
+                  Speed = speedName speed }
             File.WriteAllText(settingsPath (), JsonSerializer.Serialize(s))
         with ex -> AppLog.error "Saving the Space Press settings failed" ex
 
@@ -377,7 +393,10 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     let monitorTimer = DispatcherTimer(Interval = TimeSpan.FromMinutes(10.0))
 
     do
-        gameWatch.Tick.Add(fun _ -> this.WatchForGames())
+        gameWatch.Tick.Add(fun _ ->
+            this.WatchForGames()
+            // Auto's pace follows whether you are at the PC; keep the strip honest.
+            if job.IsSome then this.RaisePropertyChanged("JobHeader"))
         gameWatch.Start()
         monitorTimer.Tick.Add(fun _ ->
             monitorTimer.Interval <- TimeSpan.FromHours(1.0)
@@ -417,9 +436,23 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
             if pausedForGame then "PAUSED WHILE YOU PLAY"
             elif this.IsPaused then "PAUSED"
             else jobVerb.ToUpperInvariant()
+        let pace = if job.IsSome && not this.IsPaused then "  ·  " + (paceOf speed).Label else ""
         let place = if isBatch && batchTotal > 1 then sprintf "  ·  GAME %d OF %d" (batchDone + 1) batchTotal else ""
         let why = if batchIsUpkeep then "  ·  KEEPING UPDATED GAMES SQUISHED" else ""
-        verb + place + why
+        verb + pace + place + why
+
+    member _.SpeedOptions = speeds |> List.map speedBlurb |> Array.ofList
+
+    /// How hard to push the PC. Takes effect at once, even mid-squish.
+    member this.SpeedIndex
+        with get () = speeds |> List.findIndex ((=) speed)
+        and set (i: int) =
+            if i >= 0 && i < speeds.Length && speeds.[i] <> speed then
+                speed <- speeds.[i]
+                job |> Option.iter (fun j -> j.Speed <- speed)
+                saveSettings ()
+                this.RaisePropertyChanged("SpeedIndex")
+                this.RaisePropertyChanged("JobHeader")
 
     member this.CanSquish = not this.IsBusy && (match selected with Some r -> r.Info.IsSome && not r.IsSquished | None -> false)
     member this.CanUnsquish = not this.IsBusy && (match selected with Some r -> (match r.Info with Some i -> i.Status <> Plain | None -> false) | None -> false)
@@ -513,9 +546,16 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
             started <- true
             loadCache ()
 
+        // One row per folder. Several library entries can point at the same
+        // place - Epic's Fab plugin and Quixel Bridge both point at the whole
+        // Unreal Engine install - and squishing it once per entry walked the
+        // same few hundred thousand files over and over.
+        let folderKey (path: string) = (try Path.GetFullPath(path) with _ -> path).TrimEnd('\\').ToLowerInvariant()
         let known = rows |> Seq.map (fun r -> r.Key) |> HashSet
+        let folders = rows |> Seq.map (fun r -> folderKey r.Folder) |> HashSet
         for card in library do
-            if not (known.Contains(card.Game.AppId)) && Directory.Exists(card.InstallDirectory) then
+            if not (known.Contains(card.Game.AppId)) && Directory.Exists(card.InstallDirectory)
+               && folders.Add(folderKey card.InstallDirectory) then
                 let row = StorageRowViewModel(card)
                 match cache.TryGetValue(card.Game.AppId) with
                 | true, c -> row.Info <- Some(ofCached c)
@@ -629,6 +669,7 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
         // Busy from this moment, so a second click cannot start a second job;
         // the checks themselves run off the UI thread.
         let j = Job()
+        j.Speed <- speed
         job <- Some j
         working <- Some row
         jobVerb <- (if squishIt then "Squishing" else "Unsquishing")
@@ -667,11 +708,14 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
                         elif not (p.CurrentFile.Contains('\\')) then p.CurrentFile
                         else sprintf "%s  ·  %s of %s files" (Path.GetFileName(p.CurrentFile)) (p.DoneFiles.ToString("N0")) (p.TotalFiles.ToString("N0")))
             Task.Run(fun () ->
+                let work () =
+                    if squishIt then squish row.Folder alg media packages j report
+                    else unsquish row.Folder j report
                 let ok =
                     try
-                        inBackground (fun () ->
-                            if squishIt then squish row.Folder alg media packages j report
-                            else unsquish row.Folder j report)
+                        // The engine moves the folder walk in and out of
+                        // background mode as the speed changes.
+                        work ()
                     with ex ->
                         AppLog.error "Space Press failed" ex
                         false

@@ -216,6 +216,9 @@ type MainWindow() as this =
     do
         this.InitializeComponent()
 
+        // Scripted testing, only when started with --bridge.
+        this.Opened.Add(fun _ -> TestBridge.start this)
+
         // Find the star plates once, then drive their opacity every frame.
         this.Opened.Add(fun _ ->
             starPlates <-

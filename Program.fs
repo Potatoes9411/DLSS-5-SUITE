@@ -27,11 +27,32 @@ module Program =
             .With(
                 Win32PlatformOptions(
                     CompositionMode =
-                        [| Win32CompositionMode.WinUIComposition
-                           Win32CompositionMode.RedirectionSurface |],
+                        // DLSS5_COMPOSITION picks one for testing only:
+                        // winui, lowlatency or redirect.
+                        (match Environment.GetEnvironmentVariable("DLSS5_COMPOSITION") with
+                         | "lowlatency" -> [| Win32CompositionMode.LowLatencyDxgiSwapChain; Win32CompositionMode.RedirectionSurface |]
+                         | "redirect" -> [| Win32CompositionMode.RedirectionSurface |]
+                         | _ ->
+                             [| Win32CompositionMode.WinUIComposition
+                                Win32CompositionMode.RedirectionSurface |]),
                     RenderingMode =
                         [| Win32RenderingMode.AngleEgl
                            Win32RenderingMode.Software |]
+                )
+            )
+            // Room on the GPU for every picture on screen. Avalonia keeps
+            // about 28 MB of textures by default; the 4K nebula alone is more
+            // than that, so it - and the star plates and covers with it - were
+            // thrown out and uploaded again on every single frame. That upload
+            // was where a frame's time went (and why the app ran at 10-20 fps
+            // with an idle GPU). DLSS5_GPU_CACHE_MB overrides it for testing.
+            .With(
+                SkiaOptions(
+                    MaxGpuResourceSizeBytes =
+                        (match Int64.TryParse(Environment.GetEnvironmentVariable("DLSS5_GPU_CACHE_MB")) with
+                         | true, mb when mb > 0L -> mb
+                         | _ -> 384L)
+                        * 1024L * 1024L
                 )
             )
             .WithInterFont()

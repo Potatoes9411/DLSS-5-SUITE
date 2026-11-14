@@ -171,7 +171,7 @@
     </Window.Styles>
 
     <!-- Main Outer Window Frame (Seamless Rounded Glass Frame) -->
-    <Border CornerRadius="28" ClipToBounds="True" BorderThickness="0" Background="Transparent">
+    <Border x:Name="WindowFrame" CornerRadius="28" ClipToBounds="True" BorderThickness="0" Background="Transparent">
         <Panel>
             <!-- Invisible Focus Sink to reliably clear TextBox focus when clicking blank areas -->
             <Border x:Name="DummyFocusSink" Focusable="True" IsHitTestVisible="False" Width="0" Height="0" Opacity="0" />
@@ -207,7 +207,7 @@
                      theme but the green one. Only the bound image is decoded,
                      so this is one texture, not two, and no extra pass.
                      ========================================================== -->
-                <Image Source="{Binding NebulaSource}" Stretch="UniformToFill"
+                <Image x:Name="NebulaPlate" Source="{Binding NebulaSource}" Stretch="UniformToFill"
                        Opacity="0.82" IsHitTestVisible="False" />
 
                 <!-- Three star plates, each a different scatter, faded against
@@ -239,7 +239,7 @@
                      through it. What makes 0.34 safe now is that the cards on
                      top are dense glass rather than a 3% white wash, so text
                      sits on its own ground instead of on the backdrop. -->
-                <Image Source="{Binding NvidiaMarkSource}" Stretch="Uniform"
+                <Image x:Name="MarkPlate" Source="{Binding NvidiaMarkSource}" Stretch="Uniform"
                        Width="668" HorizontalAlignment="Center" VerticalAlignment="Center"
                        Opacity="0.34" IsHitTestVisible="False" />
 
@@ -254,7 +254,7 @@
                      still bind to it. -->
 
                 <!-- Soft Glass Vignette Backdrop Overlay -->
-                <Border Background="{Binding BgVignetteBrush}" />
+                <Border x:Name="VignettePlate" Background="{Binding BgVignetteBrush}" />
             </Panel>
 
             <!-- Light Diffusion Backdrop Acrylic Overlay -->
@@ -529,7 +529,7 @@
                     </Border>
 
                     <!-- ROW 1: CONTENT HOST (Settings View OR Games Grid View) -->
-                    <Panel Grid.Row="1">
+                    <Panel x:Name="ContentHost" Grid.Row="1">
 
                         <!-- 1. SETTINGS & PREFERENCES VIEW -->
                         <ScrollViewer x:Name="SettingsScrollViewer"
@@ -2072,6 +2072,13 @@
 
                                 <!-- How to squish -->
                                 <Border Grid.Row="1" Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="14,10">
+                                    <StackPanel Spacing="10">
+                                    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*" ColumnSpacing="14">
+                                        <TextBlock Grid.Column="0" Text="Speed" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                        <ComboBox Grid.Column="1" Classes="GlassComboBox" Width="300" ItemsSource="{Binding SpeedOptions}"
+                                                  SelectedIndex="{Binding SpeedIndex, Mode=TwoWay}"
+                                                  ToolTip.Tip="How hard squishing may push the PC. You can change it while a squish is running." />
+                                    </Grid>
                                     <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="14">
                                         <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
                                                     ToolTip.Tip="{Binding MonitorText}">
@@ -2099,6 +2106,7 @@
                                             <TextBlock Text="{Binding BatchText}" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
                                         </Button>
                                     </Grid>
+                                    </StackPanel>
                                 </Border>
 
                                 <!-- What is being squished right now, whichever game is selected -->

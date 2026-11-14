@@ -360,6 +360,73 @@ module StorageCompressor =
         try File.Delete(recordPath folder) with _ -> ()
 
     // ------------------------------------------------------------------
+    // Speed
+    // ------------------------------------------------------------------
+    /// How hard a squish may push the PC.
+    type Speed =
+        /// Idle priority, a couple at once - you will not notice it.
+        | Gentle
+        | Balanced
+        /// As fast as the drive and CPU allow; the PC will feel busy.
+        | FullSpeed
+        /// Gentle while you use the PC, full speed once you step away.
+        | Auto
+
+    let speeds = [ Auto; Gentle; Balanced; FullSpeed ]
+
+    let speedName =
+        function
+        | Auto -> "AUTO"
+        | Gentle -> "GENTLE"
+        | Balanced -> "BALANCED"
+        | FullSpeed -> "FULL"
+
+    let speedBlurb =
+        function
+        | Auto -> "Auto - full speed when you step away"
+        | Gentle -> "Gentle - you won't notice it"
+        | Balanced -> "Balanced"
+        | FullSpeed -> "Full speed - fastest, the PC feels busy"
+
+    /// What a speed means at this moment.
+    type Pace =
+        { Workers: int
+          Priority: ProcessPriorityClass
+          /// ProcessIoPriority: 0 very low, 1 low, 2 normal.
+          IoPriority: int
+          /// Run the folder walks in Windows' background mode.
+          Background: bool
+          Label: string }
+
+    [<Struct; StructLayout(LayoutKind.Sequential)>]
+    type private LastInput = { mutable Size: uint32; mutable Time: uint32 }
+
+    [<DllImport("user32.dll")>]
+    extern bool private GetLastInputInfo(LastInput& info)
+
+    /// Seconds since the last keyboard or mouse input anywhere on the PC.
+    let idleSeconds () =
+        try
+            let mutable info = { Size = 8u; Time = 0u }
+            if GetLastInputInfo(&info) then float (uint32 Environment.TickCount - info.Time) / 1000.0 else 0.0
+        with _ -> 0.0
+
+    /// How long without input before Auto counts you as away.
+    let awayAfterSeconds = 120.0
+
+    let paceOf (speed: Speed) : Pace =
+        let cores = Environment.ProcessorCount
+        let gentle = { Workers = 2; Priority = ProcessPriorityClass.Idle; IoPriority = 0; Background = true; Label = "GENTLE" }
+        let full = { Workers = Math.Clamp(cores - 2, 2, 16); Priority = ProcessPriorityClass.Normal; IoPriority = 2; Background = false; Label = "FULL SPEED" }
+        match speed with
+        | Gentle -> gentle
+        | Balanced -> { Workers = Math.Clamp(cores / 4, 2, 6); Priority = ProcessPriorityClass.BelowNormal; IoPriority = 1; Background = false; Label = "BALANCED" }
+        | FullSpeed -> full
+        | Auto ->
+            if idleSeconds () >= awayAfterSeconds then { full with Label = "FULL SPEED WHILE YOU'RE AWAY" }
+            else { gentle with Label = "GENTLE WHILE YOU USE THE PC" }
+
+    // ------------------------------------------------------------------
     // A job: one squish or unsquish, pausable and stoppable
     // ------------------------------------------------------------------
     type Job() =
@@ -367,11 +434,30 @@ module StorageCompressor =
         let processes = ConcurrentDictionary<int, Process>()
         let mutable cancelled = false
         let mutable paused = false
+        let slotLock = obj ()
+        let mutable running = 0
 
         member _.IsCancelled = cancelled
         member _.IsPaused = paused
         member internal _.Gate = gate
         member internal _.Processes = processes
+
+        /// Changeable while the job runs - it applies from the next batch.
+        member val Speed = Auto with get, set
+
+        /// Waits for a free slot under the current pace's limit. Re-checked
+        /// twice a second, so Auto speeds up when you step away and backs
+        /// off as soon as you are back.
+        member internal this.Acquire() =
+            lock slotLock (fun () ->
+                while not cancelled && running >= (paceOf this.Speed).Workers do
+                    Monitor.Wait(slotLock, 500) |> ignore
+                running <- running + 1)
+
+        member internal _.Release() =
+            lock slotLock (fun () ->
+                running <- running - 1
+                Monitor.PulseAll(slotLock))
 
         member _.Pause() =
             paused <- true
@@ -395,21 +481,15 @@ module StorageCompressor =
                 with _ -> ()
             processes.Clear()
 
-    /// A few at once at most. Squishing is mostly disk work; more processes
-    /// than this only fight over the drive and make everything else wait.
-    let private workers () = Math.Clamp(Environment.ProcessorCount / 4, 1, 4)
-
     let private compactExe () =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "compact.exe")
 
-    /// Puts a compact.exe at the back of every queue: idle CPU priority and
-    /// very low disk priority, so a game or the app always goes first.
-    let private makeGentle (p: Process) =
-        try p.PriorityClass <- ProcessPriorityClass.Idle with _ -> ()
+    /// Sets a compact.exe's CPU and disk priority for the pace in force.
+    let private applyPace (pace: Pace) (p: Process) =
+        try p.PriorityClass <- pace.Priority with _ -> ()
         try
-            // ProcessIoPriority = 33; 0 is "very low".
-            let mutable veryLow = 0
-            Native.NtSetInformationProcess(p.Handle, 33, &veryLow, 4) |> ignore
+            let mutable io = pace.IoPriority
+            Native.NtSetInformationProcess(p.Handle, 33, &io, 4) |> ignore
         with _ -> ()
 
     /// Runs work on the calling thread in Windows' background mode: lowest
@@ -430,6 +510,17 @@ module StorageCompressor =
         // Listing: sizes come with the directory listing itself - asking for
         // each file's size separately was a call per file, and an engine
         // install has hundreds of thousands. Counted out loud as it goes.
+        // The walk follows the speed as it changes: in Windows' background
+        // mode while Gentle (or Auto with you at the PC), at normal priority
+        // otherwise - re-checked a few times a second.
+        let thread = Native.GetCurrentThread()
+        let mutable backgroundMode = false
+        let followPace () =
+            let want = (paceOf job.Speed).Background
+            if want <> backgroundMode then
+                Native.SetThreadPriority(thread, (if want then 0x00010000 else 0x00020000)) |> ignore
+                backgroundMode <- want
+        followPace ()
         let listed = ResizeArray<string * int64>()
         let mutable lastListed = Environment.TickCount64
         try
@@ -438,6 +529,7 @@ module StorageCompressor =
                     listed.Add((info.FullName, info.Length))
                     if Environment.TickCount64 - lastListed > 250L then
                         lastListed <- Environment.TickCount64
+                        followPace ()
                         report { CurrentFile = sprintf "Listing files... %s found" (listed.Count.ToString("N0")); DoneFiles = 0; TotalFiles = 0; DoneBytes = 0L; TotalBytes = 0L }
         with _ -> ()
         let files = listed |> Seq.map fst |> Array.ofSeq
@@ -475,6 +567,7 @@ module StorageCompressor =
                     pending.Add((file, size))
                 if Environment.TickCount64 - lastChecked > 250L then
                     lastChecked <- Environment.TickCount64
+                    followPace ()
                     lock lockObj (fun () ->
                         report { CurrentFile = sprintf "Checking files... %s of %s" ((i + 1).ToString("N0")) (total.ToString("N0"))
                                  DoneFiles = doneFiles; TotalFiles = total; DoneBytes = doneBytes; TotalBytes = totalBytes })
@@ -496,12 +589,16 @@ module StorageCompressor =
         if not current.IsEmpty then batches.Add(List.rev current)
 
         let arg = algorithmName(algorithm).ToLowerInvariant()
-        let options = ParallelOptions(MaxDegreeOfParallelism = workers ())
+        // As many threads as Full speed could use; each batch then waits for
+        // a slot under whatever the speed allows at that moment.
+        let options = ParallelOptions(MaxDegreeOfParallelism = (paceOf FullSpeed).Workers)
         Parallel.ForEach(batches, options, Action<(string * int64) list, ParallelLoopState>(fun batch state ->
             if job.IsCancelled then state.Stop()
             else
                 job.Gate.Wait()
-                if not job.IsCancelled then
+                job.Acquire()
+                try
+                  if not job.IsCancelled then
                     // Say what is being worked on before it starts, so a single
                     // multi-gigabyte file does not look like nothing is happening.
                     lock lockObj (fun () -> send (fst (List.head batch)))
@@ -513,7 +610,7 @@ module StorageCompressor =
                     psi.RedirectStandardOutput <- true
                     try
                         use p = Process.Start(psi)
-                        makeGentle p
+                        applyPace (paceOf job.Speed) p
                         job.Processes.[p.Id] <- p
                         p.StandardOutput.ReadToEnd() |> ignore
                         p.WaitForExit()
@@ -522,8 +619,13 @@ module StorageCompressor =
                         AppLog.error "Running compact.exe failed" ex
                     if not job.IsCancelled then
                         for (file, _) in batch do squished.Add(file)
-                        advance (fst (List.last batch)) (batch |> List.sumBy snd) batch.Length))
+                        advance (fst (List.last batch)) (batch |> List.sumBy snd) batch.Length
+                finally
+                    job.Release()))
         |> ignore
+
+        // The thread goes back to the pool as it came.
+        if backgroundMode then Native.SetThreadPriority(thread, 0x00020000) |> ignore
 
         // Record a finished squish, so unsquish knows where to look and the
         // hourly check knows to keep it squished. A stopped one records
@@ -543,19 +645,23 @@ module StorageCompressor =
         let mutable doneFiles = 0
         let mutable lastReport = 0L
         let lockObj = obj ()
-        let options = ParallelOptions(MaxDegreeOfParallelism = workers ())
+        let options = ParallelOptions(MaxDegreeOfParallelism = (paceOf FullSpeed).Workers)
         Parallel.ForEach(files, options, Action<string, ParallelLoopState>(fun file state ->
             if job.IsCancelled then state.Stop()
             else
                 job.Gate.Wait()
-                if not job.IsCancelled then
+                job.Acquire()
+                try
+                  if not job.IsCancelled then
                     unsquishFile file |> ignore
                     lock lockObj (fun () ->
                         doneFiles <- doneFiles + 1
                         let now = Environment.TickCount64
                         if now - lastReport >= 50L || doneFiles >= total then
                             lastReport <- now
-                            report { CurrentFile = file; DoneFiles = doneFiles; TotalFiles = total; DoneBytes = int64 doneFiles; TotalBytes = int64 (max total 1) })))
+                            report { CurrentFile = file; DoneFiles = doneFiles; TotalFiles = total; DoneBytes = int64 doneFiles; TotalBytes = int64 (max total 1) })
+                finally
+                    job.Release()))
         |> ignore
         if not job.IsCancelled then dropRecord folder
         not job.IsCancelled
