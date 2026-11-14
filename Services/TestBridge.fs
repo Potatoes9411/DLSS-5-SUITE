@@ -59,8 +59,12 @@ module PowerThrottling =
 
 module TestBridge =
 
-    [<Literal>]
-    let PipeName = "DLSS5SuiteBridge"
+    /// DLSS5_BRIDGE_PIPE gives each copy its own channel, so several builds
+    /// can be tested side by side.
+    let PipeName =
+        match Environment.GetEnvironmentVariable("DLSS5_BRIDGE_PIPE") with
+        | null | "" -> "DLSS5SuiteBridge"
+        | name -> name
 
     let isRequested () =
         Environment.GetCommandLineArgs()
@@ -278,7 +282,7 @@ module TestBridge =
     /// Starts listening, if SUITE was started with --bridge.
     let start (window: Window) =
         if isRequested () then
-            AppLog.info "Test bridge listening on \\\\.\\pipe\\DLSS5SuiteBridge"
+            AppLog.info ("Test bridge listening on \\\\.\\pipe\\" + PipeName)
             Task.Run(fun () ->
                 task {
                     while true do
