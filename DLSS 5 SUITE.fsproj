@@ -77,6 +77,8 @@
     <Compile Include="Services\ModInstaller.fs" />
     <Compile Include="Services\GtaDlss5.fs" />
     <Compile Include="Services\DlssUpdater.fs" />
+    <!-- Upscaler Vault edition -->
+    <Compile Include="Services\UpscalerVault.fs" />
     <Compile Include="Services\Diagnosis.fs" />
     <Compile Include="Services\SharedResults.fs" />
     <Compile Include="Services\Autopilot.fs" />
