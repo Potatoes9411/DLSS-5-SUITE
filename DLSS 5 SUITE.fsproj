@@ -48,6 +48,11 @@
     <!-- Motion Forge's engine, when MotionEngine\build.cmd has built it (never committed): into engine\motion\,
          so a development build runs it too and publish carries it. -->
     <Content Include="MotionEngine\build\MotionForgeEngine.exe" Condition="Exists('MotionEngine\build\MotionForgeEngine.exe')" Link="engine\motion\MotionForgeEngine.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- The Screen Engine (tools\build-engine.bat) and AMD's FidelityFX runtime (tools\get-fidelityfx.ps1),
+         when present (never committed), so a development build has every generator. -->
+    <Content Include="Engine\build\FullScreenWrapperForDLSS5.exe" Condition="Exists('Engine\build\FullScreenWrapperForDLSS5.exe')" Link="engine\FullScreenWrapperForDLSS5.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <Content Include="..\fidelityfx-sdk\bin\amd_fidelityfx_dx12.dll" Condition="Exists('..\fidelityfx-sdk\bin\amd_fidelityfx_dx12.dll')" Link="engine\amd_fidelityfx_dx12.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <Content Include="external\fidelityfx\LICENSE.txt" Link="engine\AMD-FidelityFX-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <ItemGroup>
