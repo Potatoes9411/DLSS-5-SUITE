@@ -35,11 +35,6 @@ type MotionForgeView() as this =
 
     member this.OnStartClicked(_: obj, _: RoutedEventArgs) = this.With(fun vm -> vm.ToggleMotion())
 
-    member this.OnPickDlssgClicked(_: obj, _: RoutedEventArgs) =
-        this.PickFiles("Pick nvngx_dlssg.dll (NVIDIA DLSS Frame Generation)", false, fun paths -> this.With(fun vm -> vm.AcceptDlssg paths.Head))
-
-    member this.OnRemoveDlssgClicked(_: obj, _: RoutedEventArgs) = this.With(fun vm -> vm.RemoveDlssg())
-
     member this.OnPickXessClicked(_: obj, _: RoutedEventArgs) =
         this.PickFiles("Pick libxess_fg.dll and libxell.dll (Intel XeSS SDK)", true, fun paths -> this.With(fun vm -> vm.AcceptXess paths))
 

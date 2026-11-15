@@ -174,3 +174,16 @@ static int PresentCap();
 // What the app is told (sm_control.inl).
 static void Status(const char *format, ...);
 static bool GuardWideShift(float &across, float &down);     // sm_guard.inl (round 53)
+// DLSS MFG through NVIDIA Streamline (sm_streamline.inl, DLSS 5 SUITE).
+static void CounterAddShown(unsigned frames);
+namespace slfg
+{
+    static bool Active();
+    static bool Start();
+    static IDXGIFactory2 *ProxyFactory(IDXGIFactory2 *native);
+    static bool Present(Pipeline &pipe);
+    static void BeforeChainGone();
+    static int Multiplier();
+    static void Shutdown();
+    static constexpr UINT kBackBuffers = 3;
+}

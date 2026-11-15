@@ -43,6 +43,8 @@
 //   - --rtss-quiet (sm_rtss.inl: RivaTuner's profile written from here) is out
 //   - xe_guise.h (an Intel card shown to Intel's library as another maker's) is out
 //   - its named objects and its window say Motion Forge, so it never meets an MFG SUPER MOTION running too
+//   - DLSS MFG goes through NVIDIA Streamline (sm_streamline.inl) from SUITE's engine folder, not NGX's DLSS-G called
+//     directly: NVIDIA's runtime refuses that from a program named as this one is, and the name stays what it is
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -140,6 +142,7 @@
 #include "sm_cursor.inl"
 #include "sm_video.inl"
 #include "sm_loop.inl"
+#include "sm_streamline.inl"
 
 // The game's window is put back whatever ends the engine.
 static LONG WINAPI CrashFilter(EXCEPTION_POINTERS *info)
@@ -277,11 +280,13 @@ int wmain(int argc, wchar_t **argv)
     // (XeSS MFG: Intel's libraries and the unlock plugin instead - the plugin needs a second before the library is used.)
     // (MSM FG: nothing of anyone else's to start - its passes are among the shaders compiling above.)
     if (XeSelected()) { if (!XeStart()) g_fg.failed = true; }
-    else if (NgxSelected() && !NgxStart()) Trace("[card] NGX did not start - DLSS MFG is unavailable, the picture is shown as it is");
+    // (DLSS MFG: NVIDIA Streamline, before the output window is made - sm_streamline.inl. The engine no longer starts
+    // NGX's DLSS-G itself: NVIDIA's runtime refuses that from a program of this name.)
+    else if (NgxSelected() && !slfg::Start()) { g_fg.failed = true; Trace("[card] DLSS MFG is unavailable - the picture is shown as it is"); }
     const int code = EngineRun();
     cursorfx::Restore();      // (the pointer as it was: sm_cursor.inl)
     SpoutClose();
-    if (NgxSelected()) NgxShutdown();
+    if (NgxSelected()) { NgxShutdown(); slfg::Shutdown(); }
     Status("@state stopped");
     Trace("[engine] ended with code %d", code);
     if (g_control.instance) { ReleaseMutex(g_control.instance); CloseHandle(g_control.instance); }

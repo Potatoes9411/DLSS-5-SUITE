@@ -211,6 +211,12 @@ static unsigned ApplyOption(const char *key, const char *value)
         Trace("[option] motion: %s", motion == 2 ? "the generator's own" : motion == 1 ? "the engine's GPU estimate" : "NVIDIA Optical Flow");
         return kRedoPipeline;
     }
+    // DLSS 5 SUITE: where SUITE keeps NVIDIA Streamline for DLSS MFG (read once, when it starts: sm_streamline.inl).
+    if (KeyIs(key, "sl_dir"))
+    {
+        if (MultiByteToWideChar(CP_UTF8, 0, value, -1, g_sl_dir, MAX_PATH) == 0) g_sl_dir[0] = 0;
+        return 0;
+    }
     // Read at the start only: they decide what is taken.
     if (KeyIs(key, "source"))       { set(smOpt.source, 0, 1); return 0; }
     if (KeyIs(key, "window_mode"))  { set(smOpt.window_mode, 0, 2); return 0; }

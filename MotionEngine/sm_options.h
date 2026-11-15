@@ -77,6 +77,8 @@ struct Options
     std::atomic<unsigned long> owner{0};       // the app's process: its windows are never the source
 };
 static Options smOpt;
+// DLSS 5 SUITE: sl_dir=<folder>, where SUITE keeps NVIDIA Streamline for DLSS MFG (sm_streamline.inl); empty: beside the engine.
+static wchar_t g_sl_dir[MAX_PATH] = {};
 
 // Which generator makes the frames in between ("Generator" in the app):
 // DLSS MFG (lf_dlssg.inl, NVIDIA RTX cards), XeSS MFG (xe_mfg.inl, any card

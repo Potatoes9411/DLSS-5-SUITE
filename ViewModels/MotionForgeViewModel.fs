@@ -204,7 +204,7 @@ type MotionForgeViewModel() as this =
     member this.Activate() =
         isActive <- true
         refreshLearned ()
-        notify [ "IsEngineAvailable"; "HasDlssgFile"; "HasXessFiles"; "IsAiInstalled"; "FilesText"; "NeedsFiles"; "CanStart"; "CanImport" ]
+        notify [ "IsEngineAvailable"; "HasStreamline"; "HasXessFiles"; "IsAiInstalled"; "FilesText"; "NeedsFiles"; "CanStart"; "CanImport" ]
         if not cardsAsked && MotionFiles.isEngineAvailable () then
             cardsAsked <- true
             Task.Run(fun () ->
@@ -439,7 +439,7 @@ type MotionForgeViewModel() as this =
     /// What the picked generator runs on, in a line.
     member _.GeneratorNote =
         match (options ()).Generator with
-        | 0 -> "NVIDIA's frame generation, from your own nvngx_dlssg.dll. RTX 50: up to x6. RTX 40: x2 (SUITE does not patch NVIDIA's runtime). Older cards: use SMFG."
+        | 0 -> "NVIDIA DLSS Multi Frame Generation through NVIDIA Streamline, which comes with SUITE - nothing to pick. Needs an NVIDIA RTX 40 (x2) or RTX 50 (up to x6) card; a higher multiplier runs at the card's most. Older cards: use SMFG."
         | 1 -> "Intel's frame generation, from your own XeSS SDK files. Runs on many cards; one frame in between a pair outside Intel Arc."
         | 2 -> "Motion Forge's own generator. Any graphics card, the lightest of all."
         | _ -> "A neural network (SMFG Net) on your card through DirectML - best on cards with AI units. Heavier than SMFG; a one-time download."
@@ -692,7 +692,7 @@ type MotionForgeViewModel() as this =
     // The generators' files
     // ---------------------------------------------------------------------
 
-    member _.HasDlssgFile = MotionFiles.hasDlssg ()
+    member _.HasStreamline = MotionFiles.hasStreamline ()
     member _.HasXessFiles = MotionFiles.hasXess ()
     member _.IsAiInstalled = MotionAi.isInstalled ()
     member _.IsAiBusy = aiBusy
@@ -703,15 +703,18 @@ type MotionForgeViewModel() as this =
     /// The picked generator still needs files before it can make frames.
     member _.NeedsFiles =
         match (options ()).Generator with
-        | 0 -> not (MotionFiles.hasDlssg ())
+        | 0 -> not (MotionFiles.hasStreamline ())
         | 1 -> not (MotionFiles.hasXess ())
         | 3 -> not (MotionAi.isInstalled ())
         | _ -> false
 
     member _.FilesText =
         match (options ()).Generator with
-        | 0 when MotionFiles.hasDlssg () -> "nvngx_dlssg.dll is in place (yours, as NVIDIA ships it)."
-        | 0 -> "DLSS MFG needs NVIDIA's nvngx_dlssg.dll. Games with DLSS 3 or 4 frame generation have it in their folder - pick it there."
+        | 0 when MotionFiles.hasStreamline () ->
+            "DLSS MFG runs through NVIDIA Streamline, installed with SUITE (its engine folder). It needs an NVIDIA RTX 40 card (x2) or RTX 50 card (x2 to x6), and a current NVIDIA driver."
+        | 0 ->
+            sprintf "DLSS MFG needs NVIDIA Streamline in SUITE's engine folder, and %s is missing. Reinstall SUITE to put it back."
+                (MotionFiles.missingStreamline System.IO.File.Exists (MotionFiles.streamlineDir ())).Head
         | 1 when MotionFiles.hasXess () -> "XeSS Frame Generation's libraries are in place."
         | 1 -> "XeSS MFG needs libxess_fg.dll and libxell.dll from Intel's XeSS SDK (2.1 or later). Pick both."
         | 3 when MotionAi.isInstalled () -> "SMAI's runtime and network are installed."
@@ -725,11 +728,7 @@ type MotionForgeViewModel() as this =
 
     member private this.FilesChanged(message: string) =
         note <- message
-        notify [ "HasDlssgFile"; "HasXessFiles"; "IsAiInstalled"; "NeedsFiles"; "FilesText"; "StatusNote"; "HasStatusNote" ]
-
-    member this.AcceptDlssg(path: string) =
-        match MotionFiles.pickDlssg path with
-        | Ok m | Error m -> this.FilesChanged m
+        notify [ "HasStreamline"; "HasXessFiles"; "IsAiInstalled"; "NeedsFiles"; "FilesText"; "StatusNote"; "HasStatusNote" ]
 
     member this.AcceptXess(paths: string list) =
         match MotionFiles.pickXess paths with
@@ -738,10 +737,6 @@ type MotionForgeViewModel() as this =
             // Intel's library can now say which cards it runs on.
             Task.Run(fun () -> let c = host.ReloadCards() in Dispatcher.UIThread.Post(fun () -> this.TakeCards c)) |> ignore
         | Error m -> this.FilesChanged m
-
-    member this.RemoveDlssg() =
-        MotionFiles.removeDlssg ()
-        this.FilesChanged "nvngx_dlssg.dll was removed from SUITE's folder."
 
     member this.RemoveXess() =
         MotionFiles.removeXess ()

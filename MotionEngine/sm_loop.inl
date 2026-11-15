@@ -142,7 +142,8 @@ static void SessionTell(Session &s)
         s.told_base = base; s.told_shown = shown;
         Status("@fps %d %d", base, shown);
     }
-    const int mfg = smOpt.mfg.load() == 0 ? 0 : (g_fg.failed ? -1 : static_cast<int>(FgExtraFrames()) + 1);
+    const int mfg = NgxSelected() ? slfg::Multiplier()       // (DLSS MFG: what Streamline's DLSS-G is asked for, sm_streamline.inl)
+                  : smOpt.mfg.load() == 0 ? 0 : (g_fg.failed ? -1 : static_cast<int>(FgExtraFrames()) + 1);
     if (mfg != s.told_mfg)
     {
         s.told_mfg = mfg;

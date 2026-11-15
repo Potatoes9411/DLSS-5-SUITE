@@ -168,15 +168,18 @@ static bool ShowStart(UINT width, UINT height, uint32_t flags)
     // then the presenter stood for a second or two behind it all ("very bad
     // lag"). Measured with five: 83 pairs with five each, none late, a frame
     // 1.8 ms from its Present to the screen. Six give nothing more.
-    view_desc.BufferCount = FgRequested() ? 5u : lfShow.low_latency ? 2u : 3u;
+    // DLSS MFG through Streamline (sm_streamline.inl): its swap chain, made through Streamline's proxy of the
+    // factory on the proxy queue; DLSS-G's own pacer owns its latency, so no waitable is asked for.
+    const bool through_sl = NgxSelected() && slfg::Active();
+    view_desc.BufferCount = through_sl ? slfg::kBackBuffers : FgRequested() ? 5u : lfShow.low_latency ? 2u : 3u;
     {
         // SM_BUFFERS=<n> (to measure): another number of them.
         char v[8] = {};
-        if (FgRequested() && GetEnvironmentVariableA("SM_BUFFERS", v, sizeof(v)) > 0 && atoi(v) >= 2 && atoi(v) <= 8) view_desc.BufferCount = atoi(v);
+        if (FgRequested() && !through_sl && GetEnvironmentVariableA("SM_BUFFERS", v, sizeof(v)) > 0 && atoi(v) >= 2 && atoi(v) <= 8) view_desc.BufferCount = atoi(v);
     }
     view_desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     view_desc.AlphaMode   = DXGI_ALPHA_MODE_IGNORE;
-    if (FgRequested() || lfShow.low_latency) view_desc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+    if (!through_sl && (FgRequested() || lfShow.low_latency)) view_desc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
     // Sync mode off (lf_vrr.inl): a chain that may show a frame in the middle
     // of a refresh. Only then - any other mode's chain is what it always was.
     if (lfShow.tear_asked)
@@ -195,8 +198,20 @@ static bool ShowStart(UINT width, UINT height, uint32_t flags)
 
     // Two cards (lf_show_relay.inl): the swap chain on the queue of the card that drives the screen.
     IUnknown *present_queue = lfCore.show_queue;
-    if (RelayStart(lfShow.hwnd, view_desc.Format, view_desc.Width, view_desc.Height, view_desc.BufferCount)) present_queue = lfRelay.queue;
-    status = dxgi_factory->CreateSwapChainForHwnd(present_queue, lfShow.hwnd, &view_desc, nullptr, nullptr, &sc1);
+    // (Through Streamline the frames are presented on the generator's card, where DLSS-G makes them: no relay.)
+    if (through_sl)
+    {
+        IDXGIFactory2 *proxy = slfg::ProxyFactory(dxgi_factory);
+        if (proxy == nullptr) { Trace("[screen] no Streamline factory for the output window"); dxgi_factory->Release(); ShowStop(); return false; }
+        status = proxy->CreateSwapChainForHwnd(present_queue, lfShow.hwnd, &view_desc, nullptr, nullptr, &sc1);
+        proxy->Release();
+        if (SUCCEEDED(status)) Trace("[screen] the output window's swap chain is Streamline's (DLSS MFG, %u buffers)", view_desc.BufferCount);
+    }
+    else
+    {
+        if (RelayStart(lfShow.hwnd, view_desc.Format, view_desc.Width, view_desc.Height, view_desc.BufferCount)) present_queue = lfRelay.queue;
+        status = dxgi_factory->CreateSwapChainForHwnd(present_queue, lfShow.hwnd, &view_desc, nullptr, nullptr, &sc1);
+    }
     if ((FAILED(status) || sc1 == nullptr) && lfRelay.on)
     {
         Trace("[relay] the screen's card made no swap chain (0x%08X) - Windows copies the frames across", (unsigned)status);
@@ -224,7 +239,7 @@ static bool ShowStart(UINT width, UINT height, uint32_t flags)
     }
     // The window owns this handle across the generator's feature and format
     // recreations. The producer only consumes it in ordinary Low Latency output.
-    if (lfShow.low_latency || FgRequested())
+    if (!through_sl && (lfShow.low_latency || FgRequested()))
     {
         lfShow.chain->SetMaximumFrameLatency(1);
         lfShow.quick_waitable = lfShow.chain->GetFrameLatencyWaitableObject();
@@ -301,6 +316,7 @@ static bool ShowStart(UINT width, UINT height, uint32_t flags)
 // Close them.
 static void ShowStop()
 {
+    slfg::BeforeChainGone();     // (DLSS MFG: DLSS-G off before its swap chain goes - sm_streamline.inl)
     front::Release();
     CloseFgResources();
     if (lfShow.quick_waitable) { CloseHandle(lfShow.quick_waitable); lfShow.quick_waitable = nullptr; }
@@ -507,10 +523,13 @@ static bool ShowPassThrough(Pipeline &pipe)
     FgStopIfFailed();
     SpoutFollow();
     if (!ShowRebuildIfStale()) return false;
-    if (lfHdr.keep) return ShowHdr(pipe);
+    if (lfHdr.keep) { slfg::BeforeChainGone(); return ShowHdr(pipe); }     // (DLSS MFG is off while HDR output is on)
     if (HdrSwitchOn() && !ShowFormatReady(false)) return false;
     // (Round 86: Bloom on the real frame, before any generator or the screen reads it - lf_bloom.inl.)
     BloomApply(lfCore.cmd, pipe.picture.gpu_tex, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    // DLSS MFG: each new real frame to NVIDIA's DLSS-G through Streamline, which makes and presents the frames in
+    // between itself (sm_streamline.inl).
+    if (NgxSelected() && slfg::Active()) return slfg::Present(pipe);
     if (FgRequested() && FgPresent(pipe, pipe.picture.gpu_tex, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)) return true;
 
     g_up.in_real = false;       // no frame generation: "Upscaling" sharpens on the way to the screen (ShowBlit)

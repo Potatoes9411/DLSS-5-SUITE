@@ -14,10 +14,15 @@ rem DLSS_SDK_DIR, or else ..\..\dlss-sdk beside the repo - the same place
 rem tools\build-engine.bat looks. It is never committed: its licence does not
 rem allow that.
 rem
-rem Nothing else is copied beside the program. NVIDIA's frame generation
-rem runtime and Intel's XeSS libraries are the user's own files (SUITE keeps
-rem them in its data folder), and SMAI's ONNX Runtime, DirectML and network
-rem are downloaded by SUITE on request - see Services\MotionEngine.fs.
+rem DLSS MFG goes through NVIDIA Streamline: its headers are the Screen Engine's
+rem copy (Engine\external\streamline\include, MIT); its DLLs are loaded at run
+rem time from SUITE's engine\ folder, where tools\build-setup.sh puts them for
+rem the Screen Engine (from STREAMLINE_SDK_DIR - never committed).
+rem
+rem Nothing else is copied beside the program. Intel's XeSS libraries are the
+rem user's own files (SUITE keeps them in its data folder), and SMAI's ONNX
+rem Runtime, DirectML and network are downloaded by SUITE on request - see
+rem Services\MotionEngine.fs.
 setlocal
 set "HERE=%~dp0"
 set "OUT=%~1"
@@ -41,7 +46,7 @@ call "%VCVARS%" >nul || exit /b 1
 if not exist "%OUT%" mkdir "%OUT%"
 if not exist "%OUT%\obj" mkdir "%OUT%\obj"
 pushd "%HERE%"
-cl /nologo /O2 /EHsc /W3 /MT /utf-8 /std:c++17 /I"%DLSS_SDK_DIR%\include" /Iinclude /Iinclude\ort sm_engine.cpp /Fo"%OUT%\obj\\" /Fe:"%OUT%\MotionForgeEngine.exe" /link "%NGX_LIB%" version.lib kernel32.lib user32.lib gdi32.lib advapi32.lib ole32.lib d3d11.lib d3d12.lib dxgi.lib d3dcompiler.lib WindowsApp.lib dwmapi.lib setupapi.lib
+cl /nologo /O2 /EHsc /W3 /MT /utf-8 /std:c++17 /I"%DLSS_SDK_DIR%\include" /Iinclude /Iinclude\ort /I"%HERE%..\Engine\external\streamline\include" sm_engine.cpp /Fo"%OUT%\obj\\" /Fe:"%OUT%\MotionForgeEngine.exe" /link "%NGX_LIB%" version.lib kernel32.lib user32.lib gdi32.lib advapi32.lib ole32.lib d3d11.lib d3d12.lib dxgi.lib d3dcompiler.lib WindowsApp.lib dwmapi.lib setupapi.lib
 set "CODE=%ERRORLEVEL%"
 popd
 if not "%CODE%"=="0" exit /b 2

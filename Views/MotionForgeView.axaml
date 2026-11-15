@@ -269,14 +269,6 @@
                                 <TextBlock Classes="MfHead" Text="GENERATOR FILES" />
                                 <TextBlock Text="{Binding FilesText}" FontSize="12" TextWrapping="Wrap"
                                            Foreground="#CBD5E1" />
-                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsDlss}">
-                                    <Button Classes="ApplePrimaryBtn" Click="OnPickDlssgClicked" Cursor="Hand" Padding="16,8">
-                                        <TextBlock Text="PICK NVNGX_DLSSG.DLL" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
-                                    </Button>
-                                    <Button Classes="AppleSecondaryBtn" Click="OnRemoveDlssgClicked" IsVisible="{Binding HasDlssgFile}" Cursor="Hand" Padding="14,8">
-                                        <TextBlock Text="REMOVE" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
-                                    </Button>
-                                </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsXess}">
                                     <Button Classes="ApplePrimaryBtn" Click="OnPickXessClicked" Cursor="Hand" Padding="16,8">
                                         <TextBlock Text="PICK XESS FILES" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />

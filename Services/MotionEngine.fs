@@ -245,6 +245,14 @@ module MotionCommand =
         b.Append("owner=").Append(owner).Append('\n') |> ignore
         b.ToString()
 
+    /// DLSS MFG runs through NVIDIA Streamline from SUITE's engine folder: the
+    /// engine is told where it is (it checks NVIDIA's signature on each file
+    /// before it loads them). Only for DLSS MFG - no other generator loads it.
+    let withStreamline (streamlineDir: string) (options: (string * string) list) =
+        match options |> List.tryFind (fun (k, _) -> k = "generator") with
+        | Some(_, "0") -> options @ [ "sl_dir", streamlineDir ]
+        | _ -> options
+
     /// The lines whose value moved since `sent` - only those go to a running engine.
     let changes (sent: (string * string) list) (now: (string * string) list) =
         let before = dict sent
@@ -266,12 +274,24 @@ module MotionFiles =
 
     let isEngineAvailable () = File.Exists(enginePath ())
 
-    let dlssgPath () = Path.Combine(userDir (), "nvngx_dlssg.dll")
     let xessDir () = Path.Combine(userDir (), "xess")
     let xessFiles = [ "libxess_fg.dll"; "libxell.dll" ]
 
-    let hasDlssg () = File.Exists(dlssgPath ())
     let hasXess () = xessFiles |> List.forall (fun f -> File.Exists(Path.Combine(xessDir (), f)))
+
+    /// DLSS MFG: NVIDIA Streamline 2.14.16 and its DLSS Frame Generation runtime,
+    /// shipped in SUITE's engine\ folder beside the Screen Engine (tools/build-setup.sh
+    /// copies them from NVIDIA's release). Nothing for the user to pick.
+    let streamlineFiles =
+        [ "sl.interposer.dll"; "sl.common.dll"; "sl.dlss_g.dll"; "sl.reflex.dll"; "sl.pcl.dll"; "nvngx_dlssg.dll" ]
+
+    let streamlineDir () = Path.Combine(AppContext.BaseDirectory, "engine")
+
+    /// The Streamline files missing from a folder, in the engine's order.
+    let missingStreamline (exists: string -> bool) (folder: string) =
+        streamlineFiles |> List.filter (fun f -> not (exists (Path.Combine(folder, f))))
+
+    let hasStreamline () = (missingStreamline File.Exists (streamlineDir ())).IsEmpty
 
     /// Who signed a file, by Authenticode; "" when it is not signed. (The
     /// engine checks the whole chain again before it maps the file - this is
@@ -286,21 +306,6 @@ module MotionFiles =
 
     let private version (path: string) =
         try FileVersionInfo.GetVersionInfo(path).FileVersion with _ -> ""
-
-    /// Copies the user's nvngx_dlssg.dll (NVIDIA's DLSS Frame Generation
-    /// runtime, from any game or NVIDIA's own SDK) into SUITE's data folder.
-    /// It is used as it is - nothing in it is changed.
-    let pickDlssg (source: string) : Result<string, string> =
-        try
-            if not (Path.GetFileName(source).Equals("nvngx_dlssg.dll", StringComparison.OrdinalIgnoreCase)) then
-                Error "Pick a file named nvngx_dlssg.dll (NVIDIA's DLSS Frame Generation runtime - games with DLSS 3 or 4 frame generation have it)."
-            elif signer source <> "NVIDIA Corporation" then
-                Error "That nvngx_dlssg.dll is not signed by NVIDIA, so it cannot be used."
-            else
-                Directory.CreateDirectory(userDir ()) |> ignore
-                File.Copy(source, dlssgPath (), true)
-                Ok(sprintf "nvngx_dlssg.dll %s is in place for DLSS MFG." (version source))
-        with ex -> Error ex.Message
 
     /// Copies Intel's libxess_fg.dll and libxell.dll (XeSS SDK 2.1 and later)
     /// from the files the user picked into SUITE's data folder.
@@ -319,7 +324,6 @@ module MotionFiles =
                     Ok(sprintf "XeSS Frame Generation %s is in place for XeSS MFG." (version (snd picked.Head)))
         with ex -> Error ex.Message
 
-    let removeDlssg () = try File.Delete(dlssgPath ()) with _ -> ()
     let removeXess () = for n in xessFiles do (try File.Delete(Path.Combine(xessDir (), n)) with _ -> ())
 
 /// SMAI's runtime and network, downloaded on request into the data folder
@@ -675,8 +679,9 @@ type MotionEngineHost() =
                 let folder = MotionFiles.engineDataDir ()
                 Directory.CreateDirectory folder |> ignore
                 let lines = MotionCommand.optionLines cards options
+                let startLines = MotionCommand.withStreamline (MotionFiles.streamlineDir ()) lines
                 let startFile = Path.Combine(folder, "start.cfg")
-                File.WriteAllText(startFile, MotionCommand.startFile lines MotionCommand.studyTexts keepLog Environment.ProcessId pickNow, UTF8Encoding(false))
+                File.WriteAllText(startFile, MotionCommand.startFile startLines MotionCommand.studyTexts keepLog Environment.ProcessId pickNow, UTF8Encoding(false))
                 let info =
                     ProcessStartInfo(
                         FileName = MotionFiles.enginePath (),

@@ -229,3 +229,28 @@ let ``claiming the overlay stops every other owner and not the claimer`` () =
     Assert.Contains("idle", stopped)
     Assert.Contains("b", stopped)
     Assert.DoesNotContain("a", stopped)
+
+// ---- DLSS MFG through NVIDIA Streamline ------------------------------------
+
+[<Fact>]
+let ``DLSS MFG is told where SUITE keeps Streamline; the other generators are not`` () =
+    let dir = @"C:\SUITE\engine"
+    let dlss = MotionCommand.withStreamline dir (MotionCommand.optionLines [||] { d with Generator = 0 }) |> dict
+    Assert.Equal(dir, dlss["sl_dir"])
+    for g in [ 1; 2; 3 ] do
+        let other = MotionCommand.withStreamline dir (MotionCommand.optionLines [||] { d with Generator = g }) |> dict
+        Assert.False(other.ContainsKey "sl_dir")
+
+[<Fact>]
+let ``the Streamline files missing from a folder are named in the engine's order`` () =
+    let folder = @"C:\SUITE\engine"
+    let present = set [ IO.Path.Combine(folder, "sl.interposer.dll"); IO.Path.Combine(folder, "sl.common.dll"); IO.Path.Combine(folder, "sl.pcl.dll") ]
+    Assert.Equal<string list>([ "sl.dlss_g.dll"; "sl.reflex.dll"; "nvngx_dlssg.dll" ], MotionFiles.missingStreamline present.Contains folder)
+    Assert.Empty(MotionFiles.missingStreamline (fun _ -> true) folder)
+    Assert.Equal(6, (MotionFiles.missingStreamline (fun _ -> false) folder).Length)
+
+[<Fact>]
+let ``the engine's word that Streamline cannot start reaches the page`` () =
+    let s = MotionStatus.apply MotionStatus.idle "@mfg unavailable DLSS Frame Generation is not supported on this graphics card (it needs an RTX 40 or 50) (Streamline 3)"
+    Assert.True(s.MfgUnavailable)
+    Assert.StartsWith("DLSS Frame Generation is not supported", s.MfgWhy)

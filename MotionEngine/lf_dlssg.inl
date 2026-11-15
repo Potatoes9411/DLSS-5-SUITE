@@ -6,6 +6,12 @@
 // file, run as NVIDIA ships it - x2..x6 on RTX 50, x2 on RTX 40 (lf_dlssg_card.inl says why the RTX 20/30
 // package and the RTX 40 adaptation are not here).
 //
+// DLSS 5 SUITE, later: DLSS MFG itself no longer runs here. NVIDIA's runtime refuses NGX's DLSS-G called directly
+// from a program named as this engine is (Init_Ext 0xBAD00002 with NVIDIA's own nvngx_dlssg.dll 310.9.16), so DLSS
+// MFG goes through NVIDIA Streamline, the supported way, which makes and presents its frames itself
+// (sm_streamline.inl). What is left of the NGX calls below (its parameter blocks, the evaluation parameters a pair
+// is described by) is the shared presenter's, which XeSS MFG, SMFG and SMAI still use.
+//
 // Two generators, one presenter (round 12). Everything here but the calls
 // into NGX is the engine's own and serves XeSS MFG as well (xe_mfg.inl): the
 // real frames and their small copies, the pairs and their places, how many
@@ -1617,7 +1623,8 @@ static NVSDK_NGX_Result FgCreateSafe(ID3D12GraphicsCommandList *list, NVSDK_NGX_
 }
 static bool EnsureFg(Pipeline &v, DXGI_FORMAT format)
 {
-    if (NgxSelected() && !lfCore.ngx_ready) { Trace("[dlssg] unavailable: NGX is not initialized on this adapter"); return false; }
+    // (DLSS MFG goes through Streamline - sm_streamline.inl - and never reaches the engine's own presenter.)
+    if (NgxSelected()) return false;
     const UINT full_w = v.stretched ? v.screen_w : v.work_w, full_h = v.stretched ? v.screen_h : v.work_h;
     // "Flow" in the app: frames in between are made at this share of the
     // picture and brought back to its size from the real frames around them
@@ -1642,64 +1649,6 @@ static bool EnsureFg(Pipeline &v, DXGI_FORMAT format)
     CloseFgResources();
     // XeSS MFG: nothing of NGX. Its own swap chain is made further down
     // (XeReady), once the pictures it copies into are there.
-    if (NgxSelected() && !g_fg.module)
-    {
-        // DLSS 5 SUITE: the runtime is only ever the user's own nvngx_dlssg.dll, which SUITE's Motion Forge page
-        // copies into %LOCALAPPDATA%\DLSS5Suite\Motion\user\ when they pick it (Services/MotionEngine.fs). Nothing
-        // is bundled beside the engine and nothing is changed in the file: it is checked (NVIDIA's signature, a
-        // chain to a machine root, the product name) before it is mapped, and run as it is.
-        wchar_t lib_path[MAX_PATH] = {};
-        if (SuiteMotionPath(lib_path, L"user", true) && wcslen(lib_path) < MAX_PATH - 20)
-            wcscat_s(lib_path, L"nvngx_dlssg.dll");
-        else lib_path[0] = 0;
-        if (!lib_path[0] || GetFileAttributesW(lib_path) == INVALID_FILE_ATTRIBUTES)
-        { Trace("[dlssg] unavailable: no nvngx_dlssg.dll was picked in the app (Motion Forge, DLSS MFG)"); return false; }
-        if (!TrustUserDll(lib_path, "nvngx_dlssg.dll"))
-        { Trace("[dlssg] unavailable: the nvngx_dlssg.dll picked is not NVIDIA-signed (%ls)", lib_path); return false; }
-        g_fg.module = LoadLibraryW(lib_path);
-        if (!g_fg.module) { Trace("[dlssg] unavailable: nvngx_dlssg.dll load failed (Windows %lu)", GetLastError()); return false; }
-        Trace("[dlssg] FG runtime: the user's own nvngx_dlssg.dll (verified NVIDIA signature)");
-        // NVIDIA's runtime, unpatched, makes one frame a pair below RTX 50 (lf_dlssg_card.inl).
-        g_fg_runtime_max = FgNativeMost(FgComputeCapability());
-        g_fg_count = std::min(g_fg_count, g_fg_runtime_max);
-    }
-    if (NgxSelected() && !g_fg.initialized)
-    {
-        auto init = reinterpret_cast<NrInitFn>(GetProcAddress(g_fg.module, "NVSDK_NGX_D3D12_Init_Ext"));
-        g_fg.create = reinterpret_cast<NrCreateFn>(GetProcAddress(g_fg.module, "NVSDK_NGX_D3D12_CreateFeature"));
-        g_fg.release = reinterpret_cast<NrReleaseFn>(GetProcAddress(g_fg.module, "NVSDK_NGX_D3D12_ReleaseFeature"));
-        g_fg_evaluate = reinterpret_cast<NrEvaluateFn>(GetProcAddress(g_fg.module, "NVSDK_NGX_D3D12_EvaluateFeature"));
-        if (!init || !g_fg.create || !g_fg.release || !g_fg_evaluate) return false;
-        if (!g_fg.params && NVSDK_NGX_FAILED(NVSDK_NGX_D3D12_AllocateParameters(&g_fg.params))) return false;
-        wchar_t cache[MAX_PATH] = {};
-        EngineDataPath(cache);
-        // LF_NGX_LOG=1 (round 42): the library's own lines about the driver's profile and the preset it applied go
-        // into the engine's log ("ReportOverrideStates: render preset (requested=, effective=)"); 2: all its lines.
-        if (NgxLibraryLogWanted() > 0)
-        {
-            g_fg.params->Set("Log.Callback", reinterpret_cast<void *>(&NgxLibraryLog));
-            g_fg.params->Set("Minimum.Logging.Level", static_cast<unsigned>(NVSDK_NGX_LOGGING_LEVEL_VERBOSE));
-        }
-        const auto result = FgInitSafe(init, cache, g_fg.params);
-        Trace("[dlssg] Init_Ext -> 0x%08X", result);
-        if (NVSDK_NGX_FAILED(result)) { Trace("[dlssg] unavailable: runtime initialization 0x%08X", result); return false; }
-        g_fg.initialized = true;
-    }
-    if (NgxSelected())
-    {
-        auto p = g_fg.params;
-        p->Reset();
-        p->Set("CreationNodeMask", 1u); p->Set("VisibilityNodeMask", 1u);
-        p->Set("Width", w); p->Set("Height", height);
-        p->Set(NVSDK_NGX_DLSSG_Parameter_BackbufferFormat, (unsigned)format);
-        p->Set(NVSDK_NGX_DLSSG_Parameter_InternalWidth, v.work_w);
-        p->Set(NVSDK_NGX_DLSSG_Parameter_InternalHeight, v.work_h);
-        p->Set(NVSDK_NGX_DLSSG_Parameter_DynamicResolution, 0u);
-        if (!CmdOpen()) return false;
-        const auto result = FgCreateSafe(lfCore.cmd, p, &g_fg.feature);
-        if (!FgAwait(lfCore.timeline, CmdSubmit(), 30000) || NVSDK_NGX_FAILED(result) || !g_fg.feature)
-        { Trace("[dlssg] unavailable: CreateFeature 0x%08X (adapter/driver/runtime support)", result); return false; }
-    }
     if (!StagedCreate(g_fg.depth, v.work_w, v.work_h, DXGI_FORMAT_R32_FLOAT, v.work_w * 4)) return false;
     std::vector<float> depth(static_cast<size_t>(v.work_w) * v.work_h, 0.5f);
     if (!StagedFill(g_fg.depth, reinterpret_cast<BYTE *>(depth.data()), v.work_w * 4, v.work_h) || !CmdOpen()) return false;
@@ -2088,6 +2037,8 @@ static void FgSplit()
 
 static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES state)
 {
+    // (DLSS MFG: NVIDIA Streamline makes and presents its frames - sm_streamline.inl, from ShowPassThrough.)
+    if (NgxSelected()) return false;
     if (!FgRequested()) { StopFgPresentation(); return false; }
     if (!EnsureFg(v, color->GetDesc().Format))
     { Trace("[dlssg] unavailable: the runtime could not create frame generation; ordinary output retained"); g_fg.failed = true; CloseFgResources(); return false; }
@@ -2669,39 +2620,7 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
         }
         else { MsmForget(); msmai::Forget(); }
     }
-    for (unsigned index = 0; index < evaluated && NgxSelected(); ++index)
-    {
-        opt.multiFrameIndex = index + 1;
-        ep.pOutputInterpFrame = g_fg.output[index].get();
-        ep.pOutputDisableInterpolation = g_fg.disable.get();
-        auto pre = Barrier(model_color, model_state, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        if (model_state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) lfCore.cmd->ResourceBarrier(1, &pre);
-        auto out_pre = Barrier(g_fg.output[index].get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        lfCore.cmd->ResourceBarrier(1, &out_pre);
-        const auto result = NGX_D3D12_EVALUATE_DLSSG(lfCore.cmd, g_fg.feature, p, &ep, &opt);
-        auto disable_pre = Barrier(g_fg.disable.get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        lfCore.cmd->ResourceBarrier(1, &disable_pre);
-        lfCore.cmd->CopyBufferRegion(g_fg.disable_readback.get(), index * 4, g_fg.disable.get(), 0, 4);
-        auto disable_post = Barrier(g_fg.disable.get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        lfCore.cmd->ResourceBarrier(1, &disable_post);
-        auto out_post = Barrier(g_fg.output[index].get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        lfCore.cmd->ResourceBarrier(1, &out_post);
-        auto post = Barrier(model_color, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, model_state);
-        if (model_state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) lfCore.cmd->ResourceBarrier(1, &post);
-        FgCostMark(lfCore.cmd, index == 0 ? "eval1" : index == 1 ? "eval2" : "eval+");
-        if (!NVSDK_NGX_FAILED(result) && index + 1 < evaluated) FgSplit();
-        if (NVSDK_NGX_FAILED(result))
-        {
-            FgAwait(lfCore.timeline, CmdSubmit(), 30000);
-            if (g_fg_count > 1) {
-                const unsigned next = g_fg_count > 3 ? 3 : 1;
-                Trace("[dlssg] multiplier x%u refused 0x%08X; retrying x%u", g_fg_count + 1, result, next + 1);
-                CloseFgResources(); g_fg_count = next; return false;
-            }
-            Trace("[dlssg] unavailable: Evaluate 0x%08X; ordinary output retained", result);
-            g_fg.failed = true; CloseFgResources(); return false;
-        }
-    }
+    // (DLSS MFG's own evaluation was here: it goes through Streamline now - sm_streamline.inl.)
     FgSlot *slot = nullptr;
     {
         std::lock_guard<std::mutex> lock(g_fg.mutex);

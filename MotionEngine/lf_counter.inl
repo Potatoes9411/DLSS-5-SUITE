@@ -185,6 +185,14 @@ static void CounterPresented(double source, bool own_capture)
     c.shown_fps = static_cast<int>(shown / span + 0.5);
 }
 
+// DLSS MFG through Streamline (sm_streamline.inl): the frames DLSS-G presented itself after a real one's Present,
+// counted with the frames shown.
+static void CounterAddShown(unsigned frames)
+{
+    std::lock_guard<std::mutex> hold(g_counter.lock);
+    g_counter.shown += frames;
+}
+
 // The two figures for the app's status line: real frames and all frames shown
 // a second, -1 while there is no rate (a still picture).
 static void CounterRates(int &base, int &shown)
