@@ -144,6 +144,7 @@
                                 <TextBlock Classes="MfLabel" Text="Multiplier" />
                                 <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding Multipliers}" SelectedIndex="{Binding MultiplierIndex, Mode=TwoWay}" />
                             </Grid>
+                            <TextBlock Classes="MfHint" Text="{Binding MultiplierNote}" IsVisible="{Binding HasMultiplierNote}" />
                             <Grid ColumnDefinitions="130,*,56" ColumnSpacing="10" IsVisible="{Binding IsCustomMultiplier}"
                                   ToolTip.Tip="Any multiplier, such as 2.1 or 3.7: the game's own frame rate times it, never above the screen. DLSS MFG and XeSS MFG alternate their pairs (for 2.5: 2, 3, 2, 3 frames in between).">
                                 <TextBlock Classes="MfLabel" Text="Custom multiplier" />
@@ -264,7 +265,7 @@
                     <StackPanel Grid.Column="1" Spacing="12">
 
                         <!-- The generator's own files -->
-                        <Border Classes="MfCard" IsVisible="{Binding !IsSmfg}">
+                        <Border Classes="MfCard" IsVisible="{Binding HasGeneratorFiles}">
                             <StackPanel Spacing="8">
                                 <TextBlock Classes="MfHead" Text="GENERATOR FILES" />
                                 <TextBlock Text="{Binding FilesText}" FontSize="12" TextWrapping="Wrap"
@@ -467,6 +468,14 @@
                                     <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding MsmSearches}" SelectedIndex="{Binding MsmSearchIndex, Mode=TwoWay}" />
                                 </Grid>
                                 <TextBlock Classes="MfHint" Text="SMAI's network finds the motion itself." IsVisible="{Binding IsSmai}" />
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" IsVisible="{Binding IsSuiteFg}" ToolTip.Tip="How the movement between two frames is found for SUITE FG.">
+                                    <TextBlock Classes="MfLabel" Text="Motion estimation" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding SuiteMotionSources}" SelectedIndex="{Binding SuiteMotionSourceIndex, Mode=TwoWay}" />
+                                </Grid>
+                                <Grid ColumnDefinitions="130,*" ColumnSpacing="10" IsVisible="{Binding IsFsr}" ToolTip.Tip="How the movement between two frames is found for FSR FG.">
+                                    <TextBlock Classes="MfLabel" Text="Motion estimation" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding FsrMotionSources}" SelectedIndex="{Binding FsrMotionSourceIndex, Mode=TwoWay}" />
+                                </Grid>
 
                                 <TextBlock Classes="MfGroup" Text="SHORTCUT" />
                                 <Grid ColumnDefinitions="130,*" ColumnSpacing="10" ToolTip.Tip="Starts and stops Motion Forge while you play: the game in front is taken at once, no countdown.">
@@ -615,9 +624,6 @@
                     </Border>
                 </Grid>
 
-                <!-- Condition 1 of NODIX TECH's permission: his credit stays with his work. -->
-                <TextBlock Classes="MfHint" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,2,0,0"
-                           Text="Motion Forge is MFG SUPER MOTION by NODIX TECH, folded into DLSS 5 SUITE with his permission. Copyright (c) 2026 NODIX-TECH." />
             </StackPanel>
         </ScrollViewer>
     </Grid>

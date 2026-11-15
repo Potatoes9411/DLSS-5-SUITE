@@ -63,7 +63,7 @@ static unsigned ApplyOption(const char *key, const char *value)
 {
     if (KeyIs(key, "generator"))
     {
-        if (!g_generator_locked) g_generator = std::clamp(atoi(value), 0, 2);
+        if (!g_generator_locked) g_generator = std::clamp(atoi(value), 0, 4);     // (DLSS 5 SUITE: 3 SUITE FG, 4 FSR FG)
         return 0;
     }
     // The lines Adaptive Motion Learning shows while it studies a game, in the app's language: aml_say0 .. 8.
@@ -215,6 +215,12 @@ static unsigned ApplyOption(const char *key, const char *value)
     if (KeyIs(key, "sl_dir"))
     {
         if (MultiByteToWideChar(CP_UTF8, 0, value, -1, g_sl_dir, MAX_PATH) == 0) g_sl_dir[0] = 0;
+        return 0;
+    }
+    // DLSS 5 SUITE: where SUITE keeps AMD's FidelityFX runtime for FSR FG (read once, when it is loaded: fsr_fg.inl).
+    if (KeyIs(key, "ffx_dir"))
+    {
+        if (MultiByteToWideChar(CP_UTF8, 0, value, -1, g_ffx_dir, MAX_PATH) == 0) g_ffx_dir[0] = 0;
         return 0;
     }
     // Read at the start only: they decide what is taken.

@@ -212,3 +212,41 @@ static bool TrustIntelDll(const wchar_t *path)
     lf_trust::HoldOpen(path);
     return true;
 }
+
+// DLSS 5 SUITE: FSR FG's runtime (amd_fidelityfx_dx12.dll, fsr_fg.inl) gets the same: a valid Authenticode signature
+// by Advanced Micro Devices, chained to a root in this machine's own store, and a version resource that names an AMD
+// product; then it is held open.
+static bool TrustAmdDll(const wchar_t *path)
+{
+    FILETIME as_of = {};
+    if (!lf_trust::WindowsAccepts(path, as_of)) return false;
+    lf_trust::Store store;
+    lf_trust::Cert signer = lf_trust::SigningCertificate(path, store);
+    if (!signer || !lf_trust::ReachesMachineRoot(signer.get(), as_of)) return false;
+    const DWORD chars = CertGetNameStringW(signer.get(), CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nullptr, nullptr, 0);
+    if (chars == 0) return false;
+    std::wstring name(chars, L'\0');
+    if (CertGetNameStringW(signer.get(), CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nullptr, &name[0], chars) == 0) return false;
+    if (wcscmp(name.c_str(), L"Advanced Micro Devices") != 0 && wcscmp(name.c_str(), L"Advanced Micro Devices, Inc.") != 0) return false;
+    signer.reset();
+    store.reset();
+    DWORD ignored = 0;
+    const DWORD bytes = GetFileVersionInfoSizeW(path, &ignored);
+    if (bytes == 0) return false;
+    std::vector<unsigned char> info(bytes);
+    if (!GetFileVersionInfoW(path, 0, bytes, info.data())) return false;
+    struct Language { WORD id; WORD codepage; } *languages = nullptr;
+    UINT languages_bytes = 0;
+    if (!VerQueryValueW(info.data(), L"\\VarFileInfo\\Translation", reinterpret_cast<void **>(&languages), &languages_bytes) ||
+        languages_bytes < sizeof(Language))
+        return false;
+    wchar_t key[256];
+    _snwprintf_s(key, 256, _TRUNCATE, L"\\StringFileInfo\\%04x%04x\\ProductName", languages[0].id, languages[0].codepage);
+    wchar_t *product = nullptr;
+    UINT product_chars = 0;
+    if (!VerQueryValueW(info.data(), key, reinterpret_cast<void **>(&product), &product_chars) || product == nullptr ||
+        wcsncmp(product, L"AMD", 3) != 0)
+        return false;
+    lf_trust::HoldOpen(path);
+    return true;
+}

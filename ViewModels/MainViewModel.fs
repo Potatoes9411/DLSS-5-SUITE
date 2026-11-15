@@ -1505,7 +1505,6 @@ type MainViewModel() as this =
                 this.RaisePropertyChanged("SelectedSortIndex")
                 this.RaisePropertyChanged("SupportPromptText")
                 this.RaisePropertyChanged("DonateLabel")
-                this.RaisePropertyChanged("OriginalDonateLabel")
                 this.RaiseDlss5State()
 
                 GameScanner.saveSettings
@@ -1930,11 +1929,10 @@ type MainViewModel() as this =
 
     member this.ShowSupportCard =
         matchesCard searchText [ "support"; "donate"; "ko-fi"; "kofi"; "tutorial"; "tutorials"; "guide"
-                                 "youtube"; "video"; "help"; "channel"; "nodix" ]
+                                 "youtube"; "video"; "help"; "channel" ]
 
     member this.ShowAboutCard =
-        matchesCard searchText [ "about"; "update"; "updates"; "version"; "credits"; "copyright"
-                                 "dlss 5 manager"; "nodix"; "numidia" ]
+        matchesCard searchText [ "about"; "update"; "updates"; "version"; "credits"; "copyright" ]
 
     member this.ShowUniversalCard =
         matchesCard searchText [ "universal"; "lossless"; "scaling"; "nr"; "neural"; "steam"; "readiness" ]
@@ -4180,63 +4178,20 @@ type MainViewModel() as this =
 
     member this.SupportPromptText = loc.SupportPromptText
 
-    // Two donation targets, by agreement with the original developer: tips are
-    // split 50-50 between this fork and the author of DLSS 5 MANAGER. Both
-    // links are shown side by side and each is labelled with whose it is, so a
-    // user always knows who they are actually tipping.
     member this.DonateUrl = "https://ko-fi.com/potatoes9411"
     member this.DonateLabel = loc.BtnSupportThisBuild
 
-    member this.OriginalDonateUrl = "https://ko-fi.com/nodix"
-    member this.OriginalDonateLabel = loc.BtnSupportOriginal
-
-    // The two homepages, kept beside the two Ko-fi links so it is obvious
-    // which project each one belongs to.
     member this.SiteUrl = "https://potatoes-dev.com"
     member this.SiteLabel = "potatoes-dev.com"
 
-    member this.OriginalSiteUrl = "https://numidiastudios.com"
-    member this.OriginalSiteLabel = "numidiastudios.com"
-    /// Like DonateUrl, this belongs to the original creator - the button is
-    /// labelled "Watch tutorials" and its tooltip names youtube.com/@Nodix-Tech.
+    /// The "Watch tutorials" button: step-by-step videos on YouTube.
     member this.TutorialsUrl = "https://youtube.com/@Nodix-Tech"
 
     // Authorship & rights, shown in the About card.
-    //
-    // This is a modified build, so the credit runs in two lines: what it was
-    // built from and who made that, then who made this. Dropping the first
-    // line would take the original authors' name off work that is still
-    // largely theirs, so it stays above our own.
-    member this.OriginalCreditsText =
-        "Modified version of DLSS 5 MANAGER · Built by NODIX TECH · Published by Numidia Studios"
-
     member this.CreditsText = "Built by Potatoes9411 · Published by Potatoes-dev"
 
-    // ---------------------------------------------------------------------
-    // THE ORIGINAL, AND THE TERMS THIS BUILD EXISTS UNDER
-    // ---------------------------------------------------------------------
-    // NODIX TECH gave permission for this modified build on conditions, and
-    // two of them are things the application itself has to carry: the
-    // original's download location must not be changed or replaced, and its
-    // link must be present; and once their community guides site is live, it
-    // must be linked from here too. Both live in UpdateChecker so there is
-    // one place to look.
-    member this.OriginalDownloadUrl = UpdateChecker.OriginalDownloadUrl
-
-    member this.OriginalDownloadText = "Get the original DLSS 5 MANAGER"
-
-    member this.GuidesUrl = UpdateChecker.GuidesUrl
-
-    /// The guides button hides itself until there is a site to point at, so
-    /// shipping before it launches costs nothing and launching it is a
-    /// one-line change.
-    member this.HasGuidesLink = not (String.IsNullOrWhiteSpace(UpdateChecker.GuidesUrl))
-
-    member this.GuidesText = "Community guides"
-
     member this.CopyrightText =
-        sprintf "© %d Potatoes-dev. Based on DLSS 5 MANAGER, © %d Numidia Studios. All rights reserved."
-            DateTime.Now.Year DateTime.Now.Year
+        sprintf "© %d Potatoes-dev. All rights reserved." DateTime.Now.Year
 
     member this.IsCheckingUpdates
         with get () = isCheckingUpdates

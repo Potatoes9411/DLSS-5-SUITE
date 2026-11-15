@@ -124,12 +124,21 @@ module MotionStatus =
 module MotionCommand =
     let private flag value = if value then "1" else "0"
 
-    /// Can this generator run on that card? (2 SMFG and 3 SMAI run on any.)
+    /// Can this generator run on that card? (2 SMFG, 3 SMAI, 4 SUITE FG and 5 FSR FG run on any.)
     let runsOn (generator: int) (card: MotionCard) =
         match generator with
         | 0 -> card.Dlss
         | 1 -> card.Xess
         | _ -> true
+
+    /// The engine's number for the page's generator: 0 DLSS MFG, 1 XeSS MFG, 2 SMFG (and SMAI, by msm_ai), 3 SUITE FG,
+    /// 4 FSR FG.
+    let engineGenerator (generator: int) =
+        match generator with
+        | 3 -> 2
+        | 4 -> 3
+        | 5 -> 4
+        | g -> g
 
     /// A profile in the engine's own words - his optionLines, line for line,
     /// less xess_tensor (lf_dlssg_card.inl says why it is gone).
@@ -139,8 +148,9 @@ module MotionCommand =
             |> Option.map (fun c -> c.Index) |> Option.defaultValue -1
         let tenths = MotionPrefs.multiplierTenths o
         let tri list which kept = string (MotionPrefs.triValue list which kept)
-        [ // SMAI is the engine's SMFG path (generator 2) with the network making the frames (msm_ai 1).
-          "generator", string (if o.Generator = 3 then 2 else o.Generator)
+        [ // SMAI is the engine's SMFG path (generator 2) with the network making the frames (msm_ai 1); SUITE FG and
+          // FSR FG are the engine's generators 3 and 4.
+          "generator", string (engineGenerator o.Generator)
           "gpu", string card
           "mfg", flag o.FrameGeneration
           // Adaptive and x2.5-like multipliers go by the beat: the generator is made for x6's most.
@@ -205,6 +215,10 @@ module MotionCommand =
           (match o.Generator with
            | 1 -> (match o.XessMotionSource with | 1 -> "1" | 2 -> "0" | _ -> "2")
            | 2 | 3 -> "2"
+           // SUITE FG: the GPU estimate (the Screen Engine's builtin) or NVIDIA Optical Flow (its nvof).
+           | 4 -> (match o.SuiteMotionSource with | 1 -> "0" | _ -> "1")
+           // FSR FG: the GPU estimate, FSR's own optical flow alone (a field of noughts), or NVIDIA Optical Flow.
+           | 5 -> (match o.FsrMotionSource with | 1 -> "2" | 2 -> "0" | _ -> "1")
            | _ -> (match o.MotionSource with | 1 -> "0" | 2 -> "1" | _ -> "2"))
           "window_mode", string o.WindowMode
           "delay", string MotionPrefs.countdowns[Math.Clamp(o.Countdown, 0, MotionPrefs.countdowns.Length - 1)] ]
@@ -253,6 +267,13 @@ module MotionCommand =
         | Some(_, "0") -> options @ [ "sl_dir", streamlineDir ]
         | _ -> options
 
+    /// FSR FG loads AMD's FidelityFX runtime from SUITE's engine folder: the engine is told where it is (it checks
+    /// AMD's signature before it loads it). Only for FSR FG.
+    let withFidelityFx (fidelityFxDir: string) (options: (string * string) list) =
+        match options |> List.tryFind (fun (k, _) -> k = "generator") with
+        | Some(_, "4") -> options @ [ "ffx_dir", fidelityFxDir ]
+        | _ -> options
+
     /// The lines whose value moved since `sent` - only those go to a running engine.
     let changes (sent: (string * string) list) (now: (string * string) list) =
         let before = dict sent
@@ -292,6 +313,15 @@ module MotionFiles =
         streamlineFiles |> List.filter (fun f -> not (exists (Path.Combine(folder, f))))
 
     let hasStreamline () = (missingStreamline File.Exists (streamlineDir ())).IsEmpty
+
+    /// FSR FG: AMD's FidelityFX runtime (SDK 1.1.4, MIT), shipped in SUITE's engine\ folder beside the Screen
+    /// Engine (tools/get-fidelityfx.ps1 fetches it, tools/build-setup.sh copies it). Nothing for the user to pick.
+    [<Literal>]
+    let FidelityFxFile = "amd_fidelityfx_dx12.dll"
+
+    let fidelityFxDir () = streamlineDir ()
+
+    let hasFidelityFx () = File.Exists(Path.Combine(fidelityFxDir (), FidelityFxFile))
 
     /// Who signed a file, by Authenticode; "" when it is not signed. (The
     /// engine checks the whole chain again before it maps the file - this is
@@ -684,7 +714,9 @@ type MotionEngineHost() =
                 let streamlineDir =
                     if lines |> List.contains ("generator", "0") then fst (DlssgVersions.streamlineDirFor DlssgVersions.MotionForge)
                     else MotionFiles.streamlineDir ()
-                let startLines = MotionCommand.withStreamline streamlineDir lines
+                let startLines =
+                    MotionCommand.withStreamline streamlineDir lines
+                    |> MotionCommand.withFidelityFx (MotionFiles.fidelityFxDir ())
                 let startFile = Path.Combine(folder, "start.cfg")
                 File.WriteAllText(startFile, MotionCommand.startFile startLines MotionCommand.studyTexts keepLog Environment.ProcessId pickNow, UTF8Encoding(false))
                 let info =

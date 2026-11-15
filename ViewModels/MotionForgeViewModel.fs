@@ -73,7 +73,7 @@ type MotionForgeViewModel() as this =
 
     // The page's lists. The upscalers in the order the page shows them; the
     // engine's own numbers are upscalerOrder (his app put SMSR second).
-    let generatorNames = [| "DLSS MFG"; "XeSS MFG"; "SMFG 1.3"; "SMAI 1.0" |]
+    let generatorNames = [| "DLSS MFG"; "XeSS MFG"; "SMFG 1.3"; "SMAI 1.0"; "SUITE FG"; "AMD FSR 3.1 FG" |]
     let upscalerOrder = [| 0; 5; 1; 2; 3; 4 |]
     let upscalerNames = [| "Off"; "SMSR 1.0"; "Sharpness only"; "Integer"; "Nearest Neighbor"; "Anime4K" |]
     let multiplierNames = [| "x2"; "x3"; "x4"; "x5"; "x6"; "Custom" |]
@@ -83,6 +83,8 @@ type MotionForgeViewModel() as this =
     let queueNames = [| "0 · least delay"; "1 · balanced"; "2 · smoothest" |]
     let motionNames = [| "DLSS MFG's own"; "NVIDIA Optical Flow"; "GPU estimate" |]
     let xessMotionNames = [| "XeSS MFG's own"; "GPU estimate"; "NVIDIA Optical Flow" |]
+    let suiteMotionNames = [| "GPU estimate"; "NVIDIA Optical Flow" |]
+    let fsrMotionNames = [| "GPU estimate"; "FSR's own optical flow"; "NVIDIA Optical Flow" |]
     let searchNames = [| "SMFG (full search)"; "SMFG · Fast" |]
     let captureNames = [| "DXGI (Desktop Duplication)"; "WGC (Windows Graphics Capture)" |]
     let windowNames = [| "Borderless"; "Scaled to screen"; "Windowed (as it is)" |]
@@ -113,11 +115,11 @@ type MotionForgeViewModel() as this =
           "UpscalerIndex"; "Stretch"; "SmsrBoost"; "Sharpness"; "OverSharpness"
           "Vrr"; "Hdr"; "StillPixels"; "LimitToScreen"; "MultiDisplay"; "FpsCounter"; "FpsCounterModeIndex"; "FpsCounterSize"
           "LockRefresh"; "QueueTargetIndex"; "FrameLimit"; "FrameLimitText"; "GameFpsIndex"; "SyncModeIndex"; "Bloom"; "BloomWide"
-          "MotionSourceIndex"; "XessMotionSourceIndex"; "MsmSearchIndex"; "CaptureApiIndex"; "WindowModeIndex"; "CountdownIndex"; "Spout"
+          "MotionSourceIndex"; "XessMotionSourceIndex"; "SuiteMotionSourceIndex"; "FsrMotionSourceIndex"; "MsmSearchIndex"; "CaptureApiIndex"; "WindowModeIndex"; "CountdownIndex"; "Spout"
           "GpuIndex"; "GpuPriorityIndex"; "CropLeft"; "CropTop"; "CropRight"; "CropBottom"
           "CursorClip"; "CursorSpeed"; "CursorHide"; "CursorScale"
-          "IsDlss"; "IsXess"; "IsSmfg"; "IsSmai"; "IsDlssOrXess"; "IsFixed"; "IsAdaptive"; "IsCustomMultiplier"; "IsCustomGame"
-          "IsUpscaling"; "IsSmsr"; "ShowSmtGear"; "FlowNote"; "NeedsFiles"; "FilesText"; "CanStart"; "GeneratorNote" ]
+          "IsDlss"; "IsXess"; "IsSmfg"; "IsSmai"; "IsSuiteFg"; "IsFsr"; "IsDlssOrXess"; "HasGeneratorFiles"; "IsFixed"; "IsAdaptive"; "IsCustomMultiplier"; "IsCustomGame"
+          "IsUpscaling"; "IsSmsr"; "ShowSmtGear"; "FlowNote"; "MultiplierNote"; "HasMultiplierNote"; "NeedsFiles"; "FilesText"; "CanStart"; "GeneratorNote" ]
 
     let notify (names: string list) =
         if names |> List.contains "ProfileNames" then
@@ -430,14 +432,19 @@ type MotionForgeViewModel() as this =
         with get () = (options ()).Generator
         and set v =
             if v >= 0 && v < MotionPrefs.generators then
-                this.Update([ "GeneratorIndex"; "IsDlss"; "IsXess"; "IsSmfg"; "IsSmai"; "IsDlssOrXess"; "FlowNote"; "NeedsFiles"; "FilesText"; "CanStart"; "GeneratorNote"; "GpuIndex"; "ShowSmtGear" ],
+                this.Update([ "GeneratorIndex"; "IsDlss"; "IsXess"; "IsSmfg"; "IsSmai"; "IsSuiteFg"; "IsFsr"; "IsDlssOrXess"; "HasGeneratorFiles"; "FlowNote"; "MultiplierNote"; "HasMultiplierNote"
+                              "NeedsFiles"; "FilesText"; "CanStart"; "GeneratorNote"; "GpuIndex"; "ShowSmtGear" ],
                             fun o -> { o with Generator = v })
 
     member _.IsDlss = (options ()).Generator = 0
     member _.IsXess = (options ()).Generator = 1
     member _.IsSmfg = (options ()).Generator = 2
     member _.IsSmai = (options ()).Generator = 3
+    member _.IsSuiteFg = (options ()).Generator = MotionPrefs.suiteFg
+    member _.IsFsr = (options ()).Generator = MotionPrefs.fsrFg
     member _.IsDlssOrXess = (options ()).Generator <= 1
+    /// The generators that come with files to pick, download or check (SMFG and SUITE FG have none).
+    member _.HasGeneratorFiles = let g = (options ()).Generator in g <> 2 && g <> MotionPrefs.suiteFg
 
     /// What the picked generator runs on, in a line.
     member _.GeneratorNote =
@@ -445,11 +452,13 @@ type MotionForgeViewModel() as this =
         | 0 -> "NVIDIA DLSS Multi Frame Generation through NVIDIA Streamline, which comes with SUITE; pick its DLSS Frame Generation version under GENERATOR FILES. Needs an NVIDIA RTX 40 (x2) or RTX 50 (up to x6) card; a higher multiplier runs at the card's most. Older cards: use SMFG."
         | 1 -> "Intel's frame generation, from your own XeSS SDK files. Runs on many cards; one frame in between a pair outside Intel Arc."
         | 2 -> "Motion Forge's own generator. Any graphics card, the lightest of all."
+        | 4 -> "The Screen Engine's own frame generation: each frame in between drawn from the two real frames along the motion SUITE works out. Any graphics card, x2 to x6."
+        | 5 -> "AMD FidelityFX Super Resolution 3.1 Frame Generation, which comes with SUITE. Any graphics card (AMD, NVIDIA or Intel); one frame in between a pair, so x2."
         | _ -> "A neural network (SMFG Net) on your card through DirectML - best on cards with AI units. Heavier than SMFG; a one-time download."
 
     member _.FrameModeIndex
         with get () = if (options ()).Adaptive then 1 else 0
-        and set v = this.Update([ "FrameModeIndex"; "IsFixed"; "IsAdaptive"; "IsCustomMultiplier" ], fun o -> { o with Adaptive = (v = 1) })
+        and set v = this.Update([ "FrameModeIndex"; "IsFixed"; "IsAdaptive"; "IsCustomMultiplier"; "MultiplierNote"; "HasMultiplierNote" ], fun o -> { o with Adaptive = (v = 1) })
 
     member _.IsFixed = not (options ()).Adaptive
     member _.IsAdaptive = (options ()).Adaptive
@@ -458,19 +467,29 @@ type MotionForgeViewModel() as this =
         with get () = let o = options () in if o.MultiplierCustom > 0 then 5 else o.Mode
         and set v =
             if v = 5 then
-                this.Update([ "MultiplierIndex"; "IsCustomMultiplier"; "CustomMultiplier"; "CustomMultiplierText" ],
+                this.Update([ "MultiplierIndex"; "IsCustomMultiplier"; "CustomMultiplier"; "CustomMultiplierText"; "MultiplierNote"; "HasMultiplierNote" ],
                             fun o -> { o with MultiplierCustom = (if o.MultiplierCustom > 0 then o.MultiplierCustom else (o.Mode + 2) * 10 + 5) })
             elif v >= 0 && v <= 4 then
-                this.Update([ "MultiplierIndex"; "IsCustomMultiplier"; "CustomMultiplier"; "CustomMultiplierText" ], fun o -> { o with Mode = v; MultiplierCustom = 0 })
+                this.Update([ "MultiplierIndex"; "IsCustomMultiplier"; "CustomMultiplier"; "CustomMultiplierText"; "MultiplierNote"; "HasMultiplierNote" ], fun o -> { o with Mode = v; MultiplierCustom = 0 })
 
     member _.IsCustomMultiplier = not (options ()).Adaptive && (options ()).MultiplierCustom > 0
+
+    /// A generator that cannot go as high as the multiplier picked says so (FSR 3.1: one frame in between a pair).
+    member _.MultiplierNote =
+        let o = options ()
+        let most = MotionPrefs.mostMultiplier o.Generator
+        if most < 6 && (o.Adaptive || MotionPrefs.multiplierTenths o > most * 10) then
+            sprintf "FSR 3.1 makes one frame in between each pair: it runs at x%d whatever is picked here." most
+        else ""
+
+    member this.HasMultiplierNote = this.MultiplierNote <> ""
 
     /// x1.1 .. x6.0, in tenths underneath.
     member _.CustomMultiplier
         with get () = float (MotionPrefs.multiplierTenths (options ())) / 10.0
         and set (v: float) =
             let tenths = Math.Clamp(int (Math.Round(v * 10.0)), 11, MotionPrefs.multiplierCustomMost)
-            this.Update([ "CustomMultiplier"; "CustomMultiplierText" ], fun o -> { o with MultiplierCustom = tenths })
+            this.Update([ "CustomMultiplier"; "CustomMultiplierText"; "MultiplierNote"; "HasMultiplierNote" ], fun o -> { o with MultiplierCustom = tenths })
 
     member this.CustomMultiplierText = sprintf "x%.1f" this.CustomMultiplier
 
@@ -502,7 +521,9 @@ type MotionForgeViewModel() as this =
 
     member _.FlowNote =
         let o = options ()
-        if o.Generator >= 2 then "SMFG and SMAI make their frames at the picture's full size."
+        if o.Generator = 2 || o.Generator = 3 then "SMFG and SMAI make their frames at the picture's full size."
+        elif o.Generator = MotionPrefs.suiteFg || o.Generator = MotionPrefs.fsrFg then
+            sprintf "Frames in between are made at the picture's full size; the motion is worked out at %d%% of it." (MotionPrefs.effectiveFlow o)
         else sprintf "Frames in between are made at %d%% of the picture, then rebuilt at full size." (MotionPrefs.effectiveFlow o)
 
     member _.DlssPresetIndex
@@ -604,6 +625,8 @@ type MotionForgeViewModel() as this =
     member _.SyncModes = syncNames
     member _.MotionSources = motionNames
     member _.XessMotionSources = xessMotionNames
+    member _.SuiteMotionSources = suiteMotionNames
+    member _.FsrMotionSources = fsrMotionNames
     member _.MsmSearches = searchNames
     member _.CaptureApis = captureNames
     member _.WindowModes = windowNames
@@ -630,6 +653,8 @@ type MotionForgeViewModel() as this =
     member _.BloomWide with get () = float (options ()).BloomWide and set (v: float) = this.Update([ "BloomWide" ], fun o -> { o with BloomWide = int (Math.Round v) })
     member _.MotionSourceIndex with get () = (options ()).MotionSource and set v = this.Update([ "MotionSourceIndex" ], fun o -> { o with MotionSource = v })
     member _.XessMotionSourceIndex with get () = (options ()).XessMotionSource and set v = this.Update([ "XessMotionSourceIndex" ], fun o -> { o with XessMotionSource = v })
+    member _.SuiteMotionSourceIndex with get () = (options ()).SuiteMotionSource and set v = this.Update([ "SuiteMotionSourceIndex" ], fun o -> { o with SuiteMotionSource = v })
+    member _.FsrMotionSourceIndex with get () = (options ()).FsrMotionSource and set v = this.Update([ "FsrMotionSourceIndex" ], fun o -> { o with FsrMotionSource = v })
     member _.MsmSearchIndex with get () = (options ()).MsmSearch and set v = this.Update([ "MsmSearchIndex" ], fun o -> { o with MsmSearch = v })
     member _.CaptureApiIndex with get () = (options ()).CaptureApi and set v = this.Update([ "CaptureApiIndex" ], fun o -> { o with CaptureApi = v })
     member _.WindowModeIndex with get () = (options ()).WindowMode and set v = this.Update([ "WindowModeIndex" ], fun o -> { o with WindowMode = v })
@@ -720,6 +745,7 @@ type MotionForgeViewModel() as this =
         | 0 -> not (MotionFiles.hasStreamline ())
         | 1 -> not (MotionFiles.hasXess ())
         | 3 -> not (MotionAi.isInstalled ())
+        | 5 -> not (MotionFiles.hasFidelityFx ())
         | _ -> false
 
     member _.FilesText =
@@ -733,6 +759,9 @@ type MotionForgeViewModel() as this =
         | 1 -> "XeSS MFG needs libxess_fg.dll and libxell.dll from Intel's XeSS SDK (2.1 or later). Pick both."
         | 3 when MotionAi.isInstalled () -> "SMAI's runtime and network are installed."
         | 3 -> "SMAI needs ONNX Runtime, DirectML and its network - a one-time download."
+        | 5 when MotionFiles.hasFidelityFx () ->
+            "FSR FG runs through AMD's FidelityFX runtime (SDK 1.1.4), installed with SUITE (its engine folder). Any DirectX 12 card."
+        | 5 -> sprintf "FSR FG needs AMD's FidelityFX runtime in SUITE's engine folder, and %s is missing. Reinstall SUITE to put it back." MotionFiles.FidelityFxFile
         | _ -> ""
 
     /// Starting is possible when the engine is there; a generator that still
