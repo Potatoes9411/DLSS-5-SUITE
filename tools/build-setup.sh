@@ -116,6 +116,24 @@ else
         cp "$SL_DIR/bin/x64/nvngx_dlss.license.txt" "$APP/publish/engine/NVIDIA-DLSS-LICENSE.txt"
         cp "$SL_DIR/bin/x64/reflex.license.txt" "$APP/publish/engine/NVIDIA-Reflex-LICENSE.txt"
     fi
+
+    # AMD FidelityFX SDK 1.1.4's runtime, for Motion Forge's FSR 3.1 Frame Generation
+    # (the engines load it from here and check AMD's signature first). It comes
+    # from AMD's own repository, never the repo: tools/get-fidelityfx.ps1 fetches
+    # it, pinned by commit and SHA-256, so FIDELITYFX_SDK_DIR (default
+    # ../fidelityfx-sdk) has bin/amd_fidelityfx_dx12.dll. SKIP_FIDELITYFX=1 builds
+    # without it; FSR FG then says it is missing.
+    FFX_DIR="${FIDELITYFX_SDK_DIR:-$ROOT/fidelityfx-sdk}"
+    if [ "$SKIP_FIDELITYFX" = "1" ]; then
+        echo "--- FidelityFX skipped (SKIP_FIDELITYFX=1) ---"
+    else
+        if [ ! -f "$FFX_DIR/bin/amd_fidelityfx_dx12.dll" ]; then
+            echo "amd_fidelityfx_dx12.dll not found under $FFX_DIR/bin (run tools/get-fidelityfx.ps1, set FIDELITYFX_SDK_DIR, or SKIP_FIDELITYFX=1)" >&2
+            exit 1
+        fi
+        cp "$FFX_DIR/bin/amd_fidelityfx_dx12.dll" "$APP/publish/engine/"
+        cp "$APP/external/fidelityfx/LICENSE.txt" "$APP/publish/engine/AMD-FidelityFX-LICENSE.txt"
+    fi
 fi
 
 # RobloxShadeHost is an optional third method. It observes Roblox through
