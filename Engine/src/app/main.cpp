@@ -580,10 +580,34 @@ struct Ended
                 return Log(console, LogLevel::Warn, line.Get()).transform([&d] { return std::move(d); });
             };
             // NVIDIA DLSS Frame Generation presents into a window's swap chain; a video has neither.
-            static constexpr auto WantsIt = [] [[nodiscard]] (const Options& o) noexcept -> bool { return o.nvidiaFrameGen && !o.video.has_value(); };
+            static constexpr auto WantsIt = [] [[nodiscard]] (const Options& o) noexcept -> bool { return interior::RequestedFrameGen(o) == interior::FrameGenMethod::Nvidia && !o.video.has_value(); };
             if (!WantsIt(b.options))
                 return d;
             Result<real::FrameGeneration, Error> started = real::StartFrameGeneration(d.device, b.executableDirectory, b.options.ngxProjectId); // WAIVER(R2): moved from once, below.
+            if (!started.has_value())
+                return FellBack(console, std::move(d), started.error());
+            return Joined(console, std::move(d), std::move(*started));
+        };
+
+        // Motion Forge's generators are a designed fallback too: one that cannot start (its files are not there, or not
+        // signed, or it does not run on this GPU) is said in the log, and the engine's own frame generation is used.
+        static constexpr auto WithForgeIfAsked = [] [[nodiscard]] (const Console& console, const Base& b, Devices d) noexcept -> Result<Devices, Error> {
+            static constexpr auto Joined = [] [[nodiscard]] (const Console& console, Devices d, real::ForgeStart started) noexcept -> Result<Devices, Error> {
+                const Line line = infra::Formatted<kLineCapacity>("Motion Forge: {}", std::string_view(started.said.data()));
+                return Log(console, LogLevel::Info, line.Get()).transform([&d, &started] {
+                    return Devices{ real::WithForge(std::move(d.device), std::move(started.session)), std::move(d.runtime), std::move(d.held) };
+                });
+            };
+
+            static constexpr auto FellBack = [] [[nodiscard]] (const Console& console, Devices d, const real::ForgeText& why) noexcept -> Result<Devices, Error> {
+                const Line line = infra::Formatted<kLineCapacity>("Motion Forge's frame generation could not start ({}); the engine's own frame generation is used instead", std::string_view(why.data()));
+                return Log(console, LogLevel::Warn, line.Get()).transform([&d] { return std::move(d); });
+            };
+            // A video's frames between are made the same way, into the pictures that are read back and written out.
+            static constexpr auto WantsIt = [] [[nodiscard]] (const Options& o) noexcept -> bool { return interior::IsForge(interior::RequestedFrameGen(o)); };
+            if (!WantsIt(b.options))
+                return d;
+            Result<real::ForgeStart, real::ForgeText> started = real::StartForge(d.device, interior::RequestedFrameGen(b.options), b.options.forge, b.geometry.targetExtent); // WAIVER(R2): moved from once, below.
             if (!started.has_value())
                 return FellBack(console, std::move(d), started.error());
             return Joined(console, std::move(d), std::move(*started));
@@ -595,20 +619,34 @@ struct Ended
                     return WithRuntime(console, b, std::move(device), NgxSettingsOf(b.options, b.executableDirectory), wantsNgx);
                 });
             })
-            .and_then([&](Devices d) { return WithFrameGenerationIfAsked(console, b, std::move(d)); });
+            .and_then([&](Devices d) { return WithFrameGenerationIfAsked(console, b, std::move(d)); })
+            .and_then([&](Devices d) { return WithForgeIfAsked(console, b, std::move(d)); });
     };
 
     static constexpr auto Offered = [] [[nodiscard]] (const Base& b, const Devices& d) noexcept -> Base {
         // A session that asked for NVIDIA DLSS Frame Generation and did not get Streamline started blends its
         // pictures itself; why was logged when Streamline was asked for.
         static constexpr auto WithoutNvidiaFrameGen = [] [[nodiscard]] (const Options& o) noexcept -> Options {
-            Options without = o; // WAIVER(R2): a copy with one answer replaced, made once and read from there on.
+            Options without = o; // WAIVER(R2): a copy with two answers replaced, made once and read from there on.
             without.nvidiaFrameGen = false;
+            without.frameGenMethod = interior::FrameGenMethod::Blend;
             return without;
         };
 
         static constexpr auto FrameGenOffered = [] [[nodiscard]] (const Base& b, const Devices& d) noexcept -> Base {
-            if (d.device.streamline.has_value())
+            static constexpr auto IsOffered = [] [[nodiscard]] (const Options& o, const Devices& d) noexcept -> bool {
+                switch (interior::RequestedFrameGen(o))
+                {
+                case interior::FrameGenMethod::Blend: return true;
+                case interior::FrameGenMethod::Nvidia: return d.device.streamline.has_value();
+                case interior::FrameGenMethod::Smfg:
+                case interior::FrameGenMethod::Smt:
+                case interior::FrameGenMethod::Smai:
+                case interior::FrameGenMethod::Xess: return d.device.forge != nullptr;
+                }
+                return false;
+            };
+            if (IsOffered(b.options, d))
                 return b;
             return Base{ WithoutNvidiaFrameGen(b.options), b.executableDirectory, b.geometry, b.monitors };
         };

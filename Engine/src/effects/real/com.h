@@ -173,6 +173,8 @@ enum class ApiCall : std::uint8_t {
     UpdateSubresource, // the code is the size of the picture handed in, which is not the size of the video's pictures
     ReadVideoFrame,    // the code is GetLastError, or the bytes read when a picture ended part-way
     WriteVideoFrame,   // the code is GetLastError
+    ForgeStart,        // Motion Forge's generator did not start; what it said is in the log
+    ForgeFrames,       // Motion Forge's generator could not make the pictures between a pair
 };
 
 struct Error

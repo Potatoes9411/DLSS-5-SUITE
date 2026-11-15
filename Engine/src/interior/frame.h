@@ -26,6 +26,8 @@ enum class ResourceKind : std::uint8_t {
     Luma,
     Flow,
     History,
+    Current,   // the processed picture at the size of the back buffers, the second of the pair Motion Forge works on
+    Generated, // the pictures Motion Forge's generators made between the history and the current picture, by moment
 };
 
 enum class ResourceState : std::uint8_t { CopyDest, CopySource, ShaderRead, UnorderedAccess, RenderTarget, Present, Common, GenericRead };
@@ -40,7 +42,8 @@ struct ResourceId
     [[nodiscard]] friend constexpr bool operator==(const ResourceId&, const ResourceId&) noexcept = default;
 };
 
-constexpr std::size_t kSlotCount = 41;
+constexpr std::uint32_t kMaxBetween = kMaxFrameGen - 1; // pictures made between two processed ones at most
+constexpr std::size_t kSlotCount = 42 + kMaxBetween;
 using StateTable = std::array<ResourceState, kSlotCount>;
 
 [[nodiscard]] ResourceId SimpleId(ResourceKind kind) noexcept;
@@ -49,6 +52,8 @@ using StateTable = std::array<ResourceState, kSlotCount>;
 // One of the two pictures the model's passes hand each other, taking turns so no pass reads what it writes.
 [[nodiscard]] ResourceId NrPassId(SetIndex set) noexcept;
 [[nodiscard]] ResourceId BackBufferId(BackBufferIndex index) noexcept;
+// The picture made at the moment (index + 1) / multiplier between the history and the current picture.
+[[nodiscard]] ResourceId GeneratedId(LevelIndex index) noexcept;
 [[nodiscard]] ResourceId ReadbackId(FrameSlot slot) noexcept;
 [[nodiscard]] std::size_t SlotOf(const ResourceId& id) noexcept;
 [[nodiscard]] ResourceState StateOf(const StateTable& table, const ResourceId& id) noexcept;
@@ -170,7 +175,20 @@ struct Present
     [[nodiscard]] friend constexpr bool operator==(const Present&, const Present&) noexcept = default;
 };
 
-using Step = std::variant<Transition, Dispatch, CopyBuffer, ClearTarget, EvaluateSr, EvaluateNr, Draw, Submit, Present>;
+// Motion Forge's generator (the session's FrameGenMethod) makes the pictures between the history and the current
+// picture, all of them at once, the moment the current one is there: at 1 / multiplier, 2 / multiplier and so on,
+// into Generated 0, 1 and so on. The two it reads and the ones it writes are found readable and left so. Reset: the
+// two do not belong together (a cut, a pause), and nothing is carried over from the pair before.
+struct MakeBetween
+{
+    ResourceId before;
+    ResourceId after;
+    FrameGen multiplier;
+    bool reset;
+    [[nodiscard]] friend constexpr bool operator==(const MakeBetween&, const MakeBetween&) noexcept = default;
+};
+
+using Step = std::variant<Transition, Dispatch, CopyBuffer, ClearTarget, EvaluateSr, EvaluateNr, Draw, Submit, Present, MakeBetween>;
 
 constexpr std::size_t kMaxSteps = 192;
 using StepList = infra::BoundedVector<Step, kMaxSteps>;
@@ -236,6 +254,11 @@ constexpr std::uint64_t kPauseResetMicroseconds = 1000000;
 // last capture as a share of the interval between the last two, rounded up to the next of the multiplier's
 // steps. One, the current picture as it is, whenever there is nothing to draw between.
 [[nodiscard]] Fraction BlendPoint(std::optional<Instant> lastCapture, std::optional<Microseconds> interval, Instant now, FrameGen multiplier) noexcept;
+// Motion Forge's generators make the pictures between a pair themselves; the others draw them as they are shown.
+[[nodiscard]] bool IsForge(FrameGenMethod method) noexcept;
+// Which of the pictures Motion Forge made between a pair is the one for a blend point short of one: the point is on
+// one of the multiplier's steps, and the picture at step k is Generated k - 1. At step 0 none is: the picture before.
+[[nodiscard]] std::optional<LevelIndex> GeneratedAt(Fraction point, FrameGen multiplier) noexcept;
 [[nodiscard]] bool ExceedsThreshold(std::optional<Fraction> unmatched, Fraction threshold) noexcept;
 [[nodiscard]] std::string_view Describe(PlanFrameError error) noexcept;
 

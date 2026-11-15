@@ -92,6 +92,16 @@ struct Replay
     return Replay{ r.states, r.valid && r.submits > 0, r.submits, r.presents + 1 };
 }
 
+[[nodiscard]] Replay Apply(const Replay& r, const MakeBetween& m) noexcept
+{
+    const bool made = std::ranges::all_of(std::views::iota(std::uint32_t{ 0 }, m.multiplier.Get() - 1), [&](std::uint32_t k) {
+        const auto level = LevelIndexTag::Parse(k);
+        return level.has_value() && Readable(r.states, GeneratedId(*level));
+    });
+    const bool ok = m.multiplier.Get() > 1 && Readable(r.states, m.before) && Readable(r.states, m.after) && made;
+    return Replay{ r.states, r.valid && ok, r.submits, r.presents };
+}
+
 [[nodiscard]] Replay ReplayPlan(const StateTable& start, const FramePlan& plan) noexcept
 {
     return std::ranges::fold_left(plan.steps.Items(), Replay{ start, true, 0, 0 }, [](const Replay& r, const Step& step) { return std::visit([&r](const auto& s) { return Apply(r, s); }, step); });
@@ -324,6 +334,9 @@ struct Replay
     for (std::uint32_t set = 0; set < 2; ++set)
         slots.push_back(SlotOf(NrPassId(*SetIndexTag::Parse(set))));
     slots.push_back(SlotOf(SimpleId(ResourceKind::History)));
+    slots.push_back(SlotOf(SimpleId(ResourceKind::Current)));
+    for (std::uint32_t index = 0; index < kMaxBetween; ++index)
+        slots.push_back(SlotOf(GeneratedId(*LevelIndexTag::Parse(index))));
     return slots;
 }
 
@@ -747,6 +760,106 @@ struct Replay
     return framePlan.has_value() && std::ranges::none_of(PresentsOf(framePlan->steps), [](const Present& p) { return p.generation.has_value(); });
 }
 
+constexpr std::array<FrameGenMethod, 4> kForgeKinds{ FrameGenMethod::Smfg, FrameGenMethod::Smt, FrameGenMethod::Smai, FrameGenMethod::Xess };
+
+[[nodiscard]] SessionPlan WithForge(const SessionPlan& p, std::uint32_t multiplier, FrameGenMethod method) noexcept
+{
+    SessionPlan plan = WithFrameGen(p, multiplier); // WAIVER(R2): a test fixture, copied and adjusted before use.
+    plan.frameGenMethod = method;
+    return plan;
+}
+
+[[nodiscard]] std::vector<MakeBetween> PairsOf(const StepList& steps) noexcept
+{
+    std::vector<MakeBetween> pairs;
+    for (const Step& step : steps.Items()) // WAIVER(R2): a test collects the emitted pairs in order.
+        if (const MakeBetween* pair = std::get_if<MakeBetween>(&step); pair != nullptr)
+            pairs.push_back(*pair);
+    return pairs;
+}
+
+// Exactly Motion Forge's four kinds make the pictures between a pair themselves.
+[[nodiscard]] bool OnlyMotionForgesKindsAreForge(infra::RngState&) noexcept
+{
+    const bool forge = std::ranges::all_of(kForgeKinds, IsForge);
+    return forge && !IsForge(FrameGenMethod::Blend) && !IsForge(FrameGenMethod::Nvidia);
+}
+
+// The picture for a point on a step k of the multiplier is the k-th made, Generated k - 1; a point past what was made
+// (the multiplier raised since) is the last made, and the pair's start is none of them: the picture before is shown.
+[[nodiscard]] bool GeneratedAtExamples(infra::RngState&) noexcept
+{
+    static constexpr auto At = [](float point, std::uint32_t multiplier) noexcept -> std::uint32_t {
+        return GeneratedAt(*FractionTag::Parse(point), *FrameGenTag::Parse(multiplier)).transform([](LevelIndex l) { return l.Get(); }).value_or(99u);
+    };
+    return At(0.25f, 4) == 0 && At(0.5f, 4) == 1 && At(0.75f, 4) == 2 && At(0.5f, 2) == 0 && At(1.0f / 6.0f, 6) == 0 && At(5.0f / 6.0f, 6) == 4 && At(0.99f, 3) == 1 && At(0.0f, 5) == 99u;
+}
+
+// With one of Motion Forge's generators the first processed picture makes nothing; the second draws itself into
+// Current and asks for the multiplier's pictures between the history and it, once; a frame between two captures
+// shows the one made for its moment as it is, and asks for nothing. Every plan replays.
+[[nodiscard]] bool ForgePairsAreMadeOnceAndShownAtTheirMoments(infra::RngState& rng) noexcept
+{
+    const std::uint32_t multiplier = proptest::DrawBetween(rng, 2, 6);
+    const FrameGenMethod method = kForgeKinds[proptest::DrawBelow(rng, 4)];
+    const SessionPlan plan = WithForge(RandomPlan(rng), multiplier, method);
+    const auto first = PlanFrame(plan, InitialFrameState(plan), CaptureAt(0, true));
+    const auto second = first.has_value() ? PlanFrame(plan, first->next, CaptureAt(40000, true)) : first;
+    const auto between = second.has_value() ? PlanFrame(plan, second->next, CaptureAt(40000 + 40000 * proptest::DrawBetween(rng, 1, multiplier - 1) / multiplier - 1, false)) : second;
+    if (!between.has_value())
+        return false;
+    const std::vector<MakeBetween> made = PairsOf(second->steps);
+    const bool firstMakesNothing = PairsOf(first->steps).empty();
+    const bool madeOnce = made.size() == 1 && made[0].multiplier.Get() == multiplier && made[0].before == SimpleId(ResourceKind::History) && made[0].after == SimpleId(ResourceKind::Current);
+    const bool currentDrawn = std::ranges::any_of(DrawsOf(second->steps), [](const Draw& d) { return d.target == SimpleId(ResourceKind::Current); });
+    const std::vector<Draw> shown = DrawsOf(between->steps);
+    const bool showsMade = shown.size() == 1 && (shown[0].processed.kind == ResourceKind::Generated || shown[0].processed.kind == ResourceKind::History) && !shown[0].history.has_value() && shown[0].blend.Get() == 1.0f &&
+                           shown[0].processed.level.Get() < multiplier - 1;
+    const bool valid = ReplayPlan(InitialStates(), *first).valid && ReplayPlan(first->next.states, *second).valid && ReplayPlan(second->next.states, *between).valid;
+    return firstMakesNothing && madeOnce && currentDrawn && showsMade && PairsOf(between->steps).empty() && valid;
+}
+
+// At one picture for one, Motion Forge's generators are asked for nothing and nothing of theirs is shown.
+[[nodiscard]] bool ForgeAtOneTimesMakesNothing(infra::RngState& rng) noexcept
+{
+    const SessionPlan plan = WithForge(RandomPlan(rng), 1, kForgeKinds[proptest::DrawBelow(rng, 4)]);
+    FrameState state = InitialFrameState(plan);
+    std::uint64_t clock = 0;
+    for (std::uint32_t i = 0; i < 8; ++i) // WAIVER(R2): test drives a sequence of frames.
+    {
+        clock += proptest::DrawBelow(rng, 60000);
+        const auto framePlan = PlanFrame(plan, state, CaptureAt(clock, proptest::DrawBool(rng)));
+        if (!framePlan.has_value() || !PairsOf(framePlan->steps).empty() || !std::ranges::all_of(framePlan->steps.Items(), DrawsTheProcessedPictureAsItIs))
+            return false;
+        state = framePlan->next;
+    }
+    return true;
+}
+
+// Over random sequences with any of Motion Forge's generators, every plan replays, presents once, and asks for a
+// pair at most once, only when it processes a picture.
+[[nodiscard]] bool ForgePlansAreValidOverRandomSequences(infra::RngState& rng) noexcept
+{
+    const SessionPlan plan = WithForge(RandomPlan(rng), proptest::DrawBetween(rng, 1, 6), kForgeKinds[proptest::DrawBelow(rng, 4)]);
+    FrameState state = InitialFrameState(plan);
+    std::uint64_t clock = 0;
+    for (std::uint32_t i = 0; i < 12; ++i) // WAIVER(R2): test drives a sequence of frames.
+    {
+        clock += proptest::DrawBelow(rng, 200000);
+        const FrameInput input = RandomInput(rng, clock, i);
+        const auto framePlan = PlanFrame(plan, state, input);
+        if (!framePlan.has_value())
+            return false;
+        const Replay replay = ReplayPlan(state.states, *framePlan);
+        const std::size_t pairs = PairsOf(framePlan->steps).size();
+        const bool processes = std::ranges::any_of(framePlan->steps.Items(), [](const Step& s) { return std::holds_alternative<Submit>(s) && std::get<Submit>(s).phase == Phase::One; });
+        if (!replay.valid || replay.presents != 1 || replay.states != framePlan->next.states || pairs > 1 || (pairs == 1 && !processes))
+            return false;
+        state = framePlan->next;
+    }
+    return true;
+}
+
 } // namespace
 
 std::uint32_t FrameSuite(std::uint64_t seed) noexcept
@@ -781,6 +894,11 @@ std::uint32_t FrameSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("NVIDIA frames never blend and hand over their inputs", seed, 300, NvidiaFramesNeverBlendAndHandOverTheirInputs));
     failures += Failures(proptest::ForAll("NVIDIA repeats are not presented while generating", seed, 300, NvidiaRepeatsAreNotPresentedWhileGenerating));
     failures += Failures(proptest::ForAll("the engine's blend presents carry no generation", seed, 200, BlendPresentsCarryNoGeneration));
+    failures += Failures(proptest::ForAll("only Motion Forge's kinds make their pictures themselves", seed, 1, OnlyMotionForgesKindsAreForge));
+    failures += Failures(proptest::ForAll("the picture made for a moment is found by its step", seed, 1, GeneratedAtExamples));
+    failures += Failures(proptest::ForAll("Motion Forge's pairs are made once and shown at their moments", seed, 300, ForgePairsAreMadeOnceAndShownAtTheirMoments));
+    failures += Failures(proptest::ForAll("Motion Forge at one times makes nothing", seed, 200, ForgeAtOneTimesMakesNothing));
+    failures += Failures(proptest::ForAll("Motion Forge plans are valid over random sequences", seed, 400, ForgePlansAreValidOverRandomSequences));
     return failures;
 }
 

@@ -224,7 +224,7 @@ Result<FrameStart, Error> VideoEnvironment::Ended(const interior::FrameState& st
 Result<ExecutionReport, Error> VideoEnvironment::Execute(const interior::FramePlan& plan) noexcept
 {
     static constexpr auto WritesFrame = [] [[nodiscard]] (std::uint32_t copies, const interior::FramePlan& plan) noexcept -> bool { return copies > 0 && HasPresent(plan.steps); };
-    const Result<interior::FenceValue, Error> fence = ExecuteSteps(gpu_, frame_, plan.steps);
+    const Result<interior::FenceValue, Error> fence = ExecuteSteps(gpu_, frame_, plan.steps).and_then([this](interior::FenceValue v) { return ForgeLogged(console_).transform([v] { return v; }); });
     if (!fence.has_value())
         return Fail(fence.error());
     frame_ = ContextAt(frame_, *fence); // WAIVER(R2): the last signalled fence, replaced whole per frame.

@@ -73,6 +73,11 @@ enum class OptionId : std::uint8_t {
     ExclusionLog,
     FrameGen,
     NvidiaFrameGen,
+    FrameGenMethod,
+    ForgeFlow,
+    ForgeKeepStill,
+    ForgeLightSearch,
+    ForgeRife,
     VideoWidth,
     VideoHeight,
     VideoFrameMicroseconds,
@@ -93,6 +98,7 @@ enum class ValueKind : std::uint8_t {
     Style,
     Grid,
     Perf,
+    Method,
     NgxLog,
     Log,
     Console,
@@ -108,7 +114,7 @@ struct OptionSpec
     ValueKind kind;
 };
 
-constexpr std::array<OptionSpec, 57> kSpecs{ {
+constexpr std::array<OptionSpec, 62> kSpecs{ {
     { L"help", OptionId::Help, ValueKind::Flag },
     { L"list-monitors", OptionId::ListMonitors, ValueKind::Flag },
     { L"monitor", OptionId::Monitor, ValueKind::MonitorSel },
@@ -130,6 +136,11 @@ constexpr std::array<OptionSpec, 57> kSpecs{ {
     { L"nr-passes", OptionId::NrPasses, ValueKind::UInt },
     { L"frame-gen", OptionId::FrameGen, ValueKind::UInt },
     { L"nvidia-frame-gen", OptionId::NvidiaFrameGen, ValueKind::Bool },
+    { L"frame-gen-method", OptionId::FrameGenMethod, ValueKind::Method },
+    { L"forge-flow", OptionId::ForgeFlow, ValueKind::UInt },
+    { L"forge-keep-still", OptionId::ForgeKeepStill, ValueKind::Bool },
+    { L"forge-light-search", OptionId::ForgeLightSearch, ValueKind::Bool },
+    { L"forge-rife", OptionId::ForgeRife, ValueKind::Bool },
     { L"video-width", OptionId::VideoWidth, ValueKind::UInt },
     { L"video-height", OptionId::VideoHeight, ValueKind::UInt },
     { L"video-frame-us", OptionId::VideoFrameMicroseconds, ValueKind::UInt },
@@ -188,7 +199,7 @@ struct NarrowBuffer
 };
 
 using OptionValue = std::variant<FlagValue, std::uint32_t, float, std::uint64_t, bool, MonitorSelValue, CursorMode, SrMode, MotionBackend, CompareMode, ColorFormat, NrStyle, GridSize, PerfLevel,
-                                 ConsoleMode, NgxLogLevel, LogLevel, DirectoryPath, WindowTitle, AsciiText>;
+                                 FrameGenMethod, ConsoleMode, NgxLogLevel, LogLevel, DirectoryPath, WindowTitle, AsciiText>;
 
 struct ParsedOption
 {
@@ -238,6 +249,12 @@ constexpr std::array<infra::Choice<GridSize>, 3> kGridChoices{ { { L"1", GridSiz
 constexpr std::array<infra::Choice<PerfLevel>, 6> kPerfChoices{
     { { L"slow", PerfLevel::Slow }, { L"5", PerfLevel::Slow }, { L"medium", PerfLevel::Medium }, { L"10", PerfLevel::Medium }, { L"fast", PerfLevel::Fast }, { L"20", PerfLevel::Fast } }
 };
+constexpr std::array<infra::Choice<FrameGenMethod>, 6> kMethodChoices{ { { L"blend", FrameGenMethod::Blend },
+                                                                          { L"nvidia", FrameGenMethod::Nvidia },
+                                                                          { L"smfg", FrameGenMethod::Smfg },
+                                                                          { L"smt", FrameGenMethod::Smt },
+                                                                          { L"smai", FrameGenMethod::Smai },
+                                                                          { L"xess", FrameGenMethod::Xess } } };
 constexpr std::array<infra::Choice<NgxLogLevel>, 3> kNgxLogChoices{ { { L"0", NgxLogLevel::Off }, { L"1", NgxLogLevel::On }, { L"2", NgxLogLevel::Verbose } } };
 constexpr std::array<infra::Choice<LogLevel>, 8> kLogChoices{ { { L"0", LogLevel::Debug },
                                                                 { L"debug", LogLevel::Debug },
@@ -334,6 +351,7 @@ struct ValidatedNumbers
     std::optional<MotionScale> mvScaleX;
     std::optional<MotionScale> mvScaleY;
     FrameGen frameGen;
+    ForgeFlow forgeFlow;
 };
 
 struct ValidatedScales
@@ -352,11 +370,12 @@ constexpr auto kDefaultSrPreset = SrPresetTag::Parse(0);
 constexpr auto kDefaultLevel = LevelIndexTag::Parse(1);
 constexpr auto kDefaultPasses = PassCountTag::Parse(1);
 constexpr auto kDefaultFrameGen = FrameGenTag::Parse(1); // one picture shown for each one made: frame generation off
+constexpr auto kDefaultForgeFlow = ForgeFlowTag::Parse(35); // Motion Forge's own default
 constexpr auto kDefaultProjectId = ProjectIdText::Parse("5e9b2a44-7c31-4d0e-9f2b-8d3c1a6e7f10");
 static_assert(kDefaultIntensity.has_value() && kDefaultStrength.has_value() && kDefaultSkin.has_value());
 static_assert(kDefaultDepth.has_value() && kDefaultThreshold.has_value());
 static_assert(kDefaultPreset.has_value() && kDefaultSrPreset.has_value());
-static_assert(kDefaultLevel.has_value() && kDefaultProjectId.has_value() && kDefaultPasses.has_value() && kDefaultFrameGen.has_value());
+static_assert(kDefaultLevel.has_value() && kDefaultProjectId.has_value() && kDefaultPasses.has_value() && kDefaultFrameGen.has_value() && kDefaultForgeFlow.has_value());
 
 } // namespace
 
@@ -365,6 +384,11 @@ LiveSettings DefaultLive(const Options& o) noexcept
     const Result<MotionScale, UnitError> one = MotionScaleTag::Parse(1.0f);
     ENSURE(one.has_value());
     return LiveSettings{ o.neuralRendering, o.tuning, o.nrPasses, o.depthInverted, o.mvScaleX.value_or(*one), o.mvScaleY.value_or(*one), o.vsync, o.resetThreshold, o.depthValue, o.frameGen };
+}
+
+FrameGenMethod RequestedFrameGen(const Options& o) noexcept
+{
+    return o.nvidiaFrameGen ? FrameGenMethod::Nvidia : o.frameGenMethod;
 }
 
 Options DefaultOptions() noexcept
@@ -417,6 +441,8 @@ Options DefaultOptions() noexcept
         false,
         *kDefaultFrameGen,
         false,
+        FrameGenMethod::Blend,
+        ForgeSettings{ *kDefaultForgeFlow, true, false, false },
         std::nullopt,
     };
 }
@@ -495,8 +521,10 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                         return Validated(list, OptionId::DepthValue, d.depthValue, DepthValueTag::Parse).and_then([&](DepthValue depth) {
                             return Validated(list, OptionId::ResetThreshold, d.resetThreshold, FractionTag::Parse).and_then([&](Fraction threshold) {
                                 return ScalesOf(list).and_then([&](const ValidatedScales& scales) {
-                                    return Validated(list, OptionId::FrameGen, d.frameGen, FrameGenTag::Parse).transform([&](FrameGen frameGen) {
-                                        return ValidatedNumbers{ srPreset, level, passes, depth, threshold, scales.x, scales.y, frameGen };
+                                    return Validated(list, OptionId::FrameGen, d.frameGen, FrameGenTag::Parse).and_then([&](FrameGen frameGen) {
+                                        return Validated(list, OptionId::ForgeFlow, d.forge.flow, ForgeFlowTag::Parse).transform([&](ForgeFlow forgeFlow) {
+                                            return ValidatedNumbers{ srPreset, level, passes, depth, threshold, scales.x, scales.y, frameGen, forgeFlow };
+                                        });
                                     });
                                 });
                             });
@@ -605,6 +633,9 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                 ValueOr(list, OptionId::ExclusionLog, d.exclusionLog),
                 n.frameGen,
                 ValueOr(list, OptionId::NvidiaFrameGen, d.nvidiaFrameGen),
+                ValueOr(list, OptionId::FrameGenMethod, d.frameGenMethod),
+                ForgeSettings{ n.forgeFlow, ValueOr(list, OptionId::ForgeKeepStill, d.forge.keepStill), ValueOr(list, OptionId::ForgeLightSearch, d.forge.lightSearch),
+                               ValueOr(list, OptionId::ForgeRife, d.forge.rife) },
                 video,
             };
         };
@@ -710,6 +741,7 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                         case ValueKind::Style: return ParseChoice(kStyleChoices, text).transform([](NrStyle v) { return OptionValue{ v }; });
                         case ValueKind::Grid: return ParseChoice(kGridChoices, text).transform([](GridSize v) { return OptionValue{ v }; });
                         case ValueKind::Perf: return ParseChoice(kPerfChoices, text).transform([](PerfLevel v) { return OptionValue{ v }; });
+                        case ValueKind::Method: return ParseChoice(kMethodChoices, text).transform([](FrameGenMethod v) { return OptionValue{ v }; });
                         case ValueKind::NgxLog: return ParseChoice(kNgxLogChoices, text).transform([](NgxLogLevel v) { return OptionValue{ v }; });
                         case ValueKind::Log: return ParseChoice(kLogChoices, text).transform([](LogLevel v) { return OptionValue{ v }; });
                         case ValueKind::Path: return ParsePath(text).transform([](DirectoryPath v) { return OptionValue{ v }; });

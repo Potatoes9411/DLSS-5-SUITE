@@ -125,8 +125,6 @@ Result<SessionPlan, PlanError> PlanSession(const Options& options, const Geometr
 
         static constexpr auto Assemble = [] [[nodiscard]] (const Options& o, const Geometry& g, const std::optional<SrChoice>& sr, const Extent& work, const Extent& flow, Scale scaleX,
                                                            Scale scaleY) noexcept -> SessionPlan {
-            static constexpr auto MethodOf = [] [[nodiscard]] (const Options& options) noexcept -> FrameGenMethod { return options.nvidiaFrameGen ? FrameGenMethod::Nvidia : FrameGenMethod::Blend; };
-
             static constexpr auto WantsCursor = [] [[nodiscard]] (const Options& options, const Geometry& geometry) noexcept -> bool {
                 switch (options.cursor)
                 {
@@ -170,7 +168,7 @@ Result<SessionPlan, PlanError> PlanSession(const Options& options, const Geometr
                                 WantsCursor(o, g),
                                 o.vsync,
                                 o.frameGen,
-                                MethodOf(o) };
+                                RequestedFrameGen(o) };
         };
         return ScaleBetween(work.width, g.sourceExtent.width).and_then([&](Scale scaleX) {
             return ScaleBetween(work.height, g.sourceExtent.height).transform([&](Scale scaleY) { return Assemble(o, g, sr, work, flow, scaleX, scaleY); });

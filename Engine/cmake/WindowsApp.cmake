@@ -88,6 +88,20 @@ endif()
 enable_language(RC)
 list(APPEND DSCREEN_REAL_SOURCES res/app.rc)
 
+# Motion Forge's generators (SMFG, SMT, SMAI, XeSS MFG): MotionEngine/'s own files, MFG SUPER MOTION's engine by NODIX
+# TECH (MIT, MotionEngine/LICENSE.txt), read where they are by src/effects/real/forge.cpp so both engines run the same
+# code. Built here to the flags MotionEngine/build.cmd builds them with, not this project's: the code is kept as it
+# came, and the project's rules are for its own code. Added 2026-11-15 at the owner's request for Motion Forge's
+# frame generation in the Screen Engine. ONNX Runtime's and DirectML's headers come with it (MotionEngine/include);
+# their libraries, the network and XeSS's libraries are loaded at run time from SUITE's data folder, never linked.
+set(DSCREEN_MOTION_ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../MotionEngine")
+add_library(dscreen_forge STATIC src/effects/real/forge.cpp)
+set_target_properties(dscreen_forge PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+target_compile_options(dscreen_forge PRIVATE /W3 /utf-8 /EHsc /bigobj)
+target_include_directories(dscreen_forge PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(dscreen_forge SYSTEM PRIVATE "${DSCREEN_MOTION_ENGINE_DIR}")
+target_link_libraries(dscreen_forge PUBLIC d3d12 dxgi wintrust crypt32 runtimeobject)
+
 add_executable(FullScreenWrapperForDLSS5 ${DSCREEN_REAL_SOURCES})
 add_dependencies(FullScreenWrapperForDLSS5 FullScreenWrapperForDLSS5Shaders)
 target_include_directories(FullScreenWrapperForDLSS5 PRIVATE "${CMAKE_BINARY_DIR}/generated" "${NGX_INCLUDE_DIR}")
@@ -101,7 +115,7 @@ if(DSCREEN_ENABLE_NVOF)
 else()
   target_compile_definitions(FullScreenWrapperForDLSS5 PRIVATE DSCREEN_HAVE_NVOF=0)
 endif()
-target_link_libraries(FullScreenWrapperForDLSS5 PRIVATE dscreen_core dscreen_trace_flags dscreen_stack
+target_link_libraries(FullScreenWrapperForDLSS5 PRIVATE dscreen_core dscreen_trace_flags dscreen_stack dscreen_forge
   "$<IF:$<CONFIG:Debug>,${NGX_LIBRARY_DEBUG},${NGX_LIBRARY_RELEASE}>"
   d3d12 dxgi d3d11 dcomp dwmapi dxguid user32 gdi32 comctl32 shcore shell32 ole32 runtimeobject wintrust crypt32 bcrypt version windowscodecs mfplat mfreadwrite mfuuid)
 # The windows subsystem so a double-click opens no console; mainCRTStartup keeps the ordinary entry point,

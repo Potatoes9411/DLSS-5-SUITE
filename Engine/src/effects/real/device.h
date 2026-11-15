@@ -1,13 +1,17 @@
 #pragma once
 #include "effects/real/com.h"
+#include "effects/real/forge.h"
 #include "effects/real/streamline.h"
 #include "infrastructure/bounded_vector.h"
 #include "interior/driver.h"
+#include "interior/options.h"
 #include "interior/units.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
 
+#include <array>
+#include <memory>
 #include <optional>
 
 namespace real {
@@ -16,6 +20,29 @@ struct DeviceSettings
 {
     bool debugLayer;
     std::optional<interior::RequestedAdapter> adapter;
+};
+
+// Motion Forge's generator (forge.h) started on a device for one session. It is stopped when the session's device
+// goes, before the device does, which is why it is the device's last member.
+struct ForgeStarted
+{
+    interior::FrameGenMethod method;
+};
+
+struct ForgeEnder
+{
+    void operator()(const ForgeStarted* started) const noexcept;
+};
+
+using ForgeSession = std::unique_ptr<const ForgeStarted, ForgeEnder>;
+
+// What the generator said when it started, or why it could not, for the log.
+using ForgeText = std::array<char, forge::kTextCapacity>;
+
+struct ForgeStart
+{
+    ForgeSession session;
+    ForgeText said;
 };
 
 struct GpuDevice
@@ -39,6 +66,8 @@ struct GpuDevice
     // NVIDIA Streamline, when DLSS Frame Generation makes the pictures between; the queue above is then its proxy.
     // Last, so it is shut down before the device and queue above are let go, and after everything made from them.
     std::optional<Streamline> streamline;
+    // Motion Forge's generator, when one of its kinds makes the pictures between; nothing otherwise.
+    ForgeSession forge;
 };
 
 constexpr std::uint32_t kMaxAdapterEntries = 16;
@@ -71,6 +100,10 @@ struct FrameGeneration
 [[nodiscard]] infra::Result<FrameGeneration, Error> StartFrameGeneration(const GpuDevice& device, const interior::DirectoryPath& executableDirectory,
                                                                          const interior::ProjectIdText& projectId) noexcept;
 [[nodiscard]] GpuDevice WithFrameGeneration(GpuDevice device, FrameGeneration generation) noexcept;
+// Motion Forge's generator of the kind asked for, made ready for pictures of the target's size on the device.
+[[nodiscard]] infra::Result<ForgeStart, ForgeText> StartForge(const GpuDevice& device, interior::FrameGenMethod method, const interior::ForgeSettings& settings,
+                                                              const interior::Extent& target) noexcept;
+[[nodiscard]] GpuDevice WithForge(GpuDevice device, ForgeSession session) noexcept;
 // The adapters the session could run on, in the order DXGI reports them, skipping the ones it could not use.
 [[nodiscard]] AdapterList UsableAdapters(IDXGIFactory4* factory) noexcept;
 [[nodiscard]] infra::Result<Com<ID3D12Fence>, Error> CreateFence(ID3D12Device* device, D3D12_FENCE_FLAGS flags) noexcept;

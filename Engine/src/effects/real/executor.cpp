@@ -1,5 +1,6 @@
 #include "effects/real/executor.h"
 
+#include "infrastructure/array_util.h"
 #include "infrastructure/fold.h"
 #include "infrastructure/overloaded.h"
 
@@ -77,6 +78,8 @@ Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameCont
         static constexpr auto IsBackBuffer = [] [[nodiscard]] (const ResourceId& id) noexcept -> bool { return id.kind == interior::ResourceKind::BackBuffer; };
 
         static constexpr auto IsHistory = [] [[nodiscard]] (const ResourceId& id) noexcept -> bool { return id.kind == interior::ResourceKind::History; };
+
+        static constexpr auto IsCurrent = [] [[nodiscard]] (const ResourceId& id) noexcept -> bool { return id.kind == interior::ResourceKind::Current; };
 
         static constexpr auto WriteView = [] [[nodiscard]] (const Gpu& gpu, ViewKind kind, const std::optional<ResourceId>& id, std::uint32_t heapIndex) noexcept -> Status<Error> {
             static constexpr auto CreateNullView = [](const GpuDevice& device, ViewKind kind, D3D12_CPU_DESCRIPTOR_HANDLE handle) noexcept -> void {
@@ -258,10 +261,13 @@ Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameCont
                         gpu.list->RSSetViewports(1, &viewport);
                         gpu.list->RSSetScissorRects(1, &scissor);
                     };
-                    // A draw lands in a back buffer, or in the history that frame generation draws the picture before from.
+                    // A draw lands in a back buffer, in the history that frame generation draws the picture before from, or in
+                    // the current picture Motion Forge's generator makes the pictures between up to.
                     static constexpr auto RtvSlotOf = [] [[nodiscard]] (const ResourceId& target) noexcept -> std::uint32_t {
-                        static constexpr auto IsDrawTarget = [] [[nodiscard]] (const ResourceId& target) noexcept -> bool { return IsBackBuffer(target) || IsHistory(target); };
+                        static constexpr auto IsDrawTarget = [] [[nodiscard]] (const ResourceId& target) noexcept -> bool { return IsBackBuffer(target) || IsHistory(target) || IsCurrent(target); };
                         REQUIRE(IsDrawTarget(target));
+                        if (IsCurrent(target))
+                            return kCurrentRtvSlot;
                         return IsHistory(target) ? kHistoryRtvSlot : target.buffer.Get();
                     };
                     const D3D12_CPU_DESCRIPTOR_HANDLE rtv = RtvHandle(gpu.device, RtvSlotOf(d.target));
@@ -324,6 +330,64 @@ Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameCont
             return c;
         };
 
+        // Motion Forge's generator makes the pictures between the pair, in this frame's list; SMAI and XeSS hand work to
+        // the queue between its commands, through the list's own send and reopen. The frame's descriptor heap is put back
+        // after it, since the generator binds its own.
+        static constexpr auto RecordMakeBetween = [] [[nodiscard]] (const Gpu& gpu, const FrameContext& f, const interior::MakeBetween& m, const Cursor& c) noexcept -> StepResult {
+            struct Listed
+            {
+                const Gpu* gpu;
+                interior::FrameSlot slot;
+            };
+
+            static constexpr auto Send = [] [[nodiscard]] (void* context) noexcept -> bool {
+                const Listed& listed = *static_cast<const Listed*>(context);
+                return Check(listed.gpu->list->Close(), ApiCall::CloseCommandList).and_then([&] { return ExecuteList(listed.gpu->device, listed.gpu->list.Get()); }).has_value();
+            };
+
+            static constexpr auto Reopen = [] [[nodiscard]] (void* context) noexcept -> bool {
+                const Listed& listed = *static_cast<const Listed*>(context);
+                return OpenList(*listed.gpu, listed.slot).has_value();
+            };
+
+            static constexpr auto IntoOf = [] [[nodiscard]] (const Gpu& gpu, std::uint32_t count) noexcept -> Result<std::array<ID3D12Resource*, forge::kMostBetween>, Error> {
+                static constexpr auto GeneratedIdOf = [] [[nodiscard]] (std::uint32_t index) noexcept -> ResourceId {
+                    const Result<interior::LevelIndex, interior::UnitError> level = interior::LevelIndexTag::Parse(index);
+                    ENSURE(level.has_value());
+                    return interior::GeneratedId(*level);
+                };
+                return infra::FoldResult(std::views::iota(std::uint32_t{ 0 }, count), Result<std::array<ID3D12Resource*, forge::kMostBetween>, Error>(std::array<ID3D12Resource*, forge::kMostBetween>{}),
+                                         [&gpu](const std::array<ID3D12Resource*, forge::kMostBetween>& so, std::uint32_t index) {
+                                             return Lookup(gpu.resources, GeneratedIdOf(index)).transform([&](ID3D12Resource* into) { return infra::WithElement(so, index, into); });
+                                         });
+            };
+
+            static constexpr auto Made = [] [[nodiscard]] (const Gpu& gpu, const Listed& listed, const forge::Pair& pair) noexcept -> Status<Error> {
+                const forge::ListControl control{ .context = const_cast<Listed*>(&listed), .send = Send, .reopen = Reopen };
+                if (!forge::Make(gpu.list.Get(), pair, control))
+                    return Fail(Error{ ApiCall::ForgeFrames, pair.count });
+                ID3D12DescriptorHeap* heaps[] = { gpu.device.srvHeap.Get() };
+                gpu.list->SetDescriptorHeaps(1, heaps);
+                return {};
+            };
+            REQUIRE(m.multiplier.Get() > 1 && m.multiplier.Get() - 1 <= forge::kMostBetween);
+            const std::uint32_t count = m.multiplier.Get() - 1;
+            const Listed listed{ &gpu, f.slot };
+            return Lookup(gpu.resources, m.before).and_then([&](ID3D12Resource* before) {
+                return Lookup(gpu.resources, m.after).and_then([&](ID3D12Resource* after) {
+                    return Lookup(gpu.resources, interior::SimpleId(interior::ResourceKind::MotionVectors)).and_then([&](ID3D12Resource* motion) {
+                        return Lookup(gpu.resources, interior::SimpleId(interior::ResourceKind::Depth)).and_then([&](ID3D12Resource* depth) {
+                            return IntoOf(gpu, count).and_then([&](const std::array<ID3D12Resource*, forge::kMostBetween>& into) {
+                                const forge::Pair pair{ .before = before, .after = after, .into = { into[0], into[1], into[2], into[3], into[4] }, .count = count, .reset = m.reset,
+                                                        .rest = ToD3D(interior::ResourceState::ShaderRead), .motion = motion, .depth = depth };
+                                return Made(gpu, listed, pair);
+                            });
+                        });
+                    });
+                });
+            }).transform([&c] { return c; });
+        };
+
         static constexpr auto RecordPresent = [] [[nodiscard]] (const Gpu& gpu, const interior::Present& present, const Cursor& c) noexcept -> StepResult {
             // A picture handed to DLSS Frame Generation goes with the motion vectors and depth plane the plan left
             // readable for it. The plan hands one over only when the session was built with Streamline on the device.
@@ -353,6 +417,7 @@ Result<interior::FenceValue, Error> ExecuteSteps(const Gpu& gpu, const FrameCont
                               [&](const interior::Draw& d) { return RecordDraw(gpu, f.slot, d, c); },
                               [&](const interior::Submit& s) { return RecordSubmit(gpu, f, s, c); },
                               [&](const interior::Present& p) { return RecordPresent(gpu, p, c); },
+                              [&](const interior::MakeBetween& m) { return RecordMakeBetween(gpu, f, m, c); },
                           },
                           step);
     };

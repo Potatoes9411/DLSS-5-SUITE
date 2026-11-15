@@ -336,7 +336,7 @@ constexpr std::uint64_t kSweepFieldMask = (1ULL << kSweepFieldBits) - 1ULL;
 RealEnvironment::RealEnvironment(HeldFiles held, Gpu gpu, const SessionPlan& plan, OutputWindow window, const ControlPanel* panel, const Console& console, const EnvironmentSettings& settings,
                                  const interior::Options& options, std::uint32_t finestPixels, interior::FenceValue fence, interior::Instant start) noexcept
     : held_(std::move(held)), gpu_(std::move(gpu)), plan_(plan), window_(std::move(window)), panel_(panel), console_(console), finestPixels_(finestPixels),
-      frame_{ interior::FrameNumberTag::Parse(0), *kZeroSlot, *kZeroSet, false, fence }, stats_{ start, 0, 0, interior::StartingLive(plan).frameGen }, applied_(settings), clearedDepth_(plan.depth),
+      frame_{ interior::FrameNumberTag::Parse(0), *kZeroSlot, *kZeroSet, false, fence }, stats_{ start, 0, 0, interior::StartingLive(plan).frameGen, 0, std::nullopt }, applied_(settings), clearedDepth_(plan.depth),
       restartWanted_(false), resized_(false), pending_(plan.source), since_(start), options_(options), built_(ShapeOf(panel)), wanted_(built_), asked_(start), abandoned_(false),
       snapshot_(std::nullopt), recording_(std::nullopt), comparison_(std::nullopt), cursor_(std::nullopt), writer_(std::make_unique<PngWriter>()), now_(start)
 {
@@ -677,14 +677,14 @@ Result<FrameStart, Error> RealEnvironment::Accept(const Begun& begun) noexcept
 
         static constexpr auto Counted = [] [[nodiscard]] (const Statistics& s, bool fresh) noexcept -> Statistics {
             static constexpr auto CountOf = [] [[nodiscard]] (bool flag) noexcept -> std::uint32_t { return flag ? 1u : 0u; };
-            return Statistics{ s.lastReport, s.processed + CountOf(fresh), s.presented, s.frameGen };
+            return Statistics{ s.lastReport, s.processed + CountOf(fresh), s.presented, s.frameGen, s.distinct, s.lastShown };
         };
 
-        static constexpr auto Restarted = [] [[nodiscard]] (const Statistics& s, interior::Instant now) noexcept -> Statistics { return Statistics{ now, 0, 0, s.frameGen }; };
+        static constexpr auto Restarted = [] [[nodiscard]] (const Statistics& s, interior::Instant now) noexcept -> Statistics { return Statistics{ now, 0, 0, s.frameGen, 0, s.lastShown }; };
 
         static constexpr auto LogThroughput = [] [[nodiscard]] (const Console& console, const Statistics& s, interior::Instant now) noexcept -> Status<Error> {
             const double seconds = static_cast<double>(now.Get() - s.lastReport.Get()) / 1000000.0;
-            return Log(console, interior::LogLevel::Info, infra::Formatted<120>("{:.1f} processed fps, {:.1f} presented fps", s.processed / seconds, s.presented / seconds).Get());
+            return Log(console, interior::LogLevel::Info, infra::Formatted<120>("{:.1f} processed fps, {:.1f} presented fps, {:.1f} distinct fps", s.processed / seconds, s.presented / seconds, s.distinct / seconds).Get());
         };
 
         // What DLSS Frame Generation made of what it was handed, beside the throughput, when it is behind the swap chain.
@@ -715,7 +715,7 @@ Result<FrameStart, Error> RealEnvironment::Accept(const Begun& begun) noexcept
         };
 
         static constexpr auto WithFrameGen = [] [[nodiscard]] (const Statistics& s, interior::FrameGen frameGen) noexcept -> Statistics {
-            return Statistics{ s.lastReport, s.processed, s.presented, frameGen };
+            return Statistics{ s.lastReport, s.processed, s.presented, frameGen, s.distinct, s.lastShown };
         };
         const interior::FrameGen requested = RequestedFrameGen(s, input);
         if (requested == s.frameGen)
@@ -995,15 +995,51 @@ Result<ExecutionReport, Error> RealEnvironment::Retuned(const interior::LiveSett
         });
 }
 
+Status<Error> ForgeLogged(const Console& console) noexcept
+{
+    static constexpr std::uint32_t kLinesPerFrame = 16;
+    return infra::ForEach(std::views::iota(std::uint32_t{ 0 }, kLinesPerFrame), Status<Error>{}, [&console](std::uint32_t) -> Status<Error> {
+        char line[forge::kTextCapacity] = {};
+        if (!forge::NextLine(line))
+            return {};
+        return Log(console, interior::LogLevel::Info, std::string_view(line));
+    });
+}
+
 Result<ExecutionReport, Error> RealEnvironment::Ran(const interior::FramePlan& plan) noexcept
 {
     // A frame with nothing new that DLSS Frame Generation is not handed is planned and submitted, but not presented.
     static constexpr auto Presented = [] [[nodiscard]] (const Statistics& s, const interior::StepList& steps) noexcept -> Statistics {
         static constexpr auto IsPresent = [] [[nodiscard]] (const interior::Step& step) noexcept -> bool { return std::holds_alternative<interior::Present>(step); };
         static constexpr auto CountOf = [] [[nodiscard]] (bool flag) noexcept -> std::uint32_t { return flag ? 1u : 0u; };
-        return Statistics{ s.lastReport, s.processed, s.presented + CountOf(std::ranges::any_of(steps.Items(), IsPresent)), s.frameGen };
+        // A presented picture is distinct when the frame processed a new one, or drew it from something else than the
+        // one before (another picture made between, or another point of the blend).
+        static constexpr auto ShownDraw = [] [[nodiscard]] (const interior::StepList& steps) noexcept -> std::optional<interior::Draw> {
+            static constexpr auto IsShown = [] [[nodiscard]] (const interior::Step& step) noexcept -> bool {
+                const interior::Draw* draw = std::get_if<interior::Draw>(&step);
+                return draw != nullptr && draw->target.kind == interior::ResourceKind::BackBuffer;
+            };
+            const auto items = steps.Items();
+            const auto found = std::ranges::find_if(items, IsShown);
+            if (found == items.end())
+                return std::nullopt;
+            return std::get<interior::Draw>(*found);
+        };
+
+        static constexpr auto IsFresh = [] [[nodiscard]] (const interior::Step& step) noexcept -> bool {
+            const interior::Submit* submit = std::get_if<interior::Submit>(&step);
+            return submit != nullptr && submit->phase == interior::Phase::One;
+        };
+        const bool presented = std::ranges::any_of(steps.Items(), IsPresent);
+        const std::optional<interior::Draw> shown = presented ? ShownDraw(steps) : s.lastShown;
+        // (Compared without the back buffer it lands in, which takes turns.)
+        static constexpr auto SameSource = [] [[nodiscard]] (const std::optional<interior::Draw>& a, const std::optional<interior::Draw>& b) noexcept -> bool {
+            return a.has_value() && b.has_value() && a->processed == b->processed && a->blend == b->blend && a->history == b->history;
+        };
+        const bool distinct = presented && (std::ranges::any_of(steps.Items(), IsFresh) || !SameSource(shown, s.lastShown));
+        return Statistics{ s.lastReport, s.processed, s.presented + CountOf(presented), s.frameGen, s.distinct + CountOf(distinct), shown };
     };
-    const Result<interior::FenceValue, Error> fence = ExecuteSteps(gpu_, frame_, plan.steps);
+    const Result<interior::FenceValue, Error> fence = ExecuteSteps(gpu_, frame_, plan.steps).and_then([this](interior::FenceValue v) { return ForgeLogged(console_).transform([v] { return v; }); });
     if (!fence.has_value())
         return Fail(fence.error());
     frame_ = ContextAt(frame_, *fence);     // WAIVER(R2): the last signalled fence is effect-layer state, replaced whole per frame.
@@ -1292,10 +1328,39 @@ namespace {
         };
         return CreateTexture(d, HistoryRequest(plan)).transform([&](const Texture& texture) { return WithView(t, d, texture); });
     };
+    // With one of Motion Forge's generators: the processed picture at the back buffers' size (the second of each pair
+    // it works on), and the pictures it makes between, as many as the largest multiplier has, all readable at rest.
+    static constexpr auto WithForgeTextures = [] [[nodiscard]] (const ResourceTable& t, const GpuDevice& d, const SessionPlan& plan) noexcept -> TableResult {
+        static constexpr auto CurrentRequest = [] [[nodiscard]] (const SessionPlan& plan) noexcept -> TextureRequest {
+            return TextureRequest{ plan.target, kSwapChainFormat, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, ToD3D(interior::ResourceState::ShaderRead), L"Frame generation current" };
+        };
+
+        static constexpr auto GeneratedRequest = [] [[nodiscard]] (const SessionPlan& plan) noexcept -> TextureRequest {
+            return TextureRequest{ plan.target, kSwapChainFormat, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, ToD3D(interior::ResourceState::ShaderRead), L"Frame generation between" };
+        };
+
+        static constexpr auto WithCurrentView = [] [[nodiscard]] (const ResourceTable& t, const GpuDevice& d, const Texture& texture) noexcept -> ResourceTable {
+            CreateRtv(d, texture.resource.Get(), kSwapChainFormat, RtvHandle(d, kCurrentRtvSlot));
+            return WithResource(t, SimpleId(ResourceKind::Current), texture.resource);
+        };
+
+        static constexpr auto GeneratedIdOf = [] [[nodiscard]] (std::uint32_t index) noexcept -> ResourceId {
+            const Result<interior::LevelIndex, interior::UnitError> level = interior::LevelIndexTag::Parse(index);
+            ENSURE(level.has_value());
+            return interior::GeneratedId(*level);
+        };
+        if (!interior::IsForge(plan.frameGenMethod))
+            return t;
+        return CreateTexture(d, CurrentRequest(plan)).transform([&](const Texture& texture) { return WithCurrentView(t, d, texture); }).and_then([&](const ResourceTable& n) {
+            return infra::FoldResult(std::views::iota(std::uint32_t{ 0 }, interior::kMaxBetween), TableResult(n),
+                                     [&](const ResourceTable& acc, std::uint32_t index) { return WithTexture(acc, d, GeneratedIdOf(index), GeneratedRequest(plan)); });
+        });
+    };
     const DXGI_FORMAT model = ModelFormatOf(plan.format);
     return CoreTextures(WithBackBuffers(ResourceTable{}, presenter), d, plan, model, canvas)
         .and_then([&](const ResourceTable& n) { return ModelOutputs(n, d, plan, model); })
         .and_then([&](const ResourceTable& n) { return WithHistory(n, d, plan); })
+        .and_then([&](const ResourceTable& n) { return WithForgeTextures(n, d, plan); })
         .and_then([&](const ResourceTable& n) { return Buffers(n, d); })
         .and_then([&](const ResourceTable& n) { return Pyramids(n, d, plan, extents); });
 }

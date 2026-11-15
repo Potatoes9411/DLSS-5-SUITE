@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cmath>
 #include <ranges>
 
 namespace interior {
@@ -112,6 +113,10 @@ static_assert(kSingle.has_value());
     {
     case FrameGenMethod::Blend: return controls.frameGen;
     case FrameGenMethod::Nvidia: return *kSingle;
+    case FrameGenMethod::Smfg:
+    case FrameGenMethod::Smt:
+    case FrameGenMethod::Smai:
+    case FrameGenMethod::Xess: return controls.frameGen;
     }
     return *kSingle;
 }
@@ -131,6 +136,10 @@ static_assert(kSingle.has_value());
     {
     case FrameGenMethod::Blend: return true;
     case FrameGenMethod::Nvidia: return !IsGenerating(controls.frameGen);
+    case FrameGenMethod::Smfg:
+    case FrameGenMethod::Smt:
+    case FrameGenMethod::Smai:
+    case FrameGenMethod::Xess: return true;
     }
     return true;
 }
@@ -141,8 +150,20 @@ static_assert(kSingle.has_value());
     {
     case FrameGenMethod::Blend: return std::nullopt;
     case FrameGenMethod::Nvidia: return Generation{ controls.frameGen, reset, plan.source };
+    case FrameGenMethod::Smfg:
+    case FrameGenMethod::Smt:
+    case FrameGenMethod::Smai:
+    case FrameGenMethod::Xess: return std::nullopt;
     }
     return std::nullopt;
+}
+
+// The multiplier Motion Forge's generator works to, when it is the one making the pictures between.
+[[nodiscard]] std::optional<FrameGen> ForgeMultiplier(const SessionPlan& plan, const LiveSettings& controls) noexcept
+{
+    if (!IsForge(plan.frameGenMethod) || !IsGenerating(controls.frameGen))
+        return std::nullopt;
+    return controls.frameGen;
 }
 
 // Two captures further apart than a long pause do not belong together, and nothing is drawn between them.
@@ -211,6 +232,12 @@ ResourceId BackBufferId(BackBufferIndex index) noexcept
     return ResourceId{ ResourceKind::BackBuffer, *kZeroSet, *kZeroLevel, index, *kZeroSlot };
 }
 
+ResourceId GeneratedId(LevelIndex index) noexcept
+{
+    REQUIRE(index.Get() < kMaxBetween);
+    return ResourceId{ ResourceKind::Generated, *kZeroSet, index, *kZeroBuffer, *kZeroSlot };
+}
+
 ResourceId ReadbackId(FrameSlot slot) noexcept
 {
     return ResourceId{ ResourceKind::StatsReadback, *kZeroSet, *kZeroLevel, *kZeroBuffer, slot };
@@ -235,6 +262,8 @@ std::size_t SlotOf(const ResourceId& id) noexcept
     case ResourceKind::Luma: return 14 + id.set.Get() * kMaxLevels + id.level.Get();
     case ResourceKind::Flow: return 30 + id.level.Get();
     case ResourceKind::History: return 40;
+    case ResourceKind::Current: return 41;
+    case ResourceKind::Generated: return 42 + id.level.Get();
     }
     return 0;
 }
@@ -250,7 +279,7 @@ struct InitialEntry
     ResourceState state;
 };
 
-constexpr std::array<InitialEntry, 11> kInitialEntries{ { { 0, ResourceState::Common },
+constexpr std::array<InitialEntry, 17> kInitialEntries{ { { 0, ResourceState::Common },
                                                           { 2, ResourceState::ShaderRead },
                                                           { 4, ResourceState::CopyDest },
                                                           { 5, ResourceState::GenericRead },
@@ -260,7 +289,13 @@ constexpr std::array<InitialEntry, 11> kInitialEntries{ { { 0, ResourceState::Co
                                                           { 11, ResourceState::Present },
                                                           { 12, ResourceState::CopyDest },
                                                           { 13, ResourceState::CopyDest },
-                                                          { 40, ResourceState::ShaderRead } } };
+                                                          { 40, ResourceState::ShaderRead },
+                                                          { 41, ResourceState::ShaderRead },
+                                                          { 42, ResourceState::ShaderRead },
+                                                          { 43, ResourceState::ShaderRead },
+                                                          { 44, ResourceState::ShaderRead },
+                                                          { 45, ResourceState::ShaderRead },
+                                                          { 46, ResourceState::ShaderRead } } };
 
 StateTable InitialStates() noexcept
 {
@@ -352,6 +387,40 @@ Fraction BlendPoint(std::optional<Instant> lastCapture, std::optional<Microsecon
     return StepPoint(*lastCapture, *interval, now, multiplier);
 }
 
+bool IsForge(FrameGenMethod method) noexcept
+{
+    switch (method)
+    {
+    case FrameGenMethod::Blend:
+    case FrameGenMethod::Nvidia: return false;
+    case FrameGenMethod::Smfg:
+    case FrameGenMethod::Smt:
+    case FrameGenMethod::Smai:
+    case FrameGenMethod::Xess: return true;
+    }
+    return false;
+}
+
+std::optional<LevelIndex> GeneratedAt(Fraction point, FrameGen multiplier) noexcept
+{
+    // The point is a whole number of steps over the multiplier; the nearest whole number is taken, and a picture
+    // asked for past the ones made (the multiplier was raised since) is the last one made.
+    static constexpr auto StepOf = [] [[nodiscard]] (Fraction point, FrameGen multiplier) noexcept -> std::uint32_t {
+        return static_cast<std::uint32_t>(std::lround(point.Get() * static_cast<float>(multiplier.Get())));
+    };
+
+    static constexpr auto Clamped = [] [[nodiscard]] (std::uint32_t step, FrameGen multiplier) noexcept -> std::uint32_t {
+        return std::min(step, multiplier.Get() - 1u) - 1u;
+    };
+    REQUIRE(IsGenerating(multiplier));
+    const std::uint32_t step = StepOf(point, multiplier);
+    if (step == 0)
+        return std::nullopt;
+    const Result<LevelIndex, UnitError> index = LevelIndexTag::Parse(Clamped(step, multiplier));
+    ENSURE(index.has_value());
+    return *index;
+}
+
 bool ExceedsThreshold(std::optional<Fraction> unmatched, Fraction threshold) noexcept
 {
     return unmatched.has_value() && unmatched->Get() > threshold.Get();
@@ -430,7 +499,7 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
 
     static constexpr auto StepsFor = [] [[nodiscard]] (const SessionPlan& plan, const FrameState& state, const FrameInput& input, const LevelExtents& extents, FrameSlot slot) noexcept -> BuildResult {
         static constexpr auto BlitSteps = [] [[nodiscard]] (const Builder& b, bool hasOutput, ResourceKind source, const Display& display, const Blend& blend, BackBufferIndex index, bool vsync,
-                                                            const std::optional<Generation>& generation) noexcept -> BuildResult {
+                                                            const std::optional<Generation>& generation, const std::optional<FrameGen>& forge) noexcept -> BuildResult {
             // What goes with a picture handed to NVIDIA DLSS Frame Generation is read when it is presented, so both are
             // left readable by shaders, which is the state it is told they are in.
             static constexpr auto GenerationInputs = [] [[nodiscard]] (const Builder& b, const std::optional<Generation>& generation) noexcept -> BuildResult {
@@ -442,7 +511,22 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
             };
 
             static constexpr auto TargetContent = [] [[nodiscard]] (const Builder& b, bool hasOutput, ResourceKind source, const Display& display, const Blend& blend,
-                                                                    BackBufferIndex index) noexcept -> BuildResult {
+                                                                    BackBufferIndex index, const std::optional<FrameGen>& forge) noexcept -> BuildResult {
+                // A picture Motion Forge made between the pair is shown as it is, in place of the processed one; at the
+                // pair's start, the picture before it (the history) is.
+                static constexpr auto ForgeSteps = [] [[nodiscard]] (const Builder& b, const Display& display, const Blend& blend, BackBufferIndex index, FrameGen multiplier) noexcept -> BuildResult {
+                    static constexpr auto SourceOf = [] [[nodiscard]] (const Blend& blend, FrameGen multiplier) noexcept -> ResourceId {
+                        return GeneratedAt(blend.point, multiplier).transform(GeneratedId).value_or(SimpleId(ResourceKind::History));
+                    };
+
+                    static constexpr auto DrawOf = [] [[nodiscard]] (const Display& display, const Blend& blend, BackBufferIndex index, FrameGen multiplier) noexcept -> Draw {
+                        return Draw{ SourceOf(blend, multiplier), SimpleId(ResourceKind::ModelColor), BackBufferId(index), display.mode, display.split, std::nullopt, std::nullopt, kWhole };
+                    };
+                    return MoveTo(b, SourceOf(blend, multiplier), ResourceState::ShaderRead)
+                        .and_then([](const Builder& n) { return MoveTo(n, SimpleId(ResourceKind::ModelColor), ResourceState::ShaderRead); })
+                        .and_then([&](const Builder& n) { return Emit(n, Step{ DrawOf(display, blend, index, multiplier) }); });
+                };
+
                 static constexpr auto DrawSteps = [] [[nodiscard]] (const Builder& b, ResourceKind source, const Display& display, const Blend& blend, BackBufferIndex index) noexcept -> BuildResult {
                     static constexpr auto BlendInputs = [] [[nodiscard]] (const Builder& b, const Blend& blend) noexcept -> BuildResult {
                         if (!blend.fromHistory)
@@ -475,10 +559,14 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
                 };
 
                 static constexpr auto ClearSteps = [] [[nodiscard]] (const Builder& b, BackBufferIndex index) noexcept -> BuildResult { return Emit(b, Step{ ClearTarget{ BackBufferId(index) } }); };
-                return hasOutput ? DrawSteps(b, source, display, blend, index) : ClearSteps(b, index);
+                if (!hasOutput)
+                    return ClearSteps(b, index);
+                if (forge.has_value() && blend.fromHistory)
+                    return ForgeSteps(b, display, blend, index, *forge);
+                return DrawSteps(b, source, display, blend, index);
             };
             return MoveTo(b, BackBufferId(index), ResourceState::RenderTarget)
-                .and_then([&](const Builder& n) { return TargetContent(n, hasOutput, source, display, blend, index); })
+                .and_then([&](const Builder& n) { return TargetContent(n, hasOutput, source, display, blend, index, forge); })
                 .and_then([index](const Builder& n) { return MoveTo(n, BackBufferId(index), ResourceState::Present); })
                 .and_then([&generation](const Builder& n) { return GenerationInputs(n, generation); })
                 .and_then([](const Builder& n) { return Emit(n, Step{ Submit{ Phase::Two } }); })
@@ -738,6 +826,29 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
                     .and_then([&state](const Builder& n) { return Emit(n, Step{ CopyOf(state) }); })
                     .and_then([](const Builder& n) { return MoveTo(n, SimpleId(ResourceKind::History), ResourceState::ShaderRead); });
             };
+            // With one of Motion Forge's generators, the processed picture is drawn as it is shown into Current and the
+            // pictures between it and the history are made at once, whenever there is a history to make them from. A
+            // pair that follows none made (the history was not there before this frame) carries nothing over.
+            static constexpr auto PairSteps = [] [[nodiscard]] (const Builder& b, const SessionPlan& plan, const FrameState& state, const FrameInput& input,
+                                                                const LiveSettings& controls) noexcept -> BuildResult {
+                static constexpr auto CurrentOf = [] [[nodiscard]] (const SessionPlan& plan, const FrameState& state, const LiveSettings& controls) noexcept -> Draw {
+                    return Draw{ SimpleId(DisplaySourceOf(plan, controls.neuralRendering)), SimpleId(ResourceKind::ModelColor), SimpleId(ResourceKind::Current), DisplayMode::Processed, state.split,
+                                 std::nullopt, std::nullopt, kWhole };
+                };
+
+                static constexpr auto PairOf = [] [[nodiscard]] (const FrameState& state, const LiveSettings& controls) noexcept -> MakeBetween {
+                    return MakeBetween{ SimpleId(ResourceKind::History), SimpleId(ResourceKind::Current), controls.frameGen, !state.hasHistory };
+                };
+                if (!ForgeMultiplier(plan, controls).has_value() || !NextHasHistory(plan, state, input))
+                    return b;
+                return MoveTo(b, SimpleId(ResourceKind::Current), ResourceState::RenderTarget)
+                    .and_then([&](const Builder& n) { return MoveTo(n, SimpleId(DisplaySourceOf(plan, controls.neuralRendering)), ResourceState::ShaderRead); })
+                    .and_then([](const Builder& n) { return MoveTo(n, SimpleId(ResourceKind::ModelColor), ResourceState::ShaderRead); })
+                    .and_then([&](const Builder& n) { return Emit(n, Step{ CurrentOf(plan, state, controls) }); })
+                    .and_then([](const Builder& n) { return MoveTo(n, SimpleId(ResourceKind::Current), ResourceState::ShaderRead); })
+                    .and_then([](const Builder& n) { return MoveTo(n, SimpleId(ResourceKind::History), ResourceState::ShaderRead); })
+                    .and_then([&](const Builder& n) { return Emit(n, Step{ PairOf(state, controls) }); });
+            };
             const bool reset = NeedsReset(state, input.now);
             const LiveSettings controls = NextControls(state.controls, input.controlRequest);
             return HistorySteps(Builder{ StepList{}, state.states }, plan, state, controls)
@@ -745,9 +856,10 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
                 .and_then([&](const Builder& n) { return MotionPhaseTwo(n, plan, extents, state, slot); })
                 .and_then([&](const Builder& n) { return SuperResolutionSteps(n, plan, reset); })
                 .and_then([&](const Builder& n) { return NeuralRenderingSteps(n, plan, controls, reset); })
+                .and_then([&](const Builder& n) { return PairSteps(n, plan, state, input, controls); })
                 .and_then([&](const Builder& n) {
                     return BlitSteps(n, true, DisplaySourceOf(plan, controls.neuralRendering), DisplayOf(state, input), BlendOf(plan, state, input), input.backBuffer, controls.vsync,
-                                     GenerationOf(plan, controls, reset));
+                                     GenerationOf(plan, controls, reset), ForgeMultiplier(plan, controls));
                 });
         };
 
@@ -759,7 +871,7 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
             if (!PresentsUnchanged(plan, live))
                 return NothingShown(state);
             return BlitSteps(Builder{ StepList{}, state.states }, state.hasOutput, DisplaySourceOf(plan, live.neuralRendering), DisplayOf(state, input), BlendOf(plan, state, input), input.backBuffer,
-                             live.vsync, GenerationOf(plan, live, false));
+                             live.vsync, GenerationOf(plan, live, false), ForgeMultiplier(plan, live));
         };
         return ProcessesFrame(state, input) ? FreshSteps(plan, state, input, extents, slot) : RepeatSteps(plan, state, input);
     };

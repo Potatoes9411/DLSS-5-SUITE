@@ -178,6 +178,8 @@ std::string_view Describe(ApiCall call) noexcept
     case ApiCall::UpdateSubresource: return "a picture handed in is not the size of the video's pictures";
     case ApiCall::ReadVideoFrame: return "reading the next picture of the video from standard input";
     case ApiCall::WriteVideoFrame: return "writing a finished picture of the video to standard output";
+    case ApiCall::ForgeStart: return "starting Motion Forge's frame generator";
+    case ApiCall::ForgeFrames: return "Motion Forge's frame generator making the pictures between a pair";
     }
     return "unknown call";
 }

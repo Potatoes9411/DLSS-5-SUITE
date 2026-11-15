@@ -110,6 +110,47 @@ constexpr std::array<std::wstring_view, 12> kVocabulary{ L"--monitor", L"all",  
     return !DefaultOptions().nvidiaFrameGen && asked.has_value() && asked->nvidiaFrameGen && refused.has_value() && !refused->nvidiaFrameGen;
 }
 
+// Every generator is named by --frame-gen-method; the blend is the default, an unknown name is refused, and
+// --nvidia-frame-gen on (older callers) still asks for NVIDIA's whatever the method says.
+[[nodiscard]] bool FrameGenMethodNamesEveryGenerator(infra::RngState&) noexcept
+{
+    struct Named
+    {
+        std::wstring_view argument;
+        FrameGenMethod method;
+    };
+    constexpr std::array<Named, 6> names{ { { L"--frame-gen-method=blend", FrameGenMethod::Blend },
+                                            { L"--frame-gen-method=nvidia", FrameGenMethod::Nvidia },
+                                            { L"--frame-gen-method=smfg", FrameGenMethod::Smfg },
+                                            { L"--frame-gen-method=smt", FrameGenMethod::Smt },
+                                            { L"--frame-gen-method=smai", FrameGenMethod::Smai },
+                                            { L"--frame-gen-method=xess", FrameGenMethod::Xess } } };
+    const bool each = std::ranges::all_of(names, [](const Named& n) {
+        const std::array<std::wstring_view, 1> args{ n.argument };
+        const auto parsed = ParseOptions(args);
+        return parsed.has_value() && parsed->frameGenMethod == n.method && RequestedFrameGen(*parsed) == n.method;
+    });
+    const std::array<std::wstring_view, 1> unknown{ L"--frame-gen-method=fsr" };
+    const std::array<std::wstring_view, 2> legacy{ L"--frame-gen-method=smfg", L"--nvidia-frame-gen=on" };
+    const auto old = ParseOptions(legacy);
+    return each && DefaultOptions().frameGenMethod == FrameGenMethod::Blend && !ParseOptions(unknown).has_value() && old.has_value() && RequestedFrameGen(*old) == FrameGenMethod::Nvidia;
+}
+
+// Motion Forge's settings: Flow from ten to a hundred percent (35 unless asked), the rest switches.
+[[nodiscard]] bool ForgeSettingsAreReadAndBounded(infra::RngState& rng) noexcept
+{
+    const std::uint32_t flow = proptest::DrawBetween(rng, 10, 100);
+    const std::wstring joined = L"--forge-flow=" + std::to_wstring(flow);
+    const std::array<std::wstring_view, 4> asked{ joined, L"--forge-keep-still=off", L"--forge-light-search=on", L"--forge-rife=on" };
+    const std::array<std::wstring_view, 1> low{ L"--forge-flow=9" };
+    const std::array<std::wstring_view, 1> high{ L"--forge-flow=101" };
+    const auto parsed = ParseOptions(asked);
+    const ForgeSettings d = DefaultOptions().forge;
+    const bool defaults = d.flow.Get() == 35 && d.keepStill && !d.lightSearch && !d.rife;
+    const bool read = parsed.has_value() && parsed->forge.flow.Get() == flow && !parsed->forge.keepStill && parsed->forge.lightSearch && parsed->forge.rife;
+    return defaults && read && !ParseOptions(low).has_value() && !ParseOptions(high).has_value();
+}
+
 // A video is asked for with all three of its numbers or not at all; none of them may be zero.
 [[nodiscard]] bool VideoNeedsItsSizeAndPeriod(infra::RngState&) noexcept
 {
@@ -311,6 +352,8 @@ std::uint32_t OptionsSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("--frame-gen accepts one to six", seed, 60, FrameGenAcceptsOneToSix));
     failures += Failures(proptest::ForAll("--frame-gen refuses zero and seven", seed, 1, FrameGenRefusesZeroAndSeven));
     failures += Failures(proptest::ForAll("--nvidia-frame-gen is off unless asked", seed, 1, NvidiaFrameGenIsOffUnlessAsked));
+    failures += Failures(proptest::ForAll("--frame-gen-method names every generator", seed, 1, FrameGenMethodNamesEveryGenerator));
+    failures += Failures(proptest::ForAll("Motion Forge settings are read and bounded", seed, 200, ForgeSettingsAreReadAndBounded));
     failures += Failures(proptest::ForAll("a video needs its size and period", seed, 1, VideoNeedsItsSizeAndPeriod));
     failures += Failures(proptest::ForAll("--nr-local-tone accepts every finite value", seed, 300, StrengthAcceptsEveryFiniteValue));
     failures += Failures(proptest::ForAll("--nr-intensity refuses what is not a number", seed, 1, IntensityRefusesWhatIsNotANumber));

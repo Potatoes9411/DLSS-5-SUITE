@@ -4,6 +4,8 @@
 
 #include <d3d12sdklayers.h>
 
+#include <algorithm>
+
 #include <ranges>
 #include <string_view>
 
@@ -190,7 +192,8 @@ Result<GpuDevice, Error> CreateGpuDevice(const DeviceSettings& settings) noexcep
                               IsNvidia(core.candidate),
                               NameOf(core.candidate),
                               ReadDriverVersion(core.candidate.adapter.Get()),
-                              std::nullopt };
+                              std::nullopt,
+                              nullptr };
         };
         return CreateFenceEvent().and_then([&](UniqueHandle event) {
             return CreateHeap(core.device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kRtvSlots, D3D12_DESCRIPTOR_HEAP_FLAG_NONE).and_then([&](Com<ID3D12DescriptorHeap> rtv) {
@@ -309,6 +312,52 @@ GpuDevice WithFrameGeneration(GpuDevice device, FrameGeneration generation) noex
     next.proxyDevice = std::move(generation.proxy.device);
     next.queue = std::move(generation.proxy.queue);
     next.streamline = std::move(generation.streamline);
+    return next;
+}
+
+void ForgeEnder::operator()(const ForgeStarted* started) const noexcept
+{
+    forge::Stop();
+    delete started; // WAIVER(R16): the session's one record, made by StartForge with new.
+}
+
+Result<ForgeStart, ForgeText> StartForge(const GpuDevice& gpu, interior::FrameGenMethod method, const interior::ForgeSettings& settings, const interior::Extent& target) noexcept
+{
+    // Motion Forge's four kinds; the others never come here (main asks only for these).
+    static constexpr auto KindOf = [] [[nodiscard]] (interior::FrameGenMethod method) noexcept -> forge::Kind {
+        switch (method)
+        {
+        case interior::FrameGenMethod::Smfg: return forge::Kind::Smfg;
+        case interior::FrameGenMethod::Smt: return forge::Kind::Smt;
+        case interior::FrameGenMethod::Smai: return forge::Kind::Smai;
+        case interior::FrameGenMethod::Xess: return forge::Kind::Xess;
+        case interior::FrameGenMethod::Blend:
+        case interior::FrameGenMethod::Nvidia: break;
+        }
+        REQUIRE(false);
+        return forge::Kind::Smfg;
+    };
+
+    static constexpr auto TextOf = [] [[nodiscard]] (const forge::Answer& answer) noexcept -> ForgeText {
+        ForgeText text{};
+        std::ranges::copy(answer.text, text.begin()); // WAIVER(R2): the text is this call's own, filled once.
+        return text;
+    };
+    const forge::Settings asked{ .flow = settings.flow.Get(), .keepStill = settings.keepStill, .lightSearch = settings.lightSearch, .rife = settings.rife };
+    const forge::Device on{ .device = gpu.device.Get(), .queue = gpu.queue.Get(), .adapter = gpu.adapter.Get() };
+    const forge::Answer answer = forge::Start(on, KindOf(method), asked, target.width.Get(), target.height.Get());
+    if (!answer.ok)
+    {
+        forge::Stop();
+        return Fail(TextOf(answer));
+    }
+    return ForgeStart{ ForgeSession(new ForgeStarted{ method }), TextOf(answer) };
+}
+
+GpuDevice WithForge(GpuDevice device, ForgeSession session) noexcept
+{
+    GpuDevice next = std::move(device); // WAIVER(R2): the device moved on whole with its generator added, read once after.
+    next.forge = std::move(session);
     return next;
 }
 

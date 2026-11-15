@@ -8,8 +8,14 @@ enum class CursorMode : std::uint8_t { Auto, On, Off };
 enum class SrMode : std::uint8_t { Auto, Dlaa, Off };
 enum class MotionBackend : std::uint8_t { BuiltIn, NvOpticalFlow, None };
 // Who makes the pictures shown between two processed ones: the engine's own blend along the motion vectors,
-// or NVIDIA DLSS Frame Generation behind the swap chain.
-enum class FrameGenMethod : std::uint8_t { Blend, Nvidia };
+// NVIDIA DLSS Frame Generation behind the swap chain, or one of Motion Forge's generators (MotionEngine/, NODIX
+// TECH's code, shared through effects/real/forge.cpp): SMFG, SMT (SMFG's triangle mesh), SMAI (a network through
+// DirectML) or Intel's XeSS Frame Generation. The four Forge ones make every picture between a pair at once, when
+// the second processed picture of the pair is there; the engine shows them at their moments.
+// (AMD FSR 3.1 frame generation is not here: another branch vendors FidelityFX under external/fidelityfx/. It
+// belongs among the Forge kinds - IsForge in frame.cpp, ForgeKindOf in forge.cpp - as a fifth that makes the
+// pictures between a pair into the same Generated textures.)
+enum class FrameGenMethod : std::uint8_t { Blend, Nvidia, Smfg, Smt, Smai, Xess };
 enum class CompareMode : std::uint8_t { Off, Split, Original };
 enum class ColorFormat : std::uint8_t { Rgba8, Rgba16f };
 enum class NrStyle : std::uint8_t { Standard, Natural, Cinematic };

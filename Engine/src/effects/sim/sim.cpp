@@ -5,6 +5,7 @@
 #include "infrastructure/overloaded.h"
 
 #include <algorithm>
+#include <ranges>
 
 namespace sim {
 namespace {
@@ -253,6 +254,20 @@ struct ModelCheck
     return WithPresent(w);
 }
 
+// The pair, and every picture made between it, are read and left readable: the generator moves nothing else.
+[[nodiscard]] Result<SimWorld, SimError> CheckMakeBetween(const SimWorld& w, const interior::MakeBetween& m) noexcept
+{
+    static constexpr auto AreMadeReadable = [] [[nodiscard]] (const StateTable& s, const interior::MakeBetween& m) noexcept -> bool {
+        static constexpr auto IsMadeReadable = [] [[nodiscard]] (const StateTable& s, std::uint32_t index) noexcept -> bool {
+            return LevelIndexTag::Parse(index).transform([&s](LevelIndex level) { return IsReadable(s, GeneratedId(level)); }).value_or(false);
+        };
+        return std::ranges::all_of(std::views::iota(std::uint32_t{ 0 }, m.multiplier.Get() - 1), [&s](std::uint32_t index) { return IsMadeReadable(s, index); });
+    };
+    if (!IsReadable(w.states, m.before) || !IsReadable(w.states, m.after) || !AreMadeReadable(w.states, m))
+        return Fail(SimError::ResourceNotReadable);
+    return w;
+}
+
 [[nodiscard]] Result<SimWorld, SimError> ExecuteStep(const SimWorld& w, const Step& step, const FailureRates& rates) noexcept
 {
     return std::visit(infra::Overloaded{
@@ -265,6 +280,7 @@ struct ModelCheck
                           [&](const interior::Draw& d) { return CheckDraw(w, d); },
                           [&](const Submit& s) { return CheckSubmit(w, s); },
                           [&](const Present& p) { return CheckPresent(w, p); },
+                          [&](const interior::MakeBetween& m) { return CheckMakeBetween(w, m); },
                       },
                       step);
 }

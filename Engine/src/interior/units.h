@@ -27,6 +27,7 @@ enum class UnitError : std::uint8_t {
     LevelCountOutOfRange,
     PassCountZero,
     FrameGenOutOfRange,
+    ForgeFlowOutOfRange,
     PresetOutOfRange,
     SlotOutOfRange,
     BackBufferOutOfRange,
@@ -225,6 +226,15 @@ struct FrameGenTag
 
 private:
     [[nodiscard]] static constexpr Result<FrameGen, UnitError> ParseNonZero(std::uint32_t raw) noexcept;
+};
+
+// The share of the picture, in percent, that Motion Forge's SMFG and SMT look for the motion at ("Flow" on its
+// page): smaller follows faster movement and costs less, larger is finer while the picture moves slowly.
+struct ForgeFlowTag;
+using ForgeFlow = infra::Strong<std::uint32_t, ForgeFlowTag>;
+struct ForgeFlowTag
+{
+    [[nodiscard]] static constexpr Result<ForgeFlow, UnitError> Parse(std::uint32_t raw) noexcept;
 };
 
 struct NgxPresetTag;
@@ -538,6 +548,16 @@ constexpr Result<FrameGen, UnitError> FrameGenTag::Parse(std::uint32_t raw) noex
     if (IsZero(raw))
         return infra::Fail(UnitError::FrameGenOutOfRange);
     return ParseNonZero(raw);
+}
+
+constexpr std::uint32_t kLeastForgeFlow = 10;
+constexpr std::uint32_t kMostForgeFlow = 100;
+
+constexpr Result<ForgeFlow, UnitError> ForgeFlowTag::Parse(std::uint32_t raw) noexcept
+{
+    if (raw < kLeastForgeFlow || raw > kMostForgeFlow)
+        return infra::Fail(UnitError::ForgeFlowOutOfRange);
+    return ForgeFlow(raw);
 }
 
 // The model resolves a preset it does not carry to the one it ships with and says so in its log, so a

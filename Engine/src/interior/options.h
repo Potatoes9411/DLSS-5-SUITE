@@ -66,6 +66,16 @@ struct VideoSource
     [[nodiscard]] friend constexpr bool operator==(const VideoSource&, const VideoSource&) noexcept = default;
 };
 
+// What Motion Forge's generators are asked for beside the multiplier, read once when the session starts.
+struct ForgeSettings
+{
+    ForgeFlow flow;   // SMFG and SMT: the share of the picture the motion is looked for at
+    bool keepStill;   // read-outs and what stays on the screen while the picture moves are kept where they are
+    bool lightSearch; // SMFG: the lighter search, for a weaker GPU
+    bool rife;        // SMAI: RIFE 4.25 lite instead of SMFG Net
+    [[nodiscard]] friend constexpr bool operator==(const ForgeSettings&, const ForgeSettings&) noexcept = default;
+};
+
 struct Options
 {
     bool showHelp;
@@ -115,6 +125,8 @@ struct Options
     bool exclusionLog;      // write the capture-exclusion notes to a file beside the executable
     FrameGen frameGen;      // how many pictures are shown for each one the model makes
     bool nvidiaFrameGen;    // the pictures between are made by NVIDIA DLSS Frame Generation rather than by the engine's own blend
+    FrameGenMethod frameGenMethod; // who makes the pictures between; --nvidia-frame-gen on, kept for older callers, asks for Nvidia
+    ForgeSettings forge;
     std::optional<VideoSource> video; // a video's pictures from standard input instead of the screen, and the finished ones to standard output
     [[nodiscard]] friend constexpr bool operator==(const Options&, const Options&) noexcept = default;
 };
@@ -152,6 +164,8 @@ constexpr std::size_t kMaxArguments = 64;
 [[nodiscard]] Options DefaultOptions() noexcept;
 // The live settings a session starts from, taken from the options it was given.
 [[nodiscard]] LiveSettings DefaultLive(const Options& options) noexcept;
+// Who is asked to make the pictures between: --nvidia-frame-gen on, which older callers send, means NVIDIA's.
+[[nodiscard]] FrameGenMethod RequestedFrameGen(const Options& options) noexcept;
 [[nodiscard]] Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> arguments) noexcept;
 [[nodiscard]] std::string_view UsageText() noexcept;
 [[nodiscard]] std::string_view Describe(OptionsErrorKind kind) noexcept;

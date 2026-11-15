@@ -27,6 +27,8 @@ struct Statistics
     std::uint32_t processed;
     std::uint32_t presented;
     interior::FrameGen frameGen; // the multiplier last reported, so a change is logged once
+    std::uint32_t distinct;      // presented pictures unlike the one before: a new processed one, or another made or drawn between
+    std::optional<interior::Draw> lastShown; // what the last presented picture was drawn from
 };
 
 struct Begun
@@ -162,6 +164,9 @@ struct VideoGpu
 // The share of the finest level's pixels the motion search could not match, read from the frame that last
 // used the slot, when it asked for the count.
 [[nodiscard]] infra::Result<std::optional<interior::Fraction>, Error> UnmatchedShare(const Gpu& gpu, std::uint32_t finestPixels, const interior::FrameState& state, interior::FrameSlot slot) noexcept;
+
+// What Motion Forge's generator said since it was last asked (it keeps its own lines, a few at most), into the log.
+[[nodiscard]] infra::Status<Error> ForgeLogged(const Console& console) noexcept;
 
 [[nodiscard]] infra::Result<RealEnvironment, Error> CreateEnvironment(HeldFiles held, GpuDevice device, std::optional<NgxRuntime> runtime, const interior::SessionPlan& plan,
                                                                       const interior::Geometry& geometry, OutputWindow window, const ControlPanel* panel, const EnvironmentSettings& settings,
