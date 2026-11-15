@@ -62,7 +62,7 @@ as NVIDIA-DLSS-LICENSE.txt and NVIDIA-Reflex-LICENSE.txt.
 ---------------------------------------------------------------------------
 AMD FidelityFX SDK 1.1.4 (the FidelityFX API headers in external/fidelityfx;
 the runtime amd_fidelityfx_dx12.dll ships beside the screen engine, for
-Motion Forge's FSR 3.1 Frame Generation)
+Motion Forge's and the Screen Engine's FSR 3.1 Frame Generation)
 ---------------------------------------------------------------------------
 
 Copyright (C) 2024 Advanced Micro Devices, Inc.

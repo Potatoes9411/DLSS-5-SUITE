@@ -90,11 +90,48 @@ let ``frame generation is written as the engine's multiplier and kept within one
     Assert.Equal(Some "6", valueOf "--frame-gen" (args { defaults with FrameGen = 7 }))
 
 [<Fact>]
-let ``NVIDIA frame generation is off unless asked, and asking restarts the overlay`` () =
-    Assert.Equal(Some "off", valueOf "--nvidia-frame-gen" (args defaults))
-    Assert.Equal(Some "on", valueOf "--nvidia-frame-gen" (args { defaults with NvidiaFrameGen = true }))
-    // Streamline goes behind the swap chain the session is built with, so no running session takes it.
-    Assert.False(liveFieldsOnly defaults { defaults with NvidiaFrameGen = true })
+let ``SUITE's blend makes the pictures between unless another generator is picked, and picking one restarts the overlay`` () =
+    Assert.Equal(Some "blend", valueOf "--frame-gen-method" (args defaults))
+    Assert.Equal(None, valueOf "--nvidia-frame-gen" (args defaults))
+    // A generator is set up with the session, so no running session takes another.
+    for g, _ in FrameGenerator.all do
+        if g <> OwnBlend then Assert.False(liveFieldsOnly defaults { defaults with Generator = g })
+
+[<Fact>]
+let ``every generator is written as the engine's name for it`` () =
+    let expected = [ OwnBlend, "blend"; NvidiaDlssg, "nvidia"; Smfg, "smfg"; Smt, "smt"; Smai, "smai"; XessMfg, "xess"; Fsr31, "fsr" ]
+    for g, name in expected do
+        Assert.Equal(Some name, valueOf "--frame-gen-method" (args { defaults with Generator = g }))
+        Assert.Equal(Some g, FrameGenerator.ofName name)
+    Assert.Equal(None, FrameGenerator.ofName "dlss4")
+
+[<Fact>]
+let ``only Motion Forge's generators are forge ones`` () =
+    Assert.Equal<FrameGenerator list>([ Smfg; Smt; Smai; XessMfg; Fsr31 ], FrameGenerator.all |> List.map fst |> List.filter FrameGenerator.isForge)
+
+[<Fact>]
+let ``Motion Forge's settings are written as the engine's options, flow kept within ten and a hundred`` () =
+    Assert.Equal(Some "35", valueOf "--forge-flow" (args defaults))
+    Assert.Equal(Some "on", valueOf "--forge-keep-still" (args defaults))
+    Assert.Equal(Some "off", valueOf "--forge-light-search" (args defaults))
+    Assert.Equal(Some "off", valueOf "--forge-rife" (args defaults))
+    let a = args { defaults with Generator = Smai; Forge = { Flow = 70; KeepStill = false; LightSearch = true; Rife = true } }
+    Assert.Equal(Some "70", valueOf "--forge-flow" a)
+    Assert.Equal(Some "off", valueOf "--forge-keep-still" a)
+    Assert.Equal(Some "on", valueOf "--forge-light-search" a)
+    Assert.Equal(Some "on", valueOf "--forge-rife" a)
+    Assert.Equal(Some "10", valueOf "--forge-flow" (args { defaults with Forge = { forgeDefaults with Flow = 3 } }))
+    Assert.Equal(Some "100", valueOf "--forge-flow" (args { defaults with Forge = { forgeDefaults with Flow = 400 } }))
+    Assert.False(liveFieldsOnly defaults { defaults with Forge = { forgeDefaults with Flow = 50 } })
+
+[<Fact>]
+let ``a settings file from when NVIDIA frame gen was a switch loads as NVIDIA's generator`` () =
+    Assert.Equal(NvidiaDlssg, (deserialize """{ "NvidiaFrameGen": true }""").Generator)
+    Assert.Equal(OwnBlend, (deserialize """{ "NvidiaFrameGen": false }""").Generator)
+    Assert.Equal(Smt, (deserialize """{ "Generator": "smt" }""").Generator)
+    Assert.Equal(OwnBlend, (deserialize """{ "Generator": "nonsense" }""").Generator)
+    // and older builds still read NVIDIA's from it
+    Assert.Contains("\"NvidiaFrameGen\": true", serialize { defaults with Generator = NvidiaDlssg })
 
 [<Fact>]
 let ``frame generation is a live setting`` () =
@@ -147,7 +184,8 @@ let ``settings survive being saved and loaded`` () =
             Skin = SkinStrength 0.4
             Passes = 2
             FrameGen = 3
-            NvidiaFrameGen = true
+            Generator = XessMfg
+            Forge = { Flow = 60; KeepStill = false; LightSearch = true; Rife = true }
             Motion = NoMotion }
     Assert.Equal(original, deserialize (serialize original))
 
@@ -304,7 +342,8 @@ let ``a settings file from before the advanced options keeps their defaults`` ()
     Assert.Equal(advancedDefaults, loaded.Advanced)
     // Frame generation came later still: off, not a multiplier of 0 the engine refuses.
     Assert.Equal(1, loaded.FrameGen)
-    Assert.False(loaded.NvidiaFrameGen)
+    Assert.Equal(OwnBlend, loaded.Generator)
+    Assert.Equal(forgeDefaults, loaded.Forge)
 
 [<Fact>]
 let ``a settings file with some advanced options keeps the rest at their defaults`` () =

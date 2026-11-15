@@ -63,12 +63,23 @@ type ScreenEngineViewModel() as this =
     // The engine reads it at start, so a running engine with NVIDIA frame gen on is restarted.
     let dlssg =
         DlssgPickerViewModel(DlssgVersions.ScreenEngine, fun () ->
-            if host.IsRunning && settings.NvidiaFrameGen then
+            if host.IsRunning && settings.Generator = NvidiaDlssg then
                 applyTimer.Stop()
                 applyTimer.Start())
 
     let styles = [ Standard, "Standard"; Natural, "Natural"; Cinematic, "Cinematic" ]
     let frameGens = [ 1, "Off"; 2, "2x"; 3, "3x"; 4, "4x"; 5, "5x"; 6, "6x" ]
+    let generators =
+        [ OwnBlend, "SUITE blend (any GPU)"
+          NvidiaDlssg, "NVIDIA DLSS Frame Generation"
+          Smfg, "SMFG (Motion Forge, any GPU)"
+          Smt, "SMT triangle mesh (Motion Forge)"
+          Smai, "SMAI neural network (DirectML)"
+          XessMfg, "Intel XeSS MFG"
+          Fsr31, "AMD FSR 3.1 Frame Generation" ]
+    let smaiModels = [ false, "SMFG Net (Motion Forge's own)"; true, "RIFE 4.25 lite" ]
+    let mutable smaiProgress = ""
+    let mutable isGettingSmai = false
     let superResolutions = [ SrAuto, "Automatic"; SrDlaa, "DLAA (native resolution)"; SrOff, "Off" ]
     let compares = [ CompareOff, "Off"; CompareSplit, "Split view"; CompareOriginal, "Original only" ]
     let motionBackends = [ "cpu", "CPU (works everywhere)"; "nvofa", "NVIDIA Optical Flow" ]
@@ -241,7 +252,7 @@ type ScreenEngineViewModel() as this =
                 Directory.CreateDirectory(NeuralScreen.dataDir ()) |> ignore
                 File.WriteAllText(methodPath (), if neuralScreen then "neuralscreen" else "engine")
              with _ -> ())
-            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsRobloxShadeHost"; "IsAvailable"; "CanStart"; "Status" ] do
+            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsRobloxShadeHost"; "IsAvailable"; "CanStart"; "Status"; "IsNvidiaGenerator"; "IsForgeGenerator" ] do
                 this.RaisePropertyChanged(name)
             if wasRunning then this.Start()
 
@@ -255,7 +266,7 @@ type ScreenEngineViewModel() as this =
                 Directory.CreateDirectory(NeuralScreen.dataDir ()) |> ignore
                 File.WriteAllText(methodPath (), "robloxshadehost")
              with _ -> ())
-            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsRobloxShadeHost"; "IsAvailable"; "CanStart"; "Status" ] do
+            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsRobloxShadeHost"; "IsAvailable"; "CanStart"; "Status"; "IsNvidiaGenerator"; "IsForgeGenerator" ] do
                 this.RaisePropertyChanged(name)
             if wasRunning then this.Start()
 
@@ -625,12 +636,105 @@ type ScreenEngineViewModel() as this =
     /// The DLSS Frame Generation version picker (bundled, own file, or a release).
     member _.DlssgPicker = dlssg
 
-    member this.NvidiaFrameGen
-        with get () = settings.NvidiaFrameGen
+    // ----- who makes the pictures between (Motion Forge's generators run inside the Screen Engine) -----
+    member _.GeneratorOptions = generators |> List.map snd
+
+    member this.SelectedGeneratorIndex
+        with get () = indexIn generators settings.Generator
+        and set (value: int) =
+            match valueAt generators value with
+            | Some g when g <> settings.Generator ->
+                this.Change { settings with Generator = g }
+                this.RaiseGeneratorProperties()
+            | _ -> ()
+
+    member this.IsNvidiaGenerator = this.IsScreenEngine && settings.Generator = NvidiaDlssg
+    member this.IsForgeGenerator = this.IsScreenEngine && FrameGenerator.isForge settings.Generator
+    /// SMFG and SMT look for the motion at a share of the picture; SMAI keeps SMFG's still pixels too.
+    member _.UsesFlow = (match settings.Generator with Smfg | Smt -> true | _ -> false)
+    member _.UsesKeepStill = (match settings.Generator with Smfg | Smt | Smai -> true | _ -> false)
+    member _.IsSmfgGenerator = settings.Generator = Smfg
+    member _.IsSmaiGenerator = settings.Generator = Smai
+
+    member this.ForgeFlow
+        with get () = float settings.Forge.Flow
+        and set (value: float) =
+            let v = Math.Clamp(int (Math.Round value), 10, 100)
+            if v <> settings.Forge.Flow then
+                this.Change { settings with Forge = { settings.Forge with Flow = v } }
+                this.RaisePropertyChanged("ForgeFlow")
+                this.RaisePropertyChanged("ForgeFlowText")
+
+    member _.ForgeFlowText = sprintf "%d%%" settings.Forge.Flow
+
+    member this.ForgeKeepStill
+        with get () = settings.Forge.KeepStill
         and set (value: bool) =
-            if value <> settings.NvidiaFrameGen then
-                this.Change { settings with NvidiaFrameGen = value }
-                this.RaisePropertyChanged("NvidiaFrameGen")
+            if value <> settings.Forge.KeepStill then
+                this.Change { settings with Forge = { settings.Forge with KeepStill = value } }
+                this.RaisePropertyChanged("ForgeKeepStill")
+
+    member this.ForgeLightSearch
+        with get () = settings.Forge.LightSearch
+        and set (value: bool) =
+            if value <> settings.Forge.LightSearch then
+                this.Change { settings with Forge = { settings.Forge with LightSearch = value } }
+                this.RaisePropertyChanged("ForgeLightSearch")
+
+    member _.SmaiModelOptions = smaiModels |> List.map snd
+
+    member this.SelectedSmaiModelIndex
+        with get () = indexIn smaiModels settings.Forge.Rife
+        and set (value: int) =
+            match valueAt smaiModels value with
+            | Some r when r <> settings.Forge.Rife ->
+                this.Change { settings with Forge = { settings.Forge with Rife = r } }
+                this.RaisePropertyChanged("SelectedSmaiModelIndex")
+            | _ -> ()
+
+    /// What the chosen generator needs and whether it is there; it falls back to SUITE's blend otherwise.
+    member _.GeneratorNote =
+        match settings.Generator with
+        | OwnBlend -> "SUITE's own: drawn along the engine's motion vectors. Any GPU, lightest."
+        | NvidiaDlssg -> "Needs an RTX 40 (up to 4x) or RTX 50 (up to 6x). Takes about 15 seconds to start; the DLSS-G version below is the one it runs."
+        | Smfg -> "Motion Forge's own generator, plain compute: any GPU. Flow: smaller follows faster motion and costs less."
+        | Smt -> "SMFG's triangle mesh: corners found by 3DRS, drawn by the GPU's rasteriser. Any GPU; sharper edges."
+        | Smai ->
+            if MotionAi.isInstalled () then "A network through DirectML, on the GPU's AI units where it has them. Its files are installed."
+            elif settings.Forge.Rife then "RIFE needs Motion Forge's AI files: get them below (about 59 MB)."
+            else "SMFG Net needs Motion Forge's AI files: get them below (about 59 MB). Without them SUITE's blend is used."
+        | XessMfg ->
+            if MotionFiles.hasXess () then "Intel's libraries are picked (checked for Intel's signature at start). On non-Intel GPUs Intel's library makes one frame a pair."
+            else "Needs Intel's libxess_fg.dll and libxell.dll: pick them on the Motion Forge page. Without them SUITE's blend is used."
+        | Fsr31 ->
+            if File.Exists(Path.Combine(AppContext.BaseDirectory, "engine", "amd_fidelityfx_dx12.dll")) then "AMD's FidelityFX runtime ships with SUITE (AMD's signature is checked). FSR 3.1 makes one frame a pair: best at 2x."
+            else "AMD's FidelityFX runtime (amd_fidelityfx_dx12.dll) is not in SUITE's engine folder; SUITE's blend is used."
+
+    member _.SmaiNeedsFiles = settings.Generator = Smai && not (MotionAi.isInstalled ())
+    member _.SmaiProgress = smaiProgress
+    member _.IsGettingSmai = isGettingSmai
+
+    /// Downloads SMAI's runtime and network into Motion Forge's data folder (shared with Motion Forge, pinned by SHA-256).
+    member this.GetSmaiFiles() =
+        if not isGettingSmai then
+            isGettingSmai <- true
+            this.RaisePropertyChanged("IsGettingSmai")
+            let say text = Dispatcher.UIThread.Post(fun () -> smaiProgress <- text; this.RaisePropertyChanged("SmaiProgress"))
+            task {
+                let! result = MotionAi.install (fun text share -> say (sprintf "%s (%.0f%%)" text (share * 100.0)))
+                say (match result with Ok () -> "SMAI's files are installed." | Error why -> "Could not get SMAI's files: " + why)
+                Dispatcher.UIThread.Post(fun () ->
+                    isGettingSmai <- false
+                    this.RaiseGeneratorProperties()
+                    this.RaisePropertyChanged("IsGettingSmai"))
+            }
+            |> ignore
+
+    member private this.RaiseGeneratorProperties() =
+        for name in
+            [ "SelectedGeneratorIndex"; "IsNvidiaGenerator"; "IsForgeGenerator"; "UsesFlow"; "UsesKeepStill"; "IsSmfgGenerator"; "IsSmaiGenerator"
+              "ForgeFlow"; "ForgeFlowText"; "ForgeKeepStill"; "ForgeLightSearch"; "SelectedSmaiModelIndex"; "GeneratorNote"; "SmaiNeedsFiles" ] do
+            this.RaisePropertyChanged(name)
 
     member _.SelectedFrameGenIndex
         with get () = indexIn frameGens settings.FrameGen
@@ -1134,7 +1238,7 @@ type ScreenEngineViewModel() as this =
         for name in
             [ "SelectedSourceIndex"; "SelectedTargetIndex"; "CanPickTarget"; "Window"; "SelectedWindowIndex"; "CaptureFolder"; "ModelFolder"; "NeuralRendering"
               "Intensity"; "IntensityText"; "LocalStructure"; "LocalStructureText"; "LocalTone"; "LocalToneText"
-              "Passes"; "PassesText"; "PassesSlider"; "LocalStructureSlider"; "LocalToneSlider"; "NrPresetSlider"; "NrPresetText"; "SrPresetText"; "MvLevelText"; "ResetThresholdText"; "SkinStrengthSlider"; "SkinStrengthText"; "AutoMask"; "SelectedStyleIndex"; "SelectedFrameGenIndex"; "NvidiaFrameGen"; "SelectedSuperResolutionIndex"
+              "Passes"; "PassesText"; "PassesSlider"; "LocalStructureSlider"; "LocalToneSlider"; "NrPresetSlider"; "NrPresetText"; "SrPresetText"; "MvLevelText"; "ResetThresholdText"; "SkinStrengthSlider"; "SkinStrengthText"; "AutoMask"; "SelectedStyleIndex"; "SelectedFrameGenIndex"; "SelectedSuperResolutionIndex"
               "SelectedCompareIndex"; "VSync"; "ShowPanel"; "NrPreset"; "SrPreset"; "MvLevel"
               "ResetThreshold"; "MvScaleAuto"; "UseManualMvScale"; "MvScaleX"; "MvScaleY"
               "CaptureBorder"; "Affinity"; "Topmost"; "ClickThrough"; "ExcludeOwnWindows"
@@ -1144,6 +1248,7 @@ type ScreenEngineViewModel() as this =
               "SelectedAdapterIndex"; "NgxAppId"; "NgxProjectId"; "SkinFollowsStructure"
               "SkinStrength"; "SelectedMotionIndex"; "SelectedCursorIndex"; "HighPrecisionColour" ] do
             this.RaisePropertyChanged(name)
+        this.RaiseGeneratorProperties()
 
     interface IDisposable with
         member _.Dispose() =

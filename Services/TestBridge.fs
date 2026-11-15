@@ -29,6 +29,10 @@ open Avalonia.VisualTree
 ///   call Path.To.Method args...   call a view-model method
 ///   click Name                    press a button by x:Name, or by its text
 ///   snap file.png                 render the window to a PNG, off-screen
+///   snapwin "Title part" file.png  the same for another of SUITE's windows
+///   render "Title part" file.png [y]  one of SUITE's windows drawn by Avalonia itself into a PNG (no screen
+///                                 needed), its first scroll view scrolled to y first when given
+///   call Window.Method args...    a method of the main window itself rather than its view model
 ///   frames seconds                frame-time statistics while it runs
 ///   wheel x y delta               a real mouse-wheel message at a point
 ///   size                          the window's size
@@ -180,7 +184,10 @@ module TestBridge =
                     let tokens = rest.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                     let path = tokens.[0]
                     let dot = path.LastIndexOf('.')
-                    let owner = if dot < 0 then window.DataContext else resolve window.DataContext (path.Substring(0, dot))
+                    let owner =
+                        if path.StartsWith("Window.") && dot = 6 then box window
+                        elif dot < 0 then window.DataContext
+                        else resolve window.DataContext (path.Substring(0, dot))
                     let name = path.Substring(dot + 1)
                     let args = tokens |> Array.skip 1
                     let methodInfo =
@@ -194,12 +201,22 @@ module TestBridge =
                         b.RaiseEvent(RoutedEventArgs(Button.ClickEvent))
                         Task.FromResult "ok"
                     | None -> Task.FromResult(sprintf "error: no visible button '%s'" rest)
-                | "snap" ->
+                | "snap" | "snapwin" ->
                     // Windows' own capture of this window, as it is on screen -
                     // even when covered. Rendering off-screen instead draws in
                     // software, which cannot see GPU-held pictures and showed
-                    // the covers blank.
-                    match window.TryGetPlatformHandle() with
+                    // the covers blank. snapwin "Title part" file.png: another of SUITE's windows.
+                    let target, file =
+                        if parts.[0].ToLowerInvariant() = "snap" then Some window, rest
+                        else
+                            let quoted = rest.Split('"', StringSplitOptions.RemoveEmptyEntries)
+                            let title, path = quoted.[0], quoted.[1].Trim()
+                            let windows =
+                                match Application.Current.ApplicationLifetime with
+                                | :? Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime as d -> List.ofSeq d.Windows
+                                | _ -> []
+                            windows |> List.tryFind (fun w -> not (isNull w.Title) && w.Title.Contains(title)), path
+                    match target |> Option.map (fun w -> w.TryGetPlatformHandle()) |> Option.defaultValue null with
                     | null -> Task.FromResult "error: no window handle"
                     | handle ->
                         let mutable rect = Unchecked.defaultof<Win32Rect>
@@ -210,7 +227,30 @@ module TestBridge =
                         // PW_RENDERFULLCONTENT = 2: includes what DirectComposition draws.
                         Native.PrintWindow(handle.Handle, dc, 2u) |> ignore
                         g.ReleaseHdc(dc)
-                        bitmap.Save(rest, System.Drawing.Imaging.ImageFormat.Png)
+                        bitmap.Save(file, System.Drawing.Imaging.ImageFormat.Png)
+                        Task.FromResult "ok"
+                | "render" ->
+                    let quoted = rest.Split('"', StringSplitOptions.RemoveEmptyEntries)
+                    let title = quoted.[0]
+                    let tail = quoted.[1].Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    let path = tail.[0]
+                    let windows =
+                        match Application.Current.ApplicationLifetime with
+                        | :? Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime as d -> List.ofSeq d.Windows
+                        | _ -> []
+                    match windows |> List.tryFind (fun w -> not (isNull w.Title) && w.Title.Contains(title)) with
+                    | None -> Task.FromResult(sprintf "error: no window titled '%s'" title)
+                    | Some w ->
+                        if tail.Length > 1 then
+                            match w.GetVisualDescendants() |> Seq.tryPick (function :? ScrollViewer as s -> Some s | _ -> None) with
+                            | Some s ->
+                                s.Offset <- Vector(0.0, Double.Parse(tail.[1], Globalization.CultureInfo.InvariantCulture))
+                                w.UpdateLayout()
+                            | None -> ()
+                        let size = PixelSize(max 1 (int w.Bounds.Width), max 1 (int w.Bounds.Height))
+                        use bitmap = new RenderTargetBitmap(size, Vector(96.0, 96.0))
+                        bitmap.Render(w)
+                        bitmap.Save(path)
                         Task.FromResult "ok"
                 | "frames" ->
                     measureFrames window (Double.Parse(rest, Globalization.CultureInfo.InvariantCulture))

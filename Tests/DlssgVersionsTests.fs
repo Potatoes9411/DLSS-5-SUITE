@@ -81,7 +81,7 @@ let ``streamline files are the five plugins and the DLSS-G runtime`` () =
 
 [<Fact>]
 let ``the screen engine is told a streamline folder only for another DLSS-G with NVIDIA frame gen on`` () =
-    let on = { ScreenEngine.defaults with NvidiaFrameGen = true }
+    let on = { ScreenEngine.defaults with Generator = ScreenEngine.NvidiaDlssg }
     let args = [ "--gui=off" ]
     Assert.Equal<string list>(args @ [ "--streamline-path"; @"C:\data\dlssg\run\310.4.0-ab" ],
                               ScreenEngine.withStreamlinePath on @"C:\app\engine" @"C:\data\dlssg\run\310.4.0-ab" args)

@@ -118,6 +118,54 @@ module ScreenEngine =
         | CompareSplit
         | CompareOriginal
 
+    /// Who makes the pictures shown between two processed ones (--frame-gen-method).
+    /// The engine's own blend; NVIDIA DLSS Frame Generation (RTX 40 / 50, through
+    /// Streamline); or one of Motion Forge's generators, run by the Screen Engine on
+    /// Motion Forge's own code: SMFG and SMT (any GPU), SMAI (a network through DirectML,
+    /// files from the Motion Forge page), XeSS MFG (the user's Intel-signed files, picked
+    /// on the Motion Forge page) and AMD FSR 3.1 FG (FidelityFX runtime beside the engine).
+    /// One that cannot start is logged and the engine's blend is used.
+    type FrameGenerator =
+        | OwnBlend
+        | NvidiaDlssg
+        | Smfg
+        | Smt
+        | Smai
+        | XessMfg
+        | Fsr31
+
+    module FrameGenerator =
+        /// The engine's name for each, and the order the page lists them in.
+        let all =
+            [ OwnBlend, "blend"; NvidiaDlssg, "nvidia"; Smfg, "smfg"; Smt, "smt"; Smai, "smai"; XessMfg, "xess"; Fsr31, "fsr" ]
+
+        let name (g: FrameGenerator) = all |> List.find (fun (x, _) -> x = g) |> snd
+
+        let ofName (text: string) =
+            all
+            |> List.tryFind (fun (_, n) -> String.Equals(n, text, StringComparison.OrdinalIgnoreCase))
+            |> Option.map fst
+
+        /// Motion Forge's own generators, which take the Forge settings.
+        let isForge (g: FrameGenerator) =
+            match g with
+            | Smfg | Smt | Smai | XessMfg | Fsr31 -> true
+            | OwnBlend | NvidiaDlssg -> false
+
+    /// What Motion Forge's generators are asked for beside the multiplier.
+    [<CLIMutable>]
+    type ForgeSettings =
+        { /// SMFG and SMT: the share of the picture the motion is looked for at, 10 to 100 percent.
+          Flow: int
+          /// Read-outs and what stays on screen are kept still (SMFG, SMT, SMAI).
+          KeepStill: bool
+          /// SMFG's lighter search, for a weaker GPU.
+          LightSearch: bool
+          /// SMAI runs RIFE 4.25 lite instead of SMFG Net.
+          Rife: bool }
+
+    let forgeDefaults = { Flow = 35; KeepStill = true; LightSearch = false; Rife = false }
+
     /// Everything past the everyday controls, one field per engine option.
     ///
     /// Plain values only (no unions or options), so the record is stored as it
@@ -230,10 +278,10 @@ module ScreenEngine =
           /// Pictures shown for each processed one, 1 (off) to 6. The ones
           /// between are interpolated from the motion between processed frames.
           FrameGen: int
-          /// The pictures between are made by NVIDIA DLSS Frame Generation (RTX 40
-          /// and 50) instead of the engine's own blend. The engine falls back to its
-          /// own, and says so in its log, when Streamline cannot start.
-          NvidiaFrameGen: bool
+          /// Who makes the pictures between. The engine falls back to its own blend,
+          /// and says so in its log, when the one asked for cannot start.
+          Generator: FrameGenerator
+          Forge: ForgeSettings
           SuperResolution: SuperResolution
           Motion: Motion
           Cursor: Cursor
@@ -271,7 +319,8 @@ module ScreenEngine =
           AutoMask = true
           Passes = 1
           FrameGen = 1
-          NvidiaFrameGen = false
+          Generator = OwnBlend
+          Forge = forgeDefaults
           SuperResolution = SrAuto
           Motion = BuiltIn
           Cursor = CursorAuto
@@ -359,6 +408,7 @@ module ScreenEngine =
             Passes = max 1 s.Passes
             // The engine refuses to start on anything outside 1 to 6.
             FrameGen = Math.Clamp(s.FrameGen, 1, 6)
+            Forge = { s.Forge with Flow = Math.Clamp(s.Forge.Flow, 10, 100) }
             Advanced = normalizeAdvanced s.Advanced }
 
     // =====================================================================
@@ -430,7 +480,11 @@ module ScreenEngine =
           yield opt "nr-automask" (onOff s.AutoMask)
           yield opt "nr-passes" (string s.Passes)
           yield opt "frame-gen" (string s.FrameGen)
-          yield opt "nvidia-frame-gen" (onOff s.NvidiaFrameGen)
+          yield opt "frame-gen-method" (FrameGenerator.name s.Generator)
+          yield opt "forge-flow" (string s.Forge.Flow)
+          yield opt "forge-keep-still" (onOff s.Forge.KeepStill)
+          yield opt "forge-light-search" (onOff s.Forge.LightSearch)
+          yield opt "forge-rife" (onOff s.Forge.Rife)
           yield opt "nr-preset" (string a.NrPreset)
           yield opt "nr-ui-correction" (onOff a.UiCorrection)
 
@@ -525,7 +579,7 @@ module ScreenEngine =
     /// bundled build, the command line stays as it was.
     let withStreamlinePath (settings: Settings) (bundledDir: string) (streamlineDir: string) (arguments: string list) =
         let same = String.Equals(Path.GetFullPath(streamlineDir).TrimEnd('\\'), Path.GetFullPath(bundledDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
-        if settings.NvidiaFrameGen && not same then arguments @ [ "--streamline-path"; streamlineDir ] else arguments
+        if settings.Generator = NvidiaDlssg && not same then arguments @ [ "--streamline-path"; streamlineDir ] else arguments
 
     /// The folder holding the nvngx_dlssnr.dll SUITE already bundles.
     /// The NVIDIA-signed copy ships in "dlss 5 signed" and is preferred: the
@@ -729,7 +783,13 @@ module ScreenEngine =
           AutoMask: bool
           Passes: int
           FrameGen: int
+          /// Written for older SUITE builds, which knew only this switch.
           NvidiaFrameGen: bool
+          Generator: string
+          ForgeFlow: int
+          ForgeKeepStill: bool
+          ForgeLightSearch: bool
+          ForgeRife: bool
           SuperResolution: string
           Motion: string
           Cursor: string
@@ -757,7 +817,12 @@ module ScreenEngine =
           AutoMask = s.AutoMask
           Passes = s.Passes
           FrameGen = s.FrameGen
-          NvidiaFrameGen = s.NvidiaFrameGen
+          NvidiaFrameGen = (s.Generator = NvidiaDlssg)
+          Generator = FrameGenerator.name s.Generator
+          ForgeFlow = s.Forge.Flow
+          ForgeKeepStill = s.Forge.KeepStill
+          ForgeLightSearch = s.Forge.LightSearch
+          ForgeRife = s.Forge.Rife
           SuperResolution = (match s.SuperResolution with SrAuto -> "auto" | SrDlaa -> "dlaa" | SrOff -> "off")
           Motion = (match s.Motion with BuiltIn -> "builtin" | NvidiaOpticalFlow -> "nvof" | NoMotion -> "none")
           Cursor = (match s.Cursor with CursorAuto -> "auto" | CursorOn -> "on" | CursorOff -> "off")
@@ -787,7 +852,11 @@ module ScreenEngine =
               AutoMask = d.AutoMask
               Passes = d.Passes
               FrameGen = d.FrameGen
-              NvidiaFrameGen = d.NvidiaFrameGen
+              // A file from before the generator was a choice says only NvidiaFrameGen.
+              Generator =
+                  if d.NvidiaFrameGen then NvidiaDlssg
+                  else FrameGenerator.ofName (if isNull d.Generator then "" else d.Generator) |> Option.defaultValue OwnBlend
+              Forge = { Flow = d.ForgeFlow; KeepStill = d.ForgeKeepStill; LightSearch = d.ForgeLightSearch; Rife = d.ForgeRife }
               SuperResolution = pick d.SuperResolution [ "auto", SrAuto; "dlaa", SrDlaa; "off", SrOff ] SrAuto
               Motion = pick d.Motion [ "builtin", BuiltIn; "nvof", NvidiaOpticalFlow; "none", NoMotion ] BuiltIn
               Cursor = pick d.Cursor [ "auto", CursorAuto; "on", CursorOn; "off", CursorOff ] CursorAuto
@@ -956,7 +1025,7 @@ module ScreenEngine =
                 // and the install folder under Program Files is not writable.
                 psi.WorkingDirectory <- data
                 let streamlineDir =
-                    if current.NvidiaFrameGen then
+                    if current.Generator = NvidiaDlssg then
                         // A choice that cannot be honoured falls back to the bundled build
                         // (logged; the picker says so too) - frame generation still runs.
                         fst (DlssgVersions.streamlineDirFor DlssgVersions.ScreenEngine)

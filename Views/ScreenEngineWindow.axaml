@@ -235,15 +235,54 @@
                                           SelectedIndex="{Binding SelectedFrameGenIndex, Mode=TwoWay}" MinWidth="150" Height="34" />
                             </StackPanel>
 
+                            <!-- Who makes the pictures between: SUITE's blend, NVIDIA's DLSS-G, or one of Motion Forge's
+                                 generators run inside the Screen Engine (SMFG, SMT, SMAI, XeSS MFG, FSR 3.1 FG). -->
                             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsScreenEngine}"
-                                        ToolTip.Tip="Uses NVIDIA DLSS Frame Generation for the in-between frames instead of SUITE's own. Needs an RTX 40 or 50 card: up to 4x on RTX 40, 6x on RTX 50. It takes about 15 seconds to start. If it can't start, SUITE's own frame generation is used and the engine log says why.">
-                                <TextBlock Text="NVIDIA frame gen" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" Width="110" />
-                                <ToggleSwitch IsChecked="{Binding NvidiaFrameGen, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
-                                <TextBlock Text="RTX 40/50 · best quality" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                        ToolTip.Tip="Who makes the in-between frames. SUITE blend and Motion Forge's SMFG, SMT and SMAI run on any GPU; NVIDIA DLSS Frame Generation needs an RTX 40 or 50; Intel XeSS MFG and AMD FSR 3.1 run on most GPUs. If the one picked can't start, SUITE's blend is used and the engine log says why. Changing it restarts the overlay.">
+                                <TextBlock Text="Generator" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" Width="110" />
+                                <ComboBox Classes="GlassComboBox" ItemsSource="{Binding GeneratorOptions}"
+                                          SelectedIndex="{Binding SelectedGeneratorIndex, Mode=TwoWay}" MinWidth="260" Height="34" />
                             </StackPanel>
+                            <TextBlock IsVisible="{Binding IsScreenEngine}" Text="{Binding GeneratorNote}" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" Margin="118,-4,0,0" />
+
+                            <!-- Motion Forge's settings for the generator picked. -->
+                            <Border IsVisible="{Binding IsForgeGenerator}" Background="#14FFFFFF" BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="14" Padding="12,10">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="MOTION FORGE" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
+                                    <Grid ColumnDefinitions="110,*,60" ColumnSpacing="10" IsVisible="{Binding UsesFlow}"
+                                          ToolTip.Tip="The share of the picture the motion is looked for at. Smaller follows fast motion further and costs less; larger is finer while the picture moves slowly. Motion Forge's default is 35%.">
+                                        <TextBlock Grid.Column="0" Text="Flow" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                        <Slider Grid.Column="1" Minimum="10" Maximum="100" Value="{Binding ForgeFlow, Mode=TwoWay}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{Binding ForgeFlowText}" FontSize="12" Foreground="#E2E8F0" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding UsesKeepStill}"
+                                                ToolTip.Tip="Read-outs (HUD, text, a crosshair) and whatever stays on screen while the picture moves are kept where they are instead of being dragged along.">
+                                        <TextBlock Text="Keep still pixels" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" Width="110" />
+                                        <ToggleSwitch IsChecked="{Binding ForgeKeepStill, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsSmfgGenerator}"
+                                                ToolTip.Tip="A lighter motion search for a weaker GPU: fewer passes, at some cost in quality.">
+                                        <TextBlock Text="Lighter search" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" Width="110" />
+                                        <ToggleSwitch IsChecked="{Binding ForgeLightSearch, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsSmaiGenerator}"
+                                                ToolTip.Tip="SMFG Net is Motion Forge's own network, run once a pair; RIFE 4.25 lite runs once a frame and costs more.">
+                                        <TextBlock Text="Network" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" Width="110" />
+                                        <ComboBox Classes="GlassComboBox" ItemsSource="{Binding SmaiModelOptions}"
+                                                  SelectedIndex="{Binding SelectedSmaiModelIndex, Mode=TwoWay}" MinWidth="220" Height="34" />
+                                    </StackPanel>
+                                    <WrapPanel IsVisible="{Binding SmaiNeedsFiles}">
+                                        <Button Classes="AppleSecondaryBtn" Command="{Binding GetSmaiFiles}" IsEnabled="{Binding !IsGettingSmai}" Cursor="Hand" Padding="14,7" Margin="0,0,8,4"
+                                                ToolTip.Tip="Downloads ONNX Runtime, DirectML and Motion Forge's networks into Motion Forge's data folder, each checked against its SHA-256. Shared with the Motion Forge page.">
+                                            <TextBlock Text="GET SMAI FILES" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                        </Button>
+                                    </WrapPanel>
+                                    <TextBlock Text="{Binding SmaiProgress}" IsVisible="{Binding IsSmaiGenerator}" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
 
                             <!-- Which DLSS Frame Generation (nvngx_dlssg.dll) NVIDIA frame gen runs. -->
-                            <Border IsVisible="{Binding IsScreenEngine}" Background="#14FFFFFF" BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="14" Padding="12,10">
+                            <Border IsVisible="{Binding IsNvidiaGenerator}" Background="#14FFFFFF" BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="14" Padding="12,10">
                                 <StackPanel Spacing="8" DataContext="{Binding DlssgPicker}" x:DataType="vm:DlssgPickerViewModel">
                                     <StackPanel Orientation="Horizontal" Spacing="8"
                                                 ToolTip.Tip="Bundled: the one that comes with SUITE. My own file: an nvngx_dlssg.dll you pick (it must be signed by NVIDIA). Any other: an NVIDIA release from the Upscaler Vault's list, downloaded and checked when picked. A running engine restarts to use it.">

@@ -1596,7 +1596,10 @@ type MainWindow() as this =
             window
 
     /// The Screen Engine has its own window; one at a time, raised if it is open.
-    member this.OnOpenScreenEngineClicked(sender: obj, e: RoutedEventArgs) =
+    member this.OnOpenScreenEngineClicked(sender: obj, e: RoutedEventArgs) = this.OpenScreenEngine()
+
+    /// (Also the test bridge's way in: call Window.OpenScreenEngine.)
+    member this.OpenScreenEngine() =
         let window = this.ScreenEngineWindowOf()
         window.SetOverlay false
         // No owner: it stays open, and visible, whatever the main window does.
