@@ -360,6 +360,8 @@ type MainViewModel() as this =
 
     /// "games" | "emulators" | "settings" - the page on screen.
     let mutable activeSection = "games"
+    /// The page Settings was opened from, for its back button.
+    let mutable sectionBeforeSettings = "games"
 
     /// True while the Manage sheet is showing an emulator, which installs by a
     /// single fixed route and needs none of the game-side choices.
@@ -1346,7 +1348,7 @@ type MainViewModel() as this =
                     selectedColorAtmosphere <- userAtmosphere
                 | None -> applyAtmosphere userAtmosphere
                 this.RaiseAtmosphere()
-                for name in [ "Editions"; "ActiveEdition"; "IsSuiteEdition"; "EditionTitle" ] do
+                for name in [ "Editions"; "ActiveEdition"; "IsSuiteEdition"; "EditionTitle"; "SettingsBackText" ] do
                     this.RaisePropertyChanged(name)
                 this.ActiveSection <- this.HomeSection
                 if key = "storage" then spacePress.Activate() else spacePress.Deactivate()
@@ -1603,11 +1605,14 @@ type MainViewModel() as this =
         with get () = activeSection
         and set (value: string) =
             if activeSection <> value then
+                // Settings' back button returns to the page it was opened from.
+                if value = "settings" then sectionBeforeSettings <- activeSection
                 activeSection <- value
                 isSettingsOpen <- (value = "settings")
 
                 this.RaisePropertyChanged("ActiveSection")
                 this.RaisePropertyChanged("IsSettingsOpen")
+                this.RaisePropertyChanged("SettingsBackText")
                 this.RaisePropertyChanged("IsGamesViewVisible")
                 this.RaisePropertyChanged("IsEmulatorsViewVisible")
                 this.RaisePropertyChanged("IsGamesTabActive")
@@ -1631,7 +1636,28 @@ type MainViewModel() as this =
 
     member this.IsSettingsOpen
         with get () = isSettingsOpen
-        and set value = this.ActiveSection <- (if value then "settings" else this.HomeSection)
+        and set value = if value then this.ActiveSection <- "settings" else this.CloseSettings()
+
+    /// Where Settings' back button goes: inside DLSS 5 SUITE, the tab it was
+    /// opened from; in any other edition, that edition's own page. It used
+    /// to go to SUITE's games page every time, which inside another edition
+    /// showed the library under that edition's header and colours.
+    member private this.SettingsReturn =
+        if activeEdition = "suite" then
+            match sectionBeforeSettings with
+            | "games" | "emulators" | "video" | "community" -> sectionBeforeSettings
+            | _ -> "games"
+        else this.HomeSection
+
+    /// The back button's label names where it goes.
+    member this.SettingsBackText =
+        if activeEdition <> "suite" then "BACK TO " + this.EditionTitle
+        else
+            match this.SettingsReturn with
+            | "emulators" -> "BACK TO EMULATORS"
+            | "video" -> "BACK TO VIDEO"
+            | "community" -> "BACK TO COMMUNITY"
+            | _ -> loc.BackToGames
 
     /// One box, four jobs - it says which one it is doing right now.
     member this.SearchPlaceholder =
@@ -1764,7 +1790,7 @@ type MainViewModel() as this =
             this.RaisePropertyChanged("IsSettingUpLosslessScaling")
             return result
     }
-    member this.CloseSettings() = this.ActiveSection <- "games"
+    member this.CloseSettings() = this.ActiveSection <- this.SettingsReturn
     member this.ShowGames() = this.ActiveSection <- "games"
     member this.ShowEmulators() = this.ActiveSection <- "emulators"
     member this.ShowCommunity() = this.ActiveSection <- "community"
@@ -1791,7 +1817,7 @@ type MainViewModel() as this =
         | None -> ()
 
     member this.ToggleSettings() =
-        this.ActiveSection <- (if activeSection = "settings" then this.HomeSection else "settings")
+        if activeSection = "settings" then this.CloseSettings() else this.ActiveSection <- "settings"
 
     // ---------------------------------------------------------------------
     // LIBRARY
