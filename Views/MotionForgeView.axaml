@@ -588,9 +588,6 @@
                     </Border>
                 </Grid>
 
-                <!-- Condition 1 of NODIX TECH's permission: his credit stays with his work. -->
-                <TextBlock Classes="MfHint" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,2,0,0"
-                           Text="Motion Forge is MFG SUPER MOTION by NODIX TECH, folded into DLSS 5 SUITE with his permission. Copyright (c) 2026 NODIX-TECH." />
             </StackPanel>
         </ScrollViewer>
     </Grid>

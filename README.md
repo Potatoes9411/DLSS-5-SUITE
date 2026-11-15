@@ -2,7 +2,7 @@
 
 # DLSS 5 SUITE
 
-**A modified edition of DLSS 5 MANAGER for Windows.**
+**DLSS, frame generation, upscaler and storage tools for your Windows games.**
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
@@ -15,23 +15,11 @@
 
 ## Project status and ownership
 
-DLSS 5 SUITE is a permitted modified version of **DLSS 5 MANAGER**, which was created by **NODIX TECH** and published by **Numidia Studios**. Potatoes9411 maintains this modified edition under the name Potatoes-dev.
+DLSS 5 SUITE is built by **Potatoes9411** and published by **Potatoes-dev**.
 
-Public access to this repository does **not** transfer ownership of DLSS 5 MANAGER, DLSS 5 SUITE, their artwork, bundled components, or third-party technology. It also does not grant permission to rename, rebrand, resell, or republish the application as someone else's product.
+Public access to this repository does **not** transfer ownership of DLSS 5 SUITE, its artwork, bundled components, or third-party technology. It also does not grant permission to rename, rebrand, resell, or republish the application as someone else's product. Refer to [NOTICE.txt](NOTICE.txt) and [Copyright.txt](Copyright.txt) before copying, modifying, or distributing any part of the project.
 
-The permission granted for DLSS 5 SUITE is specific to this project and its maintainer. It is not a blanket license for anyone who discovers or downloads the repository. Refer to [NOTICE.txt](NOTICE.txt) and [Copyright.txt](Copyright.txt) before copying, modifying, or distributing any part of the project.
-
-## Original application
-
-The original and unchanged DLSS 5 MANAGER is available from its developer at:
-
-**https://numidiastudios.com/dlss-5-manager/**
-
-**GitHub:** [https://github.com/NODIX-TECH/DLSS-5-MANAGER](https://github.com/NODIX-TECH/DLSS-5-MANAGER)
-
-DLSS 5 SUITE uses its own GitHub releases for updates, but it does not replace or claim ownership of the original application or its download location.
-
-## What this edition provides
+## What DLSS 5 SUITE provides
 
 - Detection of installed games and their likely rendering APIs.
 - Supported DLSS, ReShade, RenoDX and OptiScaler installation routes.
@@ -75,7 +63,7 @@ Compatibility varies by game, graphics hardware, anti-cheat system and game upda
 
 ## Safety notice
 
-Only obtain releases from this repository or the original DLSS 5 MANAGER website. Do not use unofficial executables advertised as “MV 2.7” or named `eurotrucks2.exe`; supplied examples were detected as Trojans by numerous independent security products and are not part of DLSS 5 SUITE.
+Only obtain releases from this repository. Do not use unofficial executables advertised as “MV 2.7” or named `eurotrucks2.exe`; supplied examples were detected as Trojans by numerous independent security products and are not part of DLSS 5 SUITE.
 
 The ShaderGlass route only uses allowlisted official upstream projects. Release names and versions are checked, downloaded assets are SHA-256 verified, archives are extracted with path-traversal protection, and setup stops safely if verification fails. The unsafe MV 2.7 method is never downloaded or used. Third-party mod components retain their own ownership and licensing.
 
@@ -124,7 +112,7 @@ Application data, cached artwork, settings, manifests and backups are stored und
 %LOCALAPPDATA%\DLSS5Suite\
 ```
 
-Data from the original `%LOCALAPPDATA%\DLSS5Manager` folder is imported once without overwriting newer SUITE data.
+Data from an older `%LOCALAPPDATA%\DLSS5Manager` folder is imported once without overwriting newer SUITE data.
 
 ## Source availability
 
@@ -132,24 +120,20 @@ The source is published for transparency, maintenance and permitted collaboratio
 
 Large mod and NVIDIA runtime payloads are intentionally excluded from the Git repository. Their absence from a source checkout does not indicate a broken release; authorized release installers package the required files separately.
 
-## Support the Developers
+## Support the Developer
 
-DLSS 5 SUITE is a free project. If you find this modified edition useful, you can support the developers through Ko-fi. Tips are split 50-50 between this fork and the original author of DLSS 5 MANAGER.
+DLSS 5 SUITE is a free project. If you find it useful, you can support its development through Ko-fi.
 
 - **Potatoes9411 (Potatoes-dev)**
   - Ko-fi: [![Support this build's dev](https://img.shields.io/badge/Ko--fi-Support%20this%20build's%20dev%20(Potatoes9411)-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/potatoes9411)
   - Website: [potatoes-dev.com](https://potatoes-dev.com)
-- **NODIX TECH (Numidia Studios)**
-  - Ko-fi: [![Support the original creator](https://img.shields.io/badge/Ko--fi-Support%20the%20original%20creator%20(NODIX%20TECH)-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/nodix)
-  - Website: [numidiastudios.com](https://numidiastudios.com)
 
 ## Credits and trademarks
 
-- DLSS 5 MANAGER: NODIX TECH / Numidia Studios
-- DLSS 5 SUITE modifications: Potatoes9411 / Potatoes-dev
+- DLSS 5 SUITE: Potatoes9411 / Potatoes-dev
 - ShaderGlass: Mausimus
 - RenoDX and ReShade components belong to their respective developers
 
 NVIDIA, DLSS and the NVIDIA eye logo are trademarks of NVIDIA Corporation. DLSS 5 SUITE is not affiliated with, endorsed by, or sponsored by NVIDIA.
 
-For the exact conditions governing this modified edition, read [NOTICE.txt](NOTICE.txt).
+For the full notice, read [NOTICE.txt](NOTICE.txt).

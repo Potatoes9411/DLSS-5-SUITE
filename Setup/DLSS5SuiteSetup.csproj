@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <OutputType>WinExe</OutputType>
@@ -29,7 +29,7 @@
     <Company>Potatoes-dev</Company>
     <Authors>Potatoes9411</Authors>
     <Description>Installer for DLSS 5 SUITE — built by Potatoes9411, published by Potatoes-dev.</Description>
-    <Copyright>© 2026 Potatoes-dev. Based on DLSS 5 MANAGER, © 2026 Numidia Studios. All rights reserved.</Copyright>
+    <Copyright>© 2026 Potatoes-dev. All rights reserved.</Copyright>
 
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>

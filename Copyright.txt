@@ -1,4 +1,7 @@
--All copyrights are reserved based on the publication dates on GitHub.
--The app was created by Nodix Tech.
--You may not take the code or application, rename it, and republish it under your own name without obtaining direct, specific permission from Nodix Tech; otherwise, a report will be filed against you.
--The use of the code for AI training without permission is strictly prohibited; any stolen code will be reported, and the responsible party will be held accountable.
+DLSS 5 SUITE
+Copyright (c) 2026 Potatoes-dev. All rights reserved.
+
+-Built by Potatoes9411 and published by Potatoes-dev.
+-You may not take the code or application, rename it, and republish it under your own name without direct, specific permission from Potatoes-dev.
+-The use of the code for AI training without permission is prohibited.
+-Third-party components keep their own licences; see NOTICE.txt.
