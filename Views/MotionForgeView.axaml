@@ -269,6 +269,33 @@
                                 <TextBlock Classes="MfHead" Text="GENERATOR FILES" />
                                 <TextBlock Text="{Binding FilesText}" FontSize="12" TextWrapping="Wrap"
                                            Foreground="#CBD5E1" />
+                                <!-- DLSS MFG: which DLSS Frame Generation (nvngx_dlssg.dll) it runs. -->
+                                <StackPanel Spacing="8" IsVisible="{Binding IsDlss}">
+                                    <StackPanel Spacing="8" DataContext="{Binding DlssgPicker}" x:DataType="vm:DlssgPickerViewModel">
+                                        <Grid ColumnDefinitions="130,*" ColumnSpacing="10"
+                                              ToolTip.Tip="Bundled: the one that comes with SUITE. My own file: an nvngx_dlssg.dll you pick (it must be signed by NVIDIA). Any other: an NVIDIA release from the Upscaler Vault's list, downloaded and checked when picked.">
+                                            <TextBlock Classes="MfLabel" Text="DLSS-G version" />
+                                            <ComboBox x:Name="DlssgVersionBox" Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding Items}" SelectedIndex="{Binding SelectedIndex, Mode=TwoWay}"
+                                                      IsEnabled="{Binding IsIdle}" DropDownOpened="OnDlssgDropDownOpened" />
+                                        </Grid>
+                                        <WrapPanel>
+                                            <Button Classes="AppleSecondaryBtn" Click="OnDlssgOwnFileClicked" IsEnabled="{Binding IsIdle}" Cursor="Hand" Padding="14,8" Margin="0,0,8,6"
+                                                    ToolTip.Tip="Pick an nvngx_dlssg.dll (from a game, say). It is only read: a copy signed by NVIDIA is kept in SUITE's data folder.">
+                                                <TextBlock Text="MY OWN FILE…" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                            </Button>
+                                            <Button Classes="AppleSecondaryBtn" Click="OnDlssgRefreshClicked" IsEnabled="{Binding IsIdle}" Cursor="Hand" Padding="14,8" Margin="0,0,8,6"
+                                                    ToolTip.Tip="Ask NVIDIA's DLSS repository and UPSCALE IT's list again for every DLSS Frame Generation release.">
+                                                <TextBlock Text="REFRESH LIST" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                            </Button>
+                                            <Button Classes="AppleDangerBtn" Click="OnDlssgRemoveOwnClicked" IsVisible="{Binding HasOwnChosen}" IsEnabled="{Binding IsIdle}" Cursor="Hand" Padding="14,8" Margin="0,0,8,6">
+                                                <TextBlock Text="REMOVE MY FILE" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                            </Button>
+                                        </WrapPanel>
+                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding Progress}" Height="6" IsVisible="{Binding IsBusy}" />
+                                        <TextBlock Classes="MfHint" Text="{Binding StatusText}" />
+                                        <TextBlock Classes="MfHint" Text="{Binding CatalogStatus}" />
+                                    </StackPanel>
+                                </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsXess}">
                                     <Button Classes="ApplePrimaryBtn" Click="OnPickXessClicked" Cursor="Hand" Padding="16,8">
                                         <TextBlock Text="PICK XESS FILES" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />

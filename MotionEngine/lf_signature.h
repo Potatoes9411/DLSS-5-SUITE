@@ -5,7 +5,10 @@
 //      along the whole chain);
 //   2. the certificate that signed it is NVIDIA Corporation's;
 //   3. that certificate leads to a root in this machine's own root store -
-//      not to one the user's store or the file itself brought along;
+//      not to one the user's store or the file itself brought along - as of
+//      the time Windows verified the signature at (its timestamp: an older
+//      NVIDIA release signed with a certificate that has since run out is
+//      still NVIDIA's, as Windows itself says in step 1);
 //   4. the file's version resource names an NVIDIA product.
 // A file that passed stays open for reading with no write sharing, so it
 // cannot be swapped between the check and its use.
@@ -45,9 +48,11 @@ namespace lf_trust
         return held;
     }
 
-    // 1. Authenticode, with revocation along the whole chain and no UI.
-    inline bool WindowsAccepts(const wchar_t *path)
+    // 1. Authenticode, with revocation along the whole chain and no UI. `as_of` is the time Windows checked the
+    // signature at: the signature's timestamp when it has one, else now.
+    inline bool WindowsAccepts(const wchar_t *path, FILETIME &as_of)
     {
+        GetSystemTimeAsFileTime(&as_of);
         WINTRUST_FILE_INFO target = {};
         target.cbStruct = sizeof(target);
         target.pcwszFilePath = path;
@@ -60,6 +65,12 @@ namespace lf_trust
         request.dwStateAction = WTD_STATEACTION_VERIFY;
         GUID policy = WINTRUST_ACTION_GENERIC_VERIFY_V2;
         const LONG verdict = WinVerifyTrust(static_cast<HWND>(INVALID_HANDLE_VALUE), &policy, &request);
+        if (verdict == ERROR_SUCCESS)
+        {
+            CRYPT_PROVIDER_DATA *data = WTHelperProvDataFromStateData(request.hWVTStateData);
+            CRYPT_PROVIDER_SGNR *signer = data ? WTHelperGetProvSignerFromChain(data, 0, FALSE, 0) : nullptr;
+            if (signer) as_of = signer->sftVerifyAsOf;
+        }
         request.dwStateAction = WTD_STATEACTION_CLOSE;         // always release the state
         WinVerifyTrust(nullptr, &policy, &request);
         return verdict == ERROR_SUCCESS;
@@ -97,8 +108,8 @@ namespace lf_trust
         return wcscmp(name.c_str(), kSigner) == 0;
     }
 
-    // 3. A chain built only against the local machine's root store.
-    inline bool ReachesMachineRoot(const CERT_CONTEXT *cert)
+    // 3. A chain built only against the local machine's root store, as of the time the signature was checked at.
+    inline bool ReachesMachineRoot(const CERT_CONTEXT *cert, FILETIME as_of)
     {
         Store roots(CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, 0,
                                   CERT_SYSTEM_STORE_LOCAL_MACHINE | CERT_STORE_READONLY_FLAG, L"Root"));
@@ -112,7 +123,7 @@ namespace lf_trust
         CERT_CHAIN_PARA want = {};
         want.cbSize = sizeof(want);
         PCCERT_CHAIN_CONTEXT chain = nullptr;
-        if (CertGetCertificateChain(engine, cert, nullptr, nullptr, &want, 0, nullptr, &chain))
+        if (CertGetCertificateChain(engine, cert, &as_of, nullptr, &want, 0, nullptr, &chain))
         {
             CERT_CHAIN_POLICY_PARA rules = {};
             rules.cbSize = sizeof(rules);
@@ -161,10 +172,11 @@ namespace lf_trust
 // All four checks, in order; the file is held open when they pass.
 static bool TrustLoadDll(const wchar_t *path)
 {
-    if (!lf_trust::WindowsAccepts(path)) return false;
+    FILETIME as_of = {};
+    if (!lf_trust::WindowsAccepts(path, as_of)) return false;
     lf_trust::Store store;
     lf_trust::Cert signer = lf_trust::SigningCertificate(path, store);
-    if (!signer || !lf_trust::SignedByNvidia(signer.get()) || !lf_trust::ReachesMachineRoot(signer.get()))
+    if (!signer || !lf_trust::SignedByNvidia(signer.get()) || !lf_trust::ReachesMachineRoot(signer.get(), as_of))
         return false;
     signer.reset();
     store.reset();
@@ -185,10 +197,11 @@ static bool TrustUserDll(const wchar_t *path, const char *what)
 // a root in this machine's own store - and are then held open.
 static bool TrustIntelDll(const wchar_t *path)
 {
-    if (!lf_trust::WindowsAccepts(path)) return false;
+    FILETIME as_of = {};
+    if (!lf_trust::WindowsAccepts(path, as_of)) return false;
     lf_trust::Store store;
     lf_trust::Cert signer = lf_trust::SigningCertificate(path, store);
-    if (!signer || !lf_trust::ReachesMachineRoot(signer.get())) return false;
+    if (!signer || !lf_trust::ReachesMachineRoot(signer.get(), as_of)) return false;
     const DWORD chars = CertGetNameStringW(signer.get(), CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nullptr, nullptr, 0);
     if (chars == 0) return false;
     std::wstring name(chars, L'\0');

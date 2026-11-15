@@ -76,6 +76,22 @@ type ScreenEngineWindow() as this =
         if on && this.WindowState = WindowState.Minimized then this.WindowState <- WindowState.Normal
 
     member this.OnReopenSuiteClicked(sender: obj, e: RoutedEventArgs) = reopenSuiteRequested.Trigger()
+
+    // The DLSS Frame Generation version picker (DlssgPickerViewModel).
+    member this.OnDlssgDropDownOpened(sender: obj, e: EventArgs) = this.WithEngine(fun engine -> engine.DlssgPicker.Opened())
+    member this.OnDlssgRefreshClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.DlssgPicker.LoadCatalog true)
+    member this.OnDlssgRemoveOwnClicked(sender: obj, e: RoutedEventArgs) = this.WithEngine(fun engine -> engine.DlssgPicker.RemoveOwn())
+
+    member this.OnDlssgOwnFileClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let dll = FilePickerFileType("NVIDIA DLSS Frame Generation", Patterns = [| "nvngx_dlssg.dll"; "*.dll" |])
+            let options = FilePickerOpenOptions(Title = "Pick an nvngx_dlssg.dll (NVIDIA DLSS Frame Generation)", AllowMultiple = false, FileTypeFilter = [| dll |])
+            let! files = this.StorageProvider.OpenFilePickerAsync(options) |> Async.AwaitTask
+            match files |> Seq.tryHead with
+            | Some f -> Dispatcher.UIThread.Post(fun () -> this.WithEngine(fun engine -> engine.DlssgPicker.ImportOwn f.Path.LocalPath))
+            | None -> ()
+        }
+        |> Async.StartImmediate
     member this.OnMinimizeClicked(sender: obj, e: RoutedEventArgs) = this.WindowState <- WindowState.Minimized
 
     member private this.ArmClickPicker() =

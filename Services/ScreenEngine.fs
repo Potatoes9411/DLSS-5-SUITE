@@ -519,6 +519,14 @@ module ScreenEngine =
     let enginePath () =
         Path.Combine(AppContext.BaseDirectory, "engine", EngineFileName)
 
+    /// NVIDIA frame gen runs the DLSS-G version picked for the Screen Engine
+    /// (DlssgVersions): any but the bundled one comes from a folder of its own,
+    /// named with --streamline-path. Without NVIDIA frame gen, or with the
+    /// bundled build, the command line stays as it was.
+    let withStreamlinePath (settings: Settings) (bundledDir: string) (streamlineDir: string) (arguments: string list) =
+        let same = String.Equals(Path.GetFullPath(streamlineDir).TrimEnd('\\'), Path.GetFullPath(bundledDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
+        if settings.NvidiaFrameGen && not same then arguments @ [ "--streamline-path"; streamlineDir ] else arguments
+
     /// The folder holding the nvngx_dlssnr.dll SUITE already bundles.
     /// The NVIDIA-signed copy ships in "dlss 5 signed" and is preferred: the
     /// driver's NGX loader refuses the modified build in "dlss 5", which stays
@@ -947,7 +955,13 @@ module ScreenEngine =
                 // The engine writes its trace file into the working directory,
                 // and the install folder under Program Files is not writable.
                 psi.WorkingDirectory <- data
-                for a in toArguments data (neuralRuntimeDir ()) current do
+                let streamlineDir =
+                    if current.NvidiaFrameGen then
+                        // A choice that cannot be honoured falls back to the bundled build
+                        // (logged; the picker says so too) - frame generation still runs.
+                        fst (DlssgVersions.streamlineDirFor DlssgVersions.ScreenEngine)
+                    else DlssgVersions.bundledDir ()
+                for a in toArguments data (neuralRuntimeDir ()) current |> withStreamlinePath current (DlssgVersions.bundledDir ()) streamlineDir do
                     psi.ArgumentList.Add(a)
 
                 let p = new Process(StartInfo = psi, EnableRaisingEvents = true)

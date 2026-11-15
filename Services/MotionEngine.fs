@@ -679,7 +679,12 @@ type MotionEngineHost() =
                 let folder = MotionFiles.engineDataDir ()
                 Directory.CreateDirectory folder |> ignore
                 let lines = MotionCommand.optionLines cards options
-                let startLines = MotionCommand.withStreamline (MotionFiles.streamlineDir ()) lines
+                // DLSS MFG runs the DLSS-G version picked for Motion Forge (DlssgVersions): the
+                // bundled one from engine\, any other from a folder of its own in the data folder.
+                let streamlineDir =
+                    if lines |> List.contains ("generator", "0") then fst (DlssgVersions.streamlineDirFor DlssgVersions.MotionForge)
+                    else MotionFiles.streamlineDir ()
+                let startLines = MotionCommand.withStreamline streamlineDir lines
                 let startFile = Path.Combine(folder, "start.cfg")
                 File.WriteAllText(startFile, MotionCommand.startFile startLines MotionCommand.studyTexts keepLog Environment.ProcessId pickNow, UTF8Encoding(false))
                 let info =

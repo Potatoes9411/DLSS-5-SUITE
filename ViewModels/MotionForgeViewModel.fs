@@ -54,6 +54,9 @@ type MotionForgeViewModel() as this =
     let profileNames = ObservableCollection<string>()
     let mutable indexShown: int option = None
 
+    // Which DLSS Frame Generation DLSS MFG runs (Services/DlssgVersions.fs, shared with the Screen Engine).
+    let dlssg = DlssgPickerViewModel(DlssgVersions.MotionForge, fun () -> this.DlssgChanged())
+
     let sendTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds 200.0)
     let saveTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds 400.0)
 
@@ -439,7 +442,7 @@ type MotionForgeViewModel() as this =
     /// What the picked generator runs on, in a line.
     member _.GeneratorNote =
         match (options ()).Generator with
-        | 0 -> "NVIDIA DLSS Multi Frame Generation through NVIDIA Streamline, which comes with SUITE - nothing to pick. Needs an NVIDIA RTX 40 (x2) or RTX 50 (up to x6) card; a higher multiplier runs at the card's most. Older cards: use SMFG."
+        | 0 -> "NVIDIA DLSS Multi Frame Generation through NVIDIA Streamline, which comes with SUITE; pick its DLSS Frame Generation version under GENERATOR FILES. Needs an NVIDIA RTX 40 (x2) or RTX 50 (up to x6) card; a higher multiplier runs at the card's most. Older cards: use SMFG."
         | 1 -> "Intel's frame generation, from your own XeSS SDK files. Runs on many cards; one frame in between a pair outside Intel Arc."
         | 2 -> "Motion Forge's own generator. Any graphics card, the lightest of all."
         | _ -> "A neural network (SMFG Net) on your card through DirectML - best on cards with AI units. Heavier than SMFG; a one-time download."
@@ -691,6 +694,17 @@ type MotionForgeViewModel() as this =
     // ---------------------------------------------------------------------
     // The generators' files
     // ---------------------------------------------------------------------
+
+    /// The DLSS Frame Generation version picker (bundled, own file, or a release).
+    member _.DlssgPicker = dlssg
+
+    /// A new DLSS-G version is read when the engine starts: a running DLSS MFG
+    /// engine is stopped so the next START MOTION runs it.
+    member private this.DlssgChanged() =
+        if host.IsActive && (options ()).Generator = 0 then
+            host.Stop()
+            note <- "The DLSS Frame Generation version changed - press START MOTION to run it."
+            notify [ "StatusNote"; "HasStatusNote" ]
 
     member _.HasStreamline = MotionFiles.hasStreamline ()
     member _.HasXessFiles = MotionFiles.hasXess ()

@@ -84,6 +84,8 @@
     <Compile Include="Services\DlssUpdater.fs" />
     <!-- Upscaler Vault edition -->
     <Compile Include="Services\UpscalerVault.fs" />
+    <!-- Which DLSS Frame Generation the Screen Engine and Motion Forge run (shared). -->
+    <Compile Include="Services\DlssgVersions.fs" />
     <Compile Include="Services\Diagnosis.fs" />
     <Compile Include="Services\SharedResults.fs" />
     <Compile Include="Services\Autopilot.fs" />
@@ -109,6 +111,7 @@
     <Compile Include="ViewModels\ViewModelBase.fs" />
     <Compile Include="ViewModels\GameCardViewModel.fs" />
     <Compile Include="ViewModels\CommunityViewModel.fs" />
+    <Compile Include="ViewModels\DlssgPickerViewModel.fs" />
     <Compile Include="ViewModels\ScreenEngineViewModel.fs" />
     <Compile Include="ViewModels\VideoViewModel.fs" />
     <Compile Include="ViewModels\SpacePressViewModel.fs" />
