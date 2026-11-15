@@ -254,3 +254,63 @@ let ``the engine's word that Streamline cannot start reaches the page`` () =
     let s = MotionStatus.apply MotionStatus.idle "@mfg unavailable DLSS Frame Generation is not supported on this graphics card (it needs an RTX 40 or 50) (Streamline 3)"
     Assert.True(s.MfgUnavailable)
     Assert.StartsWith("DLSS Frame Generation is not supported", s.MfgWhy)
+
+// ---- SUITE FG and FSR 3.1 FG -------------------------------------------------
+
+[<Fact>]
+let ``SUITE FG and FSR FG go to the engine as its generators 3 and 4`` () =
+    Assert.Equal("3", (lines { d with Generator = MotionPrefs.suiteFg })["generator"])
+    Assert.Equal("4", (lines { d with Generator = MotionPrefs.fsrFg })["generator"])
+    for g in [ MotionPrefs.suiteFg; MotionPrefs.fsrFg ] do
+        let l = lines { d with Generator = g; TriangleMesh = true; SmtAssist = true }
+        Assert.Equal("0", l["msm_ai"])
+        Assert.Equal("0", l["msm_tri"])
+    Assert.Equal<int list>([ 0; 1; 2; 2; 3; 4 ], [ 0 .. 5 ] |> List.map MotionCommand.engineGenerator)
+
+[<Fact>]
+let ``SUITE FG is always drawn along a motion field of the engine's`` () =
+    Assert.Equal("1", (lines { d with Generator = MotionPrefs.suiteFg; SuiteMotionSource = 0 })["motion"])
+    Assert.Equal("0", (lines { d with Generator = MotionPrefs.suiteFg; SuiteMotionSource = 1 })["motion"])
+    // (Whatever DLSS MFG's own choice says.)
+    Assert.Equal("1", (lines { d with Generator = MotionPrefs.suiteFg; MotionSource = 0 })["motion"])
+
+[<Fact>]
+let ``FSR FG takes the GPU estimate, its own optical flow or NVIDIA Optical Flow`` () =
+    Assert.Equal("1", (lines { d with Generator = MotionPrefs.fsrFg; FsrMotionSource = 0 })["motion"])
+    Assert.Equal("2", (lines { d with Generator = MotionPrefs.fsrFg; FsrMotionSource = 1 })["motion"])
+    Assert.Equal("0", (lines { d with Generator = MotionPrefs.fsrFg; FsrMotionSource = 2 })["motion"])
+
+[<Fact>]
+let ``only FSR FG is told where SUITE keeps AMD's runtime`` () =
+    let dir = @"C:\SUITE\engine"
+    let fsr = MotionCommand.withFidelityFx dir (MotionCommand.optionLines [||] { d with Generator = MotionPrefs.fsrFg }) |> dict
+    Assert.Equal(dir, fsr["ffx_dir"])
+    for g in [ 0; 1; 2; 3; MotionPrefs.suiteFg ] do
+        let other = MotionCommand.withFidelityFx dir (MotionCommand.optionLines [||] { d with Generator = g }) |> dict
+        Assert.False(other.ContainsKey "ffx_dir")
+    // (And Streamline stays DLSS MFG's alone.)
+    Assert.False((MotionCommand.withStreamline dir (MotionCommand.optionLines [||] { d with Generator = MotionPrefs.fsrFg }) |> dict).ContainsKey "sl_dir")
+
+[<Fact>]
+let ``the new generators run on any card`` () =
+    let amd = { Index = 0; Dlss = false; Xess = false; Name = "AMD Radeon" }
+    Assert.True(MotionCommand.runsOn MotionPrefs.suiteFg amd)
+    Assert.True(MotionCommand.runsOn MotionPrefs.fsrFg amd)
+    Assert.Equal("0", (MotionCommand.optionLines [| amd |] { d with Gpu = "AMD Radeon"; Generator = MotionPrefs.fsrFg } |> dict)["gpu"])
+
+[<Fact>]
+let ``FSR 3.1 goes no higher than x2; the others to x6`` () =
+    Assert.Equal(2, MotionPrefs.mostMultiplier MotionPrefs.fsrFg)
+    for g in [ 0; 1; 2; 3; MotionPrefs.suiteFg ] do Assert.Equal(6, MotionPrefs.mostMultiplier g)
+
+[<Fact>]
+let ``a profile keeps the new generators and their motion choices, within range`` () =
+    let n = MotionPrefs.normalizeOptions { d with Generator = MotionPrefs.fsrFg; SuiteMotionSource = 7; FsrMotionSource = -3 }
+    Assert.Equal(MotionPrefs.fsrFg, n.Generator)
+    Assert.Equal(1, n.SuiteMotionSource)
+    Assert.Equal(0, n.FsrMotionSource)
+    Assert.Equal(MotionPrefs.generators - 1, (MotionPrefs.normalizeOptions { d with Generator = 99 }).Generator)
+    // A file written before they existed reads them as their defaults.
+    let old = MotionPrefs.deserialize """{ "Version": 1, "Profiles": [ { "Id": "default", "Name": "Default", "Options": { "Generator": 2, "Schema": 24 } } ] }"""
+    Assert.Equal(0, old.Profiles[0].Options.SuiteMotionSource)
+    Assert.Equal(0, old.Profiles[0].Options.FsrMotionSource)

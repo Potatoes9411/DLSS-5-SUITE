@@ -225,7 +225,7 @@ static unsigned g_fg_count = 1, g_fg_requested_count = 0, g_fg_runtime_max = 5;
 // little longer than the game's average, or one whose beats fall clear of both real frames, has a beat more than the
 // multiplier's count, and SMFG makes a frame for each. (DLSS MFG rebuilt: each beat goes by the frame of its own
 // nearest it and needs no more than its multiplier's.)
-static unsigned FgRoom() { return EvenOn() && MsmSelected() ? std::min(5u, g_fg_count + 2u) : g_fg_count; }
+static unsigned FgRoom() { return EvenOn() && OwnMade() ? std::min(5u, g_fg_count + 2u) : g_fg_count; }
 
 // Round 53, Adaptive MFG (users' request: Lossless Scaling's and NVIDIA's own). The frames are shown at the output's
 // own even beat - a target's frames a second (the screen's refresh unless given), whatever the game draws: a game at
@@ -490,6 +490,7 @@ static void StopFgPresentation()
     // XeSS MFG: nor is a frame the library shows late copied into a picture that is gone.
     if (XeSelected()) XeForget();
     if (MsmSelected()) MsmForget();
+    if (FsrSelected()) fsrfg::Forget();
     FgDoneWatchStop();
     g_fg.stop = true;
     g_fg.wake.notify_all();
@@ -534,6 +535,8 @@ static void CloseFgResources()
     // MSM FG: what it works in (its passes stay).
     // (Round 101: also where the triangles read the motion for DLSS MFG or XeSS MFG - TriMotion works in SMFG's pictures.)
     if (MsmSelected() || g_msm.full_w) MsmClose();
+    // (DLSS 5 SUITE: FSR FG's context is made for the pictures' size; SUITE FG's pass stays.)
+    if (FsrSelected()) fsrfg::Close();
     if (g_fg.depth.gpu_tex) { g_fg.depth.gpu_tex->Release(); g_fg.depth.gpu_tex = nullptr; }
     if (g_fg.depth.staging) { g_fg.depth.staging->Release(); g_fg.depth.staging = nullptr; }
     for (auto &image : g_fg.output) image = nullptr;
@@ -1367,7 +1370,7 @@ static void FgPresenter()
             // The generator's frame it goes by: its own, or the nearest there is.
             float made_phase = phase;
             // (Adaptive MFG with DLSS MFG: the generator's frame nearest the beat, or the real frame after.)
-            if (synthetic && ad_phase_now >= 0.0 && !MsmSelected() && chosen->made && chosen->real && chosen->real->low)
+            if (synthetic && ad_phase_now >= 0.0 && !OwnMade() && chosen->made && chosen->real && chosen->real->low)
             {
                 int by = -1;
                 double least = 1.0 - ad_phase_now;
@@ -1387,7 +1390,8 @@ static void FgPresenter()
             }
             // XeSS MFG says at once when a pair has no frames in between (xe_mfg.inl, XeMake): there is nothing
             // of the library's to draw then.
-            if (synthetic && XeSelected() && chosen->denied.load()) { ++denied_frames; return 0; }
+            // (DLSS 5 SUITE: FSR FG likewise, when AMD's runtime refused the pair or it began a history.)
+            if (synthetic && (XeSelected() || FsrSelected()) && chosen->denied.load()) { ++denied_frames; return 0; }
             const bool raw = synthetic && XeSelected() && !(chosen->real && picture == chosen->real->low.get());
             // Drawn ahead, it is not waited for here: its moment is a frame or more away.
             const bool wait = ahead == 0 && !quick;
@@ -1536,7 +1540,7 @@ static void FgPresenter()
                 const signed char what = chosen->ad_what[b];
                 const double when = chosen->ad_when[b];
                 // (DLSS MFG: any of its frames - prepare() takes the one nearest the beat.)
-                ID3D12Resource *picture = what >= 0 ? chosen->interpolated[MsmSelected() ? what : 0].get() : what == -1 ? chosen->real->full.get() :
+                ID3D12Resource *picture = what >= 0 ? chosen->interpolated[OwnMade() ? what : 0].get() : what == -1 ? chosen->real->full.get() :
                                           chosen->before ? chosen->before->full.get() : nullptr;
                 if (!picture) continue;
                 plan.push_back({ picture, what >= 0, when, what >= 0 ? 0.0 : chosen->source_time, what >= 0 ? static_cast<unsigned>(what) : 0u,
@@ -1636,13 +1640,16 @@ static bool EnsureFg(Pipeline &v, DXGI_FORMAT format)
     // 3.67 at 2560x1440. Sizes in whole eights of a pixel.
     // MSM FG: its frames are made at the picture's own size whatever "Flow" says - that is the size it looks
     // for the motion at (msm_fg.h).
-    const double share = MsmSelected() ? 1.0 : std::clamp(FlowShare() / 100.0, 0.10, 1.0);
+    // (DLSS 5 SUITE: SUITE FG and FSR FG too - the Screen Engine draws its frames at the picture's size, and AMD's
+    // frame generation makes its frames at the size it is shown at.)
+    const double share = OwnMade() || FsrSelected() ? 1.0 : std::clamp(FlowShare() / 100.0, 0.10, 1.0);
     const UINT least = std::min(full_h, 504u);
     const UINT lines = share >= 0.95 ? full_h : std::min(full_h, std::max(least, static_cast<UINT>(std::lround(full_h * share / 8.0)) * 8u));
     const double scale = lines < full_h ? double(lines) / full_h : 1.0;
     const UINT w = scale < 1 ? (UINT(std::round(full_w * scale / 8.0)) * 8u) : full_w;
     const UINT height = scale < 1 ? lines : full_h;
-    if ((XeSelected() ? XeLive() : MsmSelected() ? MsmLive(full_w, full_h, format, FlowShare()) : g_fg.feature != nullptr) &&
+    if ((XeSelected() ? XeLive() : MsmSelected() ? MsmLive(full_w, full_h, format, FlowShare()) : SuiteSelected() ? suitefg::Ready()
+         : FsrSelected() ? fsrfg::Live(full_w, full_h, format) : g_fg.feature != nullptr) &&
         g_fg.w == w && g_fg.height == height && g_fg.mw == v.work_w &&
         g_fg.mh == v.work_h && g_fg.full_w == full_w && g_fg.full_h == full_h &&
         g_fg.format == format && g_fg.room == FgRoom() && g_fg.thread.joinable()) return true;
@@ -1732,6 +1739,9 @@ static bool EnsureFg(Pipeline &v, DXGI_FORMAT format)
     if (XeSelected() && !XeReady(w, height, format)) return false;
     // MSM FG: its passes, and what they work in for pictures of this size.
     if (MsmSelected() && !MsmReady(full_w, full_h, format, FlowShare())) return false;
+    // SUITE FG: its one pass. FSR FG: AMD's context, for frames at the picture's size and motion at the field's.
+    if (SuiteSelected() && !suitefg::Ready()) return false;
+    if (FsrSelected() && !fsrfg::Ready(full_w, full_h, v.work_w, v.work_h, format)) return false;
     g_fg.w = w; g_fg.height = height; g_fg.full_w = full_w; g_fg.full_h = full_h;
     g_fg.mw = v.work_w; g_fg.mh = v.work_h; g_fg.format = format;
     g_fg.stop = false;
@@ -2003,7 +2013,7 @@ static void AdaptiveLay(AdaptivePlan &p, double every, double after)
     // (SMFG: the places it has - never more than the generator was made for: round 85, x2.5 asked as x3 laid a third
     // frame on a generator of two and the card's list was refused, 0x80070057. DLSS MFG rebuilt: as many beats as the
     // plan holds - each is rebuilt at its own moment from the frame of the generator's nearest it.)
-    const unsigned room = plain ? std::min(5u, g_fg_count) : MsmSelected() ? std::min(5u, std::max(1u, g_fg.room)) : kAdaptiveMost;
+    const unsigned room = plain ? std::min(5u, g_fg_count) : OwnMade() ? std::min(5u, std::max(1u, g_fg.room)) : kAdaptiveMost;
     while (g_adaptive_next <= end + 1e-6 && p.n < kAdaptiveMost)
     {
         const float t = static_cast<float>((g_adaptive_next - before) / span);
@@ -2132,7 +2142,7 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
         // character, a car, the triangles of tests\smooth - then stands at that frame's moment, not the beat's: at
         // the limit's beat 21.7% of the picture's steps a quarter of a beat off, 3.9% with SMFG. Over a limit DLSS MFG
         // and XeSS MFG get the largest whole count that fits instead - below, `whole_fit`.)
-        const bool any_moment = MsmSelected();
+        const bool any_moment = OwnMade();
         if (!EvenOn() || smOpt.adaptive.load() > 0 || smOpt.ratio.load() > 10 || !interpolate || every <= 0.0 || !any_moment || g_fg_count == 0)
         {
             spans_filled = spans_next = 0;
@@ -2213,7 +2223,7 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
         // at its own moment. Filled exactly (below) the pairs took turns with 3 and 4: 200 a second, 5.9 and 4.45 ms
         // apart side by side - the owner's "all these oscillations". It goes up when one more has fitted for twenty
         // pairs, down when it has not for eight.
-        const bool whole_fit = capped && EvenOn() && !MsmSelected() && smOpt.adaptive.load() <= 0 && smOpt.ratio.load() <= 10 &&
+        const bool whole_fit = capped && EvenOn() && !OwnMade() && smOpt.adaptive.load() <= 0 && smOpt.ratio.load() <= 10 &&
                                room < double(g_fg_count + 1) + 0.06;
         static unsigned fitted = 0;
         static int fit_more = 0, fit_fewer = 0;
@@ -2315,8 +2325,8 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
     // moment from the generator's frame nearest it (FgPresenter, show). Filled as a limit instead, its frames stood at
     // the pair's even places, 1 to 9 ms apart on the screen. XeSS MFG stays a limit: its library's own count rules.)
     AdaptivePlan plan;
-    const bool beat_rebuilt = !MsmSelected() && !XeSelected() && g_rebuild.ready && g_rebuild.repairs && g_fg.w < g_fg.full_w;
-    const bool by_beat = !idle && interpolate && (MsmSelected() || beat_rebuilt) && AdaptiveTarget() > 0.0;
+    const bool beat_rebuilt = !OwnMade() && !XeSelected() && !FsrSelected() && g_rebuild.ready && g_rebuild.repairs && g_fg.w < g_fg.full_w;
+    const bool by_beat = !idle && interpolate && (OwnMade() || beat_rebuilt) && AdaptiveTarget() > 0.0;
     if (by_beat)
     {
         // (The moment the clock will give this frame below, read off a copy of it - nothing moves it before then.)
@@ -2325,7 +2335,7 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
         const double after = probe.Moment(source > 0 ? source : taken, chained ? source - source_before : 0.0, OutputRefresh());
         AdaptiveLay(plan, every, after);
         // (DLSS MFG rebuilt: its beats may be more than the frames it makes - each goes by the nearest of them.)
-        count = MsmSelected() ? plan.made : std::min(plan.made, g_fg_count);
+        count = OwnMade() ? plan.made : std::min(plan.made, g_fg_count);
     }
     else g_adaptive_next = 0.0;
     ++g_steady.pairs;
@@ -2380,11 +2390,15 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
         count = XeMost();
         g_fg_shown_most = AdaptiveTarget() > 0.0 ? 0u : XeMost();
     }
+    // (DLSS 5 SUITE, FSR FG: AMD's frame generation makes one frame in between a pair - FgConfigure asks for no more.)
+    if (FsrSelected() && count > 1) { count = 1; g_fg_shown_most = AdaptiveTarget() > 0.0 ? 0u : 1u; }
     // (The tensor cores' XeSS-FG: three made at most; shown as made, three shown.)
     if (FgXessTensor() && !rebuilt && count > 3) { count = 3; g_fg_shown_most = AdaptiveTarget() > 0.0 ? 0u : 3u; }
     const unsigned made = XeSelected() ? std::min(FgMadeCount(count, rebuilt), XeMost()) : FgXessTensor() ? std::min(FgMadeCount(count, rebuilt), 3u) : FgMadeCount(count, rebuilt);
     // (MSM FG has no history to keep going: a pair without frames in between asks it for none.)
-    unsigned evaluated = idle ? 0u : MsmSelected() ? made : std::max(1u, made);
+    // (SUITE FG neither: it draws from the pair alone. FSR FG keeps a history, as DLSS MFG and XeSS MFG do: every
+    // real frame is handed to it.)
+    unsigned evaluated = idle ? 0u : OwnMade() ? made : std::max(1u, made);
     // (XeSS MFG: more than the pair wants, where asking for fewer would halt the library - XeCount says why.
     // The pair is then shown by the nearest of them, as a pair with fewer made than shown is.)
     if (XeSelected() && evaluated) evaluated = std::min(XeCount(evaluated, !rebuilt), g_fg_count);
@@ -2620,6 +2634,38 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
         }
         else { MsmForget(); msmai::Forget(); }
     }
+    // DLSS 5 SUITE, SUITE FG: each frame in between at its moment, drawn as the Screen Engine draws its own (suite_fg.inl)
+    // from the two real frames along the pair's motion field. Without a frame before there is no pair.
+    bool fsr_refused = false;
+    if (SuiteSelected() && evaluated && before)
+    {
+        ID3D12Resource *outputs[5] = {};
+        float moments[5] = {};
+        for (unsigned index = 0; index < evaluated && index < 5; ++index)
+        {
+            outputs[index] = g_fg.output[index].get();
+            // (Adaptive MFG: at the moment of its beat.)
+            moments[index] = static_cast<float>(index + 1) / static_cast<float>(evaluated + 1);
+            for (unsigned b = 0; b < plan.n; ++b) if (plan.what[b] == static_cast<signed char>(index)) moments[index] = plan.phase[b];
+        }
+        suitefg::Frames(lfCore.cmd, before->full.get(), real->full.get(), D3D12_RESOURCE_STATE_COPY_SOURCE, ep.pMVecs, outputs,
+                        D3D12_RESOURCE_STATE_COPY_SOURCE, moments, std::min(evaluated, 5u));
+        FgCostMark(lfCore.cmd, "suite fg");
+    }
+    // DLSS 5 SUITE, FSR FG: the real frame handed to AMD's frame generation, which draws the frame between it and the
+    // real frame before into the pair's picture (fsr_fg.inl). "FSR's own optical flow" picked: a field of noughts.
+    if (FsrSelected())
+    {
+        if (evaluated)
+        {
+            ID3D12Resource *const fsr_motion = MotionGiven() ? ep.pMVecs : v.motion.gpu_tex;
+            fsr_refused = !fsrfg::Make(lfCore.cmd, real->full.get(), D3D12_RESOURCE_STATE_COPY_SOURCE, fsr_motion, g_fg.depth.gpu_tex,
+                                       g_fg.output[0].get(), D3D12_RESOURCE_STATE_COPY_SOURCE, restart || !before, interval) ||
+                          !before;
+            FgCostMark(lfCore.cmd, "fsr fg");
+        }
+        else fsrfg::Forget();
+    }
     // (DLSS MFG's own evaluation was here: it goes through Streamline now - sm_streamline.inl.)
     FgSlot *slot = nullptr;
     {
@@ -2712,7 +2758,7 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
         slot->taken = xe_taken;
         slot->watched = fg_fence;
         slot->done_at = 0.0;
-        slot->denied = xe_refused;
+        slot->denied = xe_refused || fsr_refused;
         slot->ready_at = LatencyNow();
         // Without a time stamp of the capture's the moment is when it was taken.
         const double raw = source > 0 ? source : taken;
@@ -2792,6 +2838,8 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
 static void FgConfigure(unsigned count)
 {
     count = std::clamp(count, 1u, 5u);
+    // (DLSS 5 SUITE, FSR FG: AMD's FSR 3.1 makes one frame in between a pair - x2, whatever was asked.)
+    if (FsrSelected()) count = 1;
     if (g_fg_requested_count == count) return;
     CloseFgResources();
     g_fg_requested_count = count;

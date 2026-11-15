@@ -27,6 +27,8 @@
 //                   lf_fg_still, sm_rebuild, lf_dlssg_compat, lf_dlssg_ada)
 //   xe_mfg          XeSS MFG: Intel's libraries (xe_api.h) and the tap that
 //                   takes their frames (xe_tap.h)
+//   suite_fg        SUITE FG: the Screen Engine's own frame generation (DLSS 5 SUITE)
+//   fsr_fg          FSR FG: AMD FidelityFX Super Resolution 3.1 Frame Generation (DLSS 5 SUITE)
 //   lf_show         the output window and its swap chain
 //   lf_window_fill  a window scaled onto its whole screen
 //   lf_vrr, lf_latency, lf_hdr_show, lf_counter   VRR, Low Latency, HDR, the FPS counter
@@ -45,6 +47,8 @@
 //   - its named objects and its window say Motion Forge, so it never meets an MFG SUPER MOTION running too
 //   - DLSS MFG goes through NVIDIA Streamline (sm_streamline.inl) from SUITE's engine folder, not NGX's DLSS-G called
 //     directly: NVIDIA's runtime refuses that from a program named as this one is, and the name stays what it is
+//   - two more generators through the shared presenter: SUITE FG (suite_fg.inl), the Screen Engine's interpolation
+//     along the engine's motion field, and FSR FG (fsr_fg.inl), AMD's FSR 3.1 frame generation from its signed runtime
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -103,6 +107,8 @@
 #include "lf_declare.h"
 #include "lf_state.h"
 #include "lf_shader_cache.inl"
+#include "fsr_fg.inl"
+#include "suite_fg.inl"
 
 #include "capture_shortcuts.inl"
 #include "lf_show_relay.inl"
@@ -280,6 +286,8 @@ int wmain(int argc, wchar_t **argv)
     // (XeSS MFG: Intel's libraries and the unlock plugin instead - the plugin needs a second before the library is used.)
     // (MSM FG: nothing of anyone else's to start - its passes are among the shaders compiling above.)
     if (XeSelected()) { if (!XeStart()) g_fg.failed = true; }
+    // (FSR FG: AMD's runtime, its signature checked, before anything is captured - the app is told at once when it is not there.)
+    else if (FsrSelected()) { if (!fsrfg::Load()) g_fg.failed = true; }
     // (DLSS MFG: NVIDIA Streamline, before the output window is made - sm_streamline.inl. The engine no longer starts
     // NGX's DLSS-G itself: NVIDIA's runtime refuses that from a program of this name.)
     else if (NgxSelected() && !slfg::Start()) { g_fg.failed = true; Trace("[card] DLSS MFG is unavailable - the picture is shown as it is"); }
@@ -287,6 +295,7 @@ int wmain(int argc, wchar_t **argv)
     cursorfx::Restore();      // (the pointer as it was: sm_cursor.inl)
     SpoutClose();
     if (NgxSelected()) { NgxShutdown(); slfg::Shutdown(); }
+    if (FsrSelected()) fsrfg::Close();
     Status("@state stopped");
     Trace("[engine] ended with code %d", code);
     if (g_control.instance) { ReleaseMutex(g_control.instance); CloseHandle(g_control.instance); }

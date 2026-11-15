@@ -86,16 +86,27 @@ static wchar_t g_sl_dir[MAX_PATH] = {};
 // Read once, before the card is picked and before any one's libraries are
 // loaded: they never share a process, and the app starts the engine anew to
 // change it. Everything else in this file means the same for all three.
-static int g_generator = 0; // 0 DLSS, 1 XeSS, 2 MSM
+//
+// DLSS 5 SUITE adds two (both through the shared presenter, lf_dlssg.inl, as MSM FG):
+//   3 SUITE FG - the Screen Engine's own frame generation (Engine/shaders/Blit.hlsl, 5da34df): each frame in between
+//     drawn from the two real frames, moved along the engine's motion field (suite_fg.inl). Any card, any moment.
+//   4 FSR FG - AMD FidelityFX Super Resolution 3.1 Frame Generation (fsr_fg.inl): one frame in between a pair, from
+//     AMD's signed runtime, on any card that runs D3D12.
+static int g_generator = 0; // 0 DLSS, 1 XeSS, 2 MSM, 3 SUITE FG, 4 FSR FG
 static bool g_generator_locked = false;
 static bool g_xess_tensor = false;  // round 85: XeSS MFG asked on the tensor cores and running so - by DLSS MFG's road (sm_engine.cpp)
 static bool NgxSelected() { return g_generator == 0; }
 static bool XeSelected() { return g_generator == 1; }
 static bool MsmSelected() { return g_generator == 2; }
+static bool SuiteSelected() { return g_generator == 3; }
+static bool FsrSelected() { return g_generator == 4; }
+// The generators whose frames in between are drawn in the engine, each at its own moment, at the picture's own size,
+// from the two real frames alone (no history of their own): MSM FG and SUITE FG.
+static bool OwnMade() { return MsmSelected() || SuiteSelected(); }
 // Round 96: "Ultra Smooth" is Even pacing and more; what Even pacing does, either asks for.
 static bool SmoothOn() { return smOpt.smooth.load() != 0; }
 static bool EvenOn() { return smOpt.fixed_beat.load() != 0 || smOpt.smooth.load() != 0; }
-static const char *GeneratorName() { return XeSelected() ? "XeSS MFG" : MsmSelected() ? "MSM FG" : "DLSS MFG"; }
+static const char *GeneratorName() { return XeSelected() ? "XeSS MFG" : MsmSelected() ? "MSM FG" : SuiteSelected() ? "SUITE FG" : FsrSelected() ? "FSR FG" : "DLSS MFG"; }
 
 // The kind of game the engine is told to expect ("Game type" in the app).
 //
@@ -165,6 +176,9 @@ static int FlowShare()
 static bool MotionGiven()
 {
     // (MSM FG finds the motion itself, on the card, as part of what it is: msm_fg.h.)
+    // (SUITE FG has no motion of its own: it is drawn along the engine's field - NVIDIA Optical Flow when picked,
+    // the GPU estimate otherwise, as the Screen Engine's "builtin" motion.)
+    if (SuiteSelected()) return true;
     return !MsmSelected() && smOpt.motion.load() != 2;
 }
 

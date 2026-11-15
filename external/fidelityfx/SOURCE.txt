@@ -1,0 +1,16 @@
+AMD FidelityFX SDK - the parts DLSS 5 SUITE builds against, shared by its engines
+(Motion Forge's FSR 3.1 Frame Generation now; the Screen Engine later).
+
+From GPUOpen-LibrariesAndSDKs/FidelityFX-SDK, tag v1.1.4
+(commit c6efa6bf7f2027b3ec94f28578bb5965eabb9e55), unchanged:
+  include/ffx_api/ffx_api.h               <- ffx-api/include/ffx_api/ffx_api.h
+  include/ffx_api/ffx_api_types.h         <- ffx-api/include/ffx_api/ffx_api_types.h
+  include/ffx_api/ffx_framegeneration.h   <- ffx-api/include/ffx_api/ffx_framegeneration.h
+  include/ffx_api/dx12/ffx_api_dx12.h     <- ffx-api/include/ffx_api/dx12/ffx_api_dx12.h
+  LICENSE.txt                             <- LICENSE.txt (MIT)
+
+The runtime these headers drive, PrebuiltSignedDLL/amd_fidelityfx_dx12.dll (signed by
+AMD), is not in the repository: tools/get-fidelityfx.ps1 fetches it, pinned to the same
+commit and to its SHA-256, into FIDELITYFX_SDK_DIR (default ../fidelityfx-sdk beside
+the repo), and tools/build-setup.sh copies it into SUITE's engine folder. The engines
+check AMD's signature on it before they load it.
