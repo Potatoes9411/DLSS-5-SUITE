@@ -41,7 +41,7 @@
               <TextBlock x:Name="WelcomeSub" Classes="Sub"
                          Text="Version 1.2.1-suite.4 — built by Potatoes9411, published by Potatoes-dev." />
               <TextBlock Classes="Sub" FontSize="12"
-                         Text="A modified version of DLSS 5 MANAGER, built by NODIX TECH and published by Numidia Studios." />
+                         Text="Built by Potatoes9411 · Published by Potatoes-dev." />
             </StackPanel>
 
             <TextBlock Classes="Body" Text="Who should this be installed for?" Margin="0,4,0,0" />

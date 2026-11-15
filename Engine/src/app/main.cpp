@@ -229,6 +229,13 @@ using Caption = real::ChoiceText;
     return b.options.appDataPath.IsEmpty() ? b.executableDirectory : b.options.appDataPath;
 }
 
+// NVIDIA Streamline, with the nvngx_dlssg.dll it hands DLSS Frame Generation, comes from --streamline-path when one
+// is given (SUITE's folder for a DLSS-G version the person picked), else from beside the executable.
+[[nodiscard]] interior::DirectoryPath StreamlineDirectoryOf(const Base& b) noexcept
+{
+    return b.options.streamlinePath.IsEmpty() ? b.executableDirectory : b.options.streamlinePath;
+}
+
 [[nodiscard]] interior::DirectoryPath CaptureFolderOf(const Base& b) noexcept
 {
     return b.options.captureFolder.IsEmpty() ? interior::DefaultCaptureFolder(CaptureRootOf(b)) : b.options.captureFolder;
@@ -583,7 +590,7 @@ struct Ended
             static constexpr auto WantsIt = [] [[nodiscard]] (const Options& o) noexcept -> bool { return interior::RequestedFrameGen(o) == interior::FrameGenMethod::Nvidia && !o.video.has_value(); };
             if (!WantsIt(b.options))
                 return d;
-            Result<real::FrameGeneration, Error> started = real::StartFrameGeneration(d.device, b.executableDirectory, b.options.ngxProjectId); // WAIVER(R2): moved from once, below.
+            Result<real::FrameGeneration, Error> started = real::StartFrameGeneration(d.device, StreamlineDirectoryOf(b), b.options.ngxProjectId); // WAIVER(R2): moved from once, below.
             if (!started.has_value())
                 return FellBack(console, std::move(d), started.error());
             return Joined(console, std::move(d), std::move(*started));

@@ -59,6 +59,14 @@ type ScreenEngineViewModel() as this =
     // still for a moment, so dragging a slider restarts it once, not per tick.
     let applyTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds(600.0))
 
+    // Which DLSS Frame Generation NVIDIA frame gen runs (Services/DlssgVersions.fs, shared with Motion Forge).
+    // The engine reads it at start, so a running engine with NVIDIA frame gen on is restarted.
+    let dlssg =
+        DlssgPickerViewModel(DlssgVersions.ScreenEngine, fun () ->
+            if host.IsRunning && settings.NvidiaFrameGen then
+                applyTimer.Stop()
+                applyTimer.Start())
+
     let styles = [ Standard, "Standard"; Natural, "Natural"; Cinematic, "Cinematic" ]
     let frameGens = [ 1, "Off"; 2, "2x"; 3, "3x"; 4, "4x"; 5, "5x"; 6, "6x" ]
     let superResolutions = [ SrAuto, "Automatic"; SrDlaa, "DLAA (native resolution)"; SrOff, "Off" ]
@@ -614,6 +622,9 @@ type ScreenEngineViewModel() as this =
     member _.FrameGenOptions = frameGens |> List.map snd
 
     /// NVIDIA DLSS Frame Generation instead of SUITE's own; it restarts the overlay.
+    /// The DLSS Frame Generation version picker (bundled, own file, or a release).
+    member _.DlssgPicker = dlssg
+
     member this.NvidiaFrameGen
         with get () = settings.NvidiaFrameGen
         and set (value: bool) =

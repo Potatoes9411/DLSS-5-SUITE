@@ -2846,7 +2846,8 @@ interior::CommandLine RestartCommandLine(const ControlPanel& panel, const interi
                 ::_snwprintf_s(line.data(), line.size(), _TRUNCATE, L"%.*s --%s=\"%.*s\"", static_cast<int>(so.Get().size()), so.Get().data(), name, static_cast<int>(path.size()), path.data());
             return Extended(so, line, written);
         };
-        const interior::CommandLine paths = WithPath(WithPath(so, L"ngx-path", o.ngxPath.Get()), L"app-data", o.appDataPath.Get());
+        const interior::CommandLine paths =
+            WithPath(WithPath(WithPath(so, L"ngx-path", o.ngxPath.Get()), L"app-data", o.appDataPath.Get()), L"streamline-path", o.streamlinePath.Get());
         return WithPath(paths, L"log-file", o.logFile.Get());
     };
     const Arguments arguments = RuntimeArguments(options, WindowArguments(panel, SurfaceArguments(panel, ModelArguments(panel, FlowArguments(panel, StartupArguments(panel, Arguments{}))))));

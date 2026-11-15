@@ -2151,24 +2151,6 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> this.OpenExternal(vm.SiteUrl)
         | _ -> ()
 
-    member this.OnOriginalSiteClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm -> this.OpenExternal(vm.OriginalSiteUrl)
-        | _ -> ()
-
-    /// The original developer's own Ko-fi - the other half of the 50-50 split.
-    member this.OnOriginalDonateClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm -> this.OpenExternal(vm.OriginalDonateUrl)
-        | _ -> ()
-
-    member this.OnSupportPromptOriginalDonateClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm ->
-            this.OpenExternal(vm.OriginalDonateUrl)
-            vm.DismissSupportPrompt()
-        | _ -> ()
-
     // =====================================================================
     // BATCH SHEET
     // =====================================================================
@@ -2219,20 +2201,6 @@ type MainWindow() as this =
     member this.OnTutorialsClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> this.OpenExternal(vm.TutorialsUrl)
-        | _ -> ()
-
-    /// The original's own download page. Required by the terms this build was
-    /// given permission under, and it goes to NODIX TECH's site rather than
-    /// anywhere this build controls.
-    member this.OnOriginalDownloadClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm -> this.OpenExternal(vm.OriginalDownloadUrl)
-        | _ -> ()
-
-    member this.OnGuidesClicked(sender: obj, e: RoutedEventArgs) =
-        match this.DataContext with
-        | :? MainViewModel as vm ->
-            if not (String.IsNullOrWhiteSpace(vm.GuidesUrl)) then this.OpenExternal(vm.GuidesUrl)
         | _ -> ()
 
     member private this.DownloadAndLaunchUpdate(vm: MainViewModel) =

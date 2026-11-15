@@ -232,6 +232,13 @@ constexpr std::array<std::wstring_view, 12> kVocabulary{ L"--monitor", L"all",  
     return parsed.has_value() && parsed->captureFolder.Get() == L"C:\\Captures With Spaces";
 }
 
+[[nodiscard]] bool StreamlinePathRoundTrips(infra::RngState&) noexcept
+{
+    const std::array<std::wstring_view, 2> args{ L"--streamline-path", L"C:\\SUITE data\\dlssg\\run\\310.4.0-1a2b" };
+    const auto parsed = ParseOptions(args);
+    return DefaultOptions().streamlinePath.IsEmpty() && parsed.has_value() && parsed->streamlinePath.Get() == L"C:\\SUITE data\\dlssg\\run\\310.4.0-1a2b";
+}
+
 [[nodiscard]] bool ShowInertRoundTrips(infra::RngState& rng) noexcept
 {
     const bool wanted = proptest::DrawBool(rng);
@@ -363,6 +370,7 @@ std::uint32_t OptionsSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("--show-inert round-trips", seed, 20, ShowInertRoundTrips));
     failures += Failures(proptest::ForAll("the exclusion log is off unless asked for", seed, 1, TheExclusionLogIsOffUnlessAsked));
     failures += Failures(proptest::ForAll("--capture-folder round-trips", seed, 1, CaptureFolderRoundTrips));
+    failures += Failures(proptest::ForAll("--streamline-path round-trips", seed, 1, StreamlinePathRoundTrips));
     failures += Failures(proptest::ForAll("--target with --monitor all is rejected", seed, 1, TargetWithAllIsRejected));
     failures += Failures(proptest::ForAll("last occurrence wins", seed, 20, LastOccurrenceWins));
     failures += Failures(proptest::ForAll("missing value is reported", seed, 1, MissingValueIsReported));

@@ -1,5 +1,6 @@
 namespace DLSS_5_MANAGER.Views
 
+open System
 open Avalonia
 open Avalonia.Controls
 open Avalonia.Interactivity
@@ -39,6 +40,15 @@ type MotionForgeView() as this =
         this.PickFiles("Pick libxess_fg.dll and libxell.dll (Intel XeSS SDK)", true, fun paths -> this.With(fun vm -> vm.AcceptXess paths))
 
     member this.OnRemoveXessClicked(_: obj, _: RoutedEventArgs) = this.With(fun vm -> vm.RemoveXess())
+
+    // The DLSS Frame Generation version picker (DlssgPickerViewModel).
+    member this.OnDlssgDropDownOpened(_: obj, _: EventArgs) = this.With(fun vm -> vm.DlssgPicker.Opened())
+    member this.OnDlssgRefreshClicked(_: obj, _: RoutedEventArgs) = this.With(fun vm -> vm.DlssgPicker.LoadCatalog true)
+    member this.OnDlssgRemoveOwnClicked(_: obj, _: RoutedEventArgs) = this.With(fun vm -> vm.DlssgPicker.RemoveOwn())
+
+    member this.OnDlssgOwnFileClicked(_: obj, _: RoutedEventArgs) =
+        this.PickFiles("Pick an nvngx_dlssg.dll (NVIDIA DLSS Frame Generation)", false, fun paths ->
+            this.With(fun vm -> vm.DlssgPicker.ImportOwn paths.Head))
     member this.OnInstallAiClicked(_: obj, _: RoutedEventArgs) = this.With(fun vm -> vm.InstallAi())
     member this.OnRemoveAiClicked(_: obj, _: RoutedEventArgs) = this.With(fun vm -> vm.RemoveAi())
     member this.OnOpenLogsClicked(_: obj, _: RoutedEventArgs) = this.With(fun vm -> vm.OpenLogFolder())

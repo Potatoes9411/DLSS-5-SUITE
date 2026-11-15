@@ -1258,14 +1258,6 @@
                                                     </StackPanel>
                                                 </Button>
 
-                                                <Button Classes="GlassLinkBtn Donate" Click="OnOriginalDonateClicked" Cursor="Hand"
-                                                        ToolTip.Tip="ko-fi.com/nodix">
-                                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <PathIcon Data="M 12,21.35 L 10.55,20.03 C 5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3 9.24,3 10.91,3.81 12,5.09 13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5 22,12.28 18.6,15.36 13.45,20.04 Z"
-                                                                  Width="15" Height="15" Foreground="#FF8FB1" VerticalAlignment="Center" />
-                                                        <TextBlock Text="{Binding OriginalDonateLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
-                                                    </StackPanel>
-                                                </Button>
                                               </StackPanel>
 
                                               <StackPanel Orientation="Horizontal" Spacing="9" HorizontalAlignment="Right">
@@ -1278,14 +1270,6 @@
                                                     </StackPanel>
                                                 </Button>
 
-                                                <Button Classes="GlassLinkBtn" Click="OnOriginalSiteClicked" Cursor="Hand"
-                                                        ToolTip.Tip="{Binding OriginalSiteUrl}">
-                                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <PathIcon Data="M 12,2 C 6.48,2 2,6.48 2,12 2,17.52 6.48,22 12,22 17.52,22 22,17.52 22,12 22,6.48 17.52,2 12,2 Z M 11,19.93 C 7.05,19.44 4,16.08 4,12 4,11.38 4.08,10.79 4.21,10.21 L 9,15 v 1 c 0,1.1 0.9,2 2,2 z m 6.9,-2.54 c -0.26,-0.81 -1,-1.39 -1.9,-1.39 h -1 v -3 c 0,-0.55 -0.45,-1 -1,-1 H 8 v -2 h 2 c 0.55,0 1,-0.45 1,-1 V 7 h 2 c 1.1,0 2,-0.9 2,-2 V 4.59 C 17.93,5.77 20,8.65 20,12 c 0,2.08 -0.8,3.97 -2.1,5.39 z"
-                                                                  Width="15" Height="15" Foreground="#7DD3A0" VerticalAlignment="Center" />
-                                                        <TextBlock Text="{Binding OriginalSiteLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
-                                                    </StackPanel>
-                                                </Button>
                                               </StackPanel>
                                             </StackPanel>
                                         </Grid>
@@ -1309,12 +1293,6 @@
                                                     </Border>
                                                 </StackPanel>
 
-                                                <!-- What this was made from, then who made this. The
-                                                     original line is dimmer but it stays: the work is
-                                                     still largely theirs. -->
-                                                <TextBlock Text="{Binding OriginalCreditsText}" FontSize="11" FontWeight="Medium" Foreground="#94A3B8"
-                                                           TextWrapping="Wrap" MaxWidth="330" HorizontalAlignment="Left" />
-
                                                 <TextBlock Text="{Binding CreditsText}" FontSize="11.5" FontWeight="SemiBold" Foreground="#CBD5E1"
                                                            TextWrapping="Wrap" MaxWidth="330" HorizontalAlignment="Left" />
 
@@ -1333,28 +1311,6 @@
                                         </Grid>
 
                                         <Rectangle Height="1" Fill="#12FFFFFF" HorizontalAlignment="Stretch" />
-
-                                        <!-- The original's own download page, and the community
-                                             guides site once it exists. Both are conditions of the
-                                             permission this modified build was given, so they are
-                                             part of the interface rather than a note in a file.
-                                             Updates to this build come from its own releases; this
-                                             link is the original's download page and points at
-                                             NODIX TECH's site, not anywhere this build controls. -->
-                                        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-                                            <StackPanel Spacing="2" VerticalAlignment="Center" ToolTip.Tip="{Binding OriginalDownloadUrl}">
-                                                <TextBlock Text="{Binding OriginalDownloadText}" FontSize="11" FontWeight="SemiBold"
-                                                           Foreground="#CBD5E1" />
-                                                <TextBlock Text="{Binding OriginalDownloadUrl}" FontSize="9" Foreground="#94A3B8" />
-                                            </StackPanel>
-
-                                            <Button Classes="EmptyActionBtn" Click="OnGuidesClicked" Cursor="Hand"
-                                                    Padding="14,7" IsVisible="{Binding HasGuidesLink}"
-                                                    ToolTip.Tip="{Binding GuidesUrl}">
-                                                <TextBlock Text="{Binding GuidesText}" FontSize="11" FontWeight="SemiBold"
-                                                           Foreground="#CBD5E1" />
-                                            </Button>
-                                        </StackPanel>
 
                                         <TextBlock Text="{Binding CopyrightText}" FontSize="10.5" FontWeight="Medium"
                                                    Foreground="#94A3B8" HorizontalAlignment="Center" />
@@ -3441,7 +3397,7 @@
                         </Button>
                     </Grid>
 
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="9">
+                    <Grid ColumnDefinitions="*" ColumnSpacing="9">
                         <Button Grid.Column="0" Classes="GlassLinkBtn Donate" Click="OnSupportPromptDonateClicked" Cursor="Hand"
                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                                 ToolTip.Tip="ko-fi.com/potatoes9411">
@@ -3449,16 +3405,6 @@
                                 <PathIcon Data="M 12,21.35 L 10.55,20.03 C 5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3 9.24,3 10.91,3.81 12,5.09 13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5 22,12.28 18.6,15.36 13.45,20.04 Z"
                                           Width="15" Height="15" Foreground="#FF8FB1" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding DonateLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-
-                        <Button Grid.Column="1" Classes="GlassLinkBtn Donate" Click="OnSupportPromptOriginalDonateClicked" Cursor="Hand"
-                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                                ToolTip.Tip="ko-fi.com/nodix">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <PathIcon Data="M 12,21.35 L 10.55,20.03 C 5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3 9.24,3 10.91,3.81 12,5.09 13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5 22,12.28 18.6,15.36 13.45,20.04 Z"
-                                          Width="15" Height="15" Foreground="#FF8FB1" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding OriginalDonateLabel}" FontSize="11.5" FontWeight="Bold" Foreground="#F1F5F9" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
                     </Grid>

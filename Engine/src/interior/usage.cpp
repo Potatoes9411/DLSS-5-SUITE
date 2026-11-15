@@ -108,6 +108,8 @@ std::string_view UsageText() noexcept
            "  --cubin-cache on|off       Let the model cache its compiled kernels (default on; start-up only)\n"
            "  --app-data DIR             Folder for the NGX logs --ngx-log asks for, and for the model's\n"
            "                             kernel cache (default: next to the executable)\n"
+           "  --streamline-path DIR      Folder holding NVIDIA Streamline and the nvngx_dlssg.dll that\n"
+           "                             --nvidia-frame-gen uses (default: next to the executable)\n"
            "\n"
            "Window and diagnostics\n"
            "  --affinity on|off          Exclude the output window from capture (default on; off makes the window\n"

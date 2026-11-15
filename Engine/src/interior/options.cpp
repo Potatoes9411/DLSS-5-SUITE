@@ -56,6 +56,7 @@ enum class OptionId : std::uint8_t {
     NgxProjectId,
     NgxLog,
     AppData,
+    StreamlinePath,
     Affinity,
     Topmost,
     ClickThrough,
@@ -114,7 +115,7 @@ struct OptionSpec
     ValueKind kind;
 };
 
-constexpr std::array<OptionSpec, 62> kSpecs{ {
+constexpr std::array<OptionSpec, 63> kSpecs{ {
     { L"help", OptionId::Help, ValueKind::Flag },
     { L"list-monitors", OptionId::ListMonitors, ValueKind::Flag },
     { L"monitor", OptionId::Monitor, ValueKind::MonitorSel },
@@ -162,6 +163,7 @@ constexpr std::array<OptionSpec, 62> kSpecs{ {
     { L"ngx-project-id", OptionId::NgxProjectId, ValueKind::Text },
     { L"ngx-log", OptionId::NgxLog, ValueKind::NgxLog },
     { L"app-data", OptionId::AppData, ValueKind::Path },
+    { L"streamline-path", OptionId::StreamlinePath, ValueKind::Path },
     { L"affinity", OptionId::Affinity, ValueKind::Bool },
     { L"topmost", OptionId::Topmost, ValueKind::Bool },
     { L"click-through", OptionId::ClickThrough, ValueKind::Bool },
@@ -424,6 +426,7 @@ Options DefaultOptions() noexcept
         *kDefaultProjectId,
         NgxLogLevel::Off,
         DirectoryPath{},
+        DirectoryPath{},
         true,
         false,
         true,
@@ -616,6 +619,7 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                 projectId,
                 ValueOr(list, OptionId::NgxLog, d.ngxLogLevel),
                 ValueOr(list, OptionId::AppData, d.appDataPath),
+                ValueOr(list, OptionId::StreamlinePath, d.streamlinePath),
                 ValueOr(list, OptionId::Affinity, d.displayAffinity),
                 ValueOr(list, OptionId::Topmost, d.topmost),
                 ValueOr(list, OptionId::ClickThrough, d.clickThrough),

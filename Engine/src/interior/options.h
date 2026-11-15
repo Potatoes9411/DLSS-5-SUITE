@@ -108,6 +108,7 @@ struct Options
     ProjectIdText ngxProjectId;
     NgxLogLevel ngxLogLevel;
     DirectoryPath appDataPath;
+    DirectoryPath streamlinePath; // empty: NVIDIA Streamline and its nvngx_dlssg.dll beside the executable
     bool displayAffinity;
     bool topmost;
     bool clickThrough;

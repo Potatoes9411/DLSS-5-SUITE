@@ -19,6 +19,11 @@ rem copy (Engine\external\streamline\include, MIT); its DLLs are loaded at run
 rem time from SUITE's engine\ folder, where tools\build-setup.sh puts them for
 rem the Screen Engine (from STREAMLINE_SDK_DIR - never committed).
 rem
+rem FSR FG goes through AMD's FidelityFX API: its headers are the repo's shared
+rem copy (external\fidelityfx\include, MIT); its runtime, amd_fidelityfx_dx12.dll,
+rem is loaded at run time from SUITE's engine\ folder, where tools\build-setup.sh
+rem puts it (fetched by tools\get-fidelityfx.ps1 - never committed).
+rem
 rem Nothing else is copied beside the program. Intel's XeSS libraries are the
 rem user's own files (SUITE keeps them in its data folder), and SMAI's ONNX
 rem Runtime, DirectML and network are downloaded by SUITE on request - see
@@ -46,7 +51,7 @@ call "%VCVARS%" >nul || exit /b 1
 if not exist "%OUT%" mkdir "%OUT%"
 if not exist "%OUT%\obj" mkdir "%OUT%\obj"
 pushd "%HERE%"
-cl /nologo /O2 /EHsc /W3 /MT /utf-8 /std:c++17 /I"%DLSS_SDK_DIR%\include" /Iinclude /Iinclude\ort /I"%HERE%..\Engine\external\streamline\include" sm_engine.cpp /Fo"%OUT%\obj\\" /Fe:"%OUT%\MotionForgeEngine.exe" /link "%NGX_LIB%" version.lib kernel32.lib user32.lib gdi32.lib advapi32.lib ole32.lib d3d11.lib d3d12.lib dxgi.lib d3dcompiler.lib WindowsApp.lib dwmapi.lib setupapi.lib
+cl /nologo /O2 /EHsc /W3 /MT /utf-8 /std:c++17 /I"%DLSS_SDK_DIR%\include" /Iinclude /Iinclude\ort /I"%HERE%..\Engine\external\streamline\include" /I"%HERE%..\external\fidelityfx\include" sm_engine.cpp /Fo"%OUT%\obj\\" /Fe:"%OUT%\MotionForgeEngine.exe" /link "%NGX_LIB%" version.lib kernel32.lib user32.lib gdi32.lib advapi32.lib ole32.lib d3d11.lib d3d12.lib dxgi.lib d3dcompiler.lib WindowsApp.lib dwmapi.lib setupapi.lib
 set "CODE=%ERRORLEVEL%"
 popd
 if not "%CODE%"=="0" exit /b 2

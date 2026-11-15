@@ -18,7 +18,7 @@ open System.Text.Json
 [<CLIMutable>]
 type MotionOptions =
     { FrameGeneration: bool
-      Generator: int        // 0 DLSS MFG, 1 XeSS MFG, 2 SMFG, 3 SMAI
+      Generator: int        // 0 DLSS MFG, 1 XeSS MFG, 2 SMFG, 3 SMAI, 4 SUITE FG, 5 FSR 3.1 FG
       Mode: int             // the Fixed multiplier: 0..4 = x2..x6
       MultiplierCustom: int // "Custom": tenths, 11..60 (x1.1..x6.0); 0 = Mode's whole one
       Flow: int             // percent of the picture, used when GameType is Custom
@@ -52,6 +52,8 @@ type MotionOptions =
       Gpu: string           // "Preferred GPU" by name; "" lets the engine pick
       MotionSource: int     // DLSS MFG: 0 its own, 1 NVIDIA Optical Flow, 2 GPU estimate
       XessMotionSource: int // XeSS MFG: 0 its own, 1 GPU estimate, 2 NVIDIA Optical Flow
+      SuiteMotionSource: int // SUITE FG: 0 GPU estimate, 1 NVIDIA Optical Flow (the Screen Engine's builtin / nvof)
+      FsrMotionSource: int  // FSR FG: 0 GPU estimate, 1 FSR's own optical flow alone, 2 NVIDIA Optical Flow
       MsmSearch: int        // SMFG: 0 full, 1 fast
       Bloom: int
       BloomWide: int
@@ -119,7 +121,11 @@ module MotionPrefs =
     /// A setting is kept as its place + 1, so 0 (a file without it) is the default.
     let triPlace (list: int[]) (which: int) (kept: int) = if kept >= 1 && kept <= list.Length then kept - 1 else triDefaults[which]
     let triValue (list: int[]) (which: int) (kept: int) = list[triPlace list which kept]
-    let generators = 4
+    let generators = 6
+    /// The generators SUITE added after MFG SUPER MOTION's four: the Screen Engine's own frame generation and
+    /// AMD FSR 3.1 Frame Generation.
+    let suiteFg = 4
+    let fsrFg = 5
     let countdowns = [| 3; 5; 10 |]
     /// Flow % for each kind of game (the engine's own table, sm_options.h kGameKinds).
     let gameFlows = [| 35; 75; 50; 35; 35; 35; 35 |]
@@ -139,7 +145,7 @@ module MotionPrefs =
           CropLeft = 0; CropTop = 0; CropRight = 0; CropBottom = 0
           CursorClip = false; CursorSpeed = false; CursorHide = false; CursorScale = false; LimitToScreen = false
           Vrr = false; SyncMode = 1; LowLatency = true; Hdr = false; GpuPriority = 0; Gpu = ""
-          MotionSource = 0; XessMotionSource = 0; MsmSearch = 1; Bloom = 0; BloomWide = 0
+          MotionSource = 0; XessMotionSource = 0; SuiteMotionSource = 0; FsrMotionSource = 0; MsmSearch = 1; Bloom = 0; BloomWide = 0
           AdaptiveLearning = false; DlssPreset = 2; AdaptiveFlow = true; AmlGuideOff = false; VrrChosen = false
           Spout = false; StillPixels = true
           TriPitch = 0; TriRounds = 0; TriFine = 0; TriFull = 0; TriHome = 0; TriRange = 0; TriExact = 0; TriRelax = 0
@@ -162,6 +168,9 @@ module MotionPrefs =
             // (XeSS MFG is made bigger than the kind of game says: the engine's FlowShare, sm_options.h.)
             if o.Generator = 1 then max gameFlows[o.GameType] 60 else gameFlows[o.GameType]
         else o.Flow
+
+    /// The most frames shown for each frame of the game a generator makes: FSR 3.1 makes one in between a pair.
+    let mostMultiplier (generator: int) = if generator = fsrFg then 2 else 6
 
     /// The Fixed multiplier in tenths: Mode's whole one, or the Custom one.
     let multiplierTenths (o: MotionOptions) =
@@ -226,6 +235,8 @@ module MotionPrefs =
                      Gpu = (if isNull o.Gpu then "" else o.Gpu.Trim())
                      MotionSource = Math.Clamp(o.MotionSource, 0, 2)
                      XessMotionSource = Math.Clamp(o.XessMotionSource, 0, 2)
+                     SuiteMotionSource = Math.Clamp(o.SuiteMotionSource, 0, 1)
+                     FsrMotionSource = Math.Clamp(o.FsrMotionSource, 0, 2)
                      MsmSearch = Math.Clamp(o.MsmSearch, 0, 1)
                      TriPitch = Math.Clamp(o.TriPitch, 0, triPitches.Length); TriRounds = Math.Clamp(o.TriRounds, 0, triRounds.Length)
                      TriFine = Math.Clamp(o.TriFine, 0, triFines.Length); TriFull = Math.Clamp(o.TriFull, 0, triFulls.Length)
