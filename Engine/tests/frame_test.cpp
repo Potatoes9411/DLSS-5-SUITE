@@ -760,7 +760,7 @@ struct Replay
     return framePlan.has_value() && std::ranges::none_of(PresentsOf(framePlan->steps), [](const Present& p) { return p.generation.has_value(); });
 }
 
-constexpr std::array<FrameGenMethod, 4> kForgeKinds{ FrameGenMethod::Smfg, FrameGenMethod::Smt, FrameGenMethod::Smai, FrameGenMethod::Xess };
+constexpr std::array<FrameGenMethod, 5> kForgeKinds{ FrameGenMethod::Smfg, FrameGenMethod::Smt, FrameGenMethod::Smai, FrameGenMethod::Xess, FrameGenMethod::Fsr };
 
 [[nodiscard]] SessionPlan WithForge(const SessionPlan& p, std::uint32_t multiplier, FrameGenMethod method) noexcept
 {
@@ -778,7 +778,7 @@ constexpr std::array<FrameGenMethod, 4> kForgeKinds{ FrameGenMethod::Smfg, Frame
     return pairs;
 }
 
-// Exactly Motion Forge's four kinds make the pictures between a pair themselves.
+// Exactly Motion Forge's five kinds make the pictures between a pair themselves.
 [[nodiscard]] bool OnlyMotionForgesKindsAreForge(infra::RngState&) noexcept
 {
     const bool forge = std::ranges::all_of(kForgeKinds, IsForge);
@@ -801,7 +801,7 @@ constexpr std::array<FrameGenMethod, 4> kForgeKinds{ FrameGenMethod::Smfg, Frame
 [[nodiscard]] bool ForgePairsAreMadeOnceAndShownAtTheirMoments(infra::RngState& rng) noexcept
 {
     const std::uint32_t multiplier = proptest::DrawBetween(rng, 2, 6);
-    const FrameGenMethod method = kForgeKinds[proptest::DrawBelow(rng, 4)];
+    const FrameGenMethod method = kForgeKinds[proptest::DrawBelow(rng, static_cast<std::uint32_t>(kForgeKinds.size()))];
     const SessionPlan plan = WithForge(RandomPlan(rng), multiplier, method);
     const auto first = PlanFrame(plan, InitialFrameState(plan), CaptureAt(0, true));
     const auto second = first.has_value() ? PlanFrame(plan, first->next, CaptureAt(40000, true)) : first;
@@ -822,7 +822,7 @@ constexpr std::array<FrameGenMethod, 4> kForgeKinds{ FrameGenMethod::Smfg, Frame
 // At one picture for one, Motion Forge's generators are asked for nothing and nothing of theirs is shown.
 [[nodiscard]] bool ForgeAtOneTimesMakesNothing(infra::RngState& rng) noexcept
 {
-    const SessionPlan plan = WithForge(RandomPlan(rng), 1, kForgeKinds[proptest::DrawBelow(rng, 4)]);
+    const SessionPlan plan = WithForge(RandomPlan(rng), 1, kForgeKinds[proptest::DrawBelow(rng, static_cast<std::uint32_t>(kForgeKinds.size()))]);
     FrameState state = InitialFrameState(plan);
     std::uint64_t clock = 0;
     for (std::uint32_t i = 0; i < 8; ++i) // WAIVER(R2): test drives a sequence of frames.
@@ -840,7 +840,7 @@ constexpr std::array<FrameGenMethod, 4> kForgeKinds{ FrameGenMethod::Smfg, Frame
 // pair at most once, only when it processes a picture.
 [[nodiscard]] bool ForgePlansAreValidOverRandomSequences(infra::RngState& rng) noexcept
 {
-    const SessionPlan plan = WithForge(RandomPlan(rng), proptest::DrawBetween(rng, 1, 6), kForgeKinds[proptest::DrawBelow(rng, 4)]);
+    const SessionPlan plan = WithForge(RandomPlan(rng), proptest::DrawBetween(rng, 1, 6), kForgeKinds[proptest::DrawBelow(rng, static_cast<std::uint32_t>(kForgeKinds.size()))]);
     FrameState state = InitialFrameState(plan);
     std::uint64_t clock = 0;
     for (std::uint32_t i = 0; i < 12; ++i) // WAIVER(R2): test drives a sequence of frames.

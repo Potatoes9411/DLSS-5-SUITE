@@ -119,18 +119,19 @@ constexpr std::array<std::wstring_view, 12> kVocabulary{ L"--monitor", L"all",  
         std::wstring_view argument;
         FrameGenMethod method;
     };
-    constexpr std::array<Named, 6> names{ { { L"--frame-gen-method=blend", FrameGenMethod::Blend },
+    constexpr std::array<Named, 7> names{ { { L"--frame-gen-method=blend", FrameGenMethod::Blend },
                                             { L"--frame-gen-method=nvidia", FrameGenMethod::Nvidia },
                                             { L"--frame-gen-method=smfg", FrameGenMethod::Smfg },
                                             { L"--frame-gen-method=smt", FrameGenMethod::Smt },
                                             { L"--frame-gen-method=smai", FrameGenMethod::Smai },
-                                            { L"--frame-gen-method=xess", FrameGenMethod::Xess } } };
+                                            { L"--frame-gen-method=xess", FrameGenMethod::Xess },
+                                            { L"--frame-gen-method=fsr", FrameGenMethod::Fsr } } };
     const bool each = std::ranges::all_of(names, [](const Named& n) {
         const std::array<std::wstring_view, 1> args{ n.argument };
         const auto parsed = ParseOptions(args);
         return parsed.has_value() && parsed->frameGenMethod == n.method && RequestedFrameGen(*parsed) == n.method;
     });
-    const std::array<std::wstring_view, 1> unknown{ L"--frame-gen-method=fsr" };
+    const std::array<std::wstring_view, 1> unknown{ L"--frame-gen-method=dlss4" };
     const std::array<std::wstring_view, 2> legacy{ L"--frame-gen-method=smfg", L"--nvidia-frame-gen=on" };
     const auto old = ParseOptions(legacy);
     return each && DefaultOptions().frameGenMethod == FrameGenMethod::Blend && !ParseOptions(unknown).has_value() && old.has_value() && RequestedFrameGen(*old) == FrameGenMethod::Nvidia;

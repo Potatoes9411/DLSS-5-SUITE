@@ -128,6 +128,7 @@ struct Options
     bool nvidiaFrameGen;    // the pictures between are made by NVIDIA DLSS Frame Generation rather than by the engine's own blend
     FrameGenMethod frameGenMethod; // who makes the pictures between; --nvidia-frame-gen on, kept for older callers, asks for Nvidia
     ForgeSettings forge;
+    DirectoryPath ffxPath; // empty: AMD's FidelityFX runtime, for FSR 3.1 Frame Generation, beside the executable
     std::optional<VideoSource> video; // a video's pictures from standard input instead of the screen, and the finished ones to standard output
     [[nodiscard]] friend constexpr bool operator==(const Options&, const Options&) noexcept = default;
 };

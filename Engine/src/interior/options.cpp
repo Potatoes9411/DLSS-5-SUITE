@@ -79,6 +79,7 @@ enum class OptionId : std::uint8_t {
     ForgeKeepStill,
     ForgeLightSearch,
     ForgeRife,
+    FfxPath,
     VideoWidth,
     VideoHeight,
     VideoFrameMicroseconds,
@@ -115,7 +116,7 @@ struct OptionSpec
     ValueKind kind;
 };
 
-constexpr std::array<OptionSpec, 63> kSpecs{ {
+constexpr std::array<OptionSpec, 64> kSpecs{ {
     { L"help", OptionId::Help, ValueKind::Flag },
     { L"list-monitors", OptionId::ListMonitors, ValueKind::Flag },
     { L"monitor", OptionId::Monitor, ValueKind::MonitorSel },
@@ -142,6 +143,7 @@ constexpr std::array<OptionSpec, 63> kSpecs{ {
     { L"forge-keep-still", OptionId::ForgeKeepStill, ValueKind::Bool },
     { L"forge-light-search", OptionId::ForgeLightSearch, ValueKind::Bool },
     { L"forge-rife", OptionId::ForgeRife, ValueKind::Bool },
+    { L"ffx-path", OptionId::FfxPath, ValueKind::Path },
     { L"video-width", OptionId::VideoWidth, ValueKind::UInt },
     { L"video-height", OptionId::VideoHeight, ValueKind::UInt },
     { L"video-frame-us", OptionId::VideoFrameMicroseconds, ValueKind::UInt },
@@ -251,12 +253,13 @@ constexpr std::array<infra::Choice<GridSize>, 3> kGridChoices{ { { L"1", GridSiz
 constexpr std::array<infra::Choice<PerfLevel>, 6> kPerfChoices{
     { { L"slow", PerfLevel::Slow }, { L"5", PerfLevel::Slow }, { L"medium", PerfLevel::Medium }, { L"10", PerfLevel::Medium }, { L"fast", PerfLevel::Fast }, { L"20", PerfLevel::Fast } }
 };
-constexpr std::array<infra::Choice<FrameGenMethod>, 6> kMethodChoices{ { { L"blend", FrameGenMethod::Blend },
+constexpr std::array<infra::Choice<FrameGenMethod>, 7> kMethodChoices{ { { L"blend", FrameGenMethod::Blend },
                                                                           { L"nvidia", FrameGenMethod::Nvidia },
                                                                           { L"smfg", FrameGenMethod::Smfg },
                                                                           { L"smt", FrameGenMethod::Smt },
                                                                           { L"smai", FrameGenMethod::Smai },
-                                                                          { L"xess", FrameGenMethod::Xess } } };
+                                                                          { L"xess", FrameGenMethod::Xess },
+                                                                          { L"fsr", FrameGenMethod::Fsr } } };
 constexpr std::array<infra::Choice<NgxLogLevel>, 3> kNgxLogChoices{ { { L"0", NgxLogLevel::Off }, { L"1", NgxLogLevel::On }, { L"2", NgxLogLevel::Verbose } } };
 constexpr std::array<infra::Choice<LogLevel>, 8> kLogChoices{ { { L"0", LogLevel::Debug },
                                                                 { L"debug", LogLevel::Debug },
@@ -446,6 +449,7 @@ Options DefaultOptions() noexcept
         false,
         FrameGenMethod::Blend,
         ForgeSettings{ *kDefaultForgeFlow, true, false, false },
+        DirectoryPath{},
         std::nullopt,
     };
 }
@@ -640,6 +644,7 @@ Result<Options, OptionsError> ParseOptions(std::span<const std::wstring_view> ar
                 ValueOr(list, OptionId::FrameGenMethod, d.frameGenMethod),
                 ForgeSettings{ n.forgeFlow, ValueOr(list, OptionId::ForgeKeepStill, d.forge.keepStill), ValueOr(list, OptionId::ForgeLightSearch, d.forge.lightSearch),
                                ValueOr(list, OptionId::ForgeRife, d.forge.rife) },
+                ValueOr(list, OptionId::FfxPath, d.ffxPath),
                 video,
             };
         };

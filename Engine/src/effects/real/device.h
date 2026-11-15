@@ -101,8 +101,9 @@ struct FrameGeneration
                                                                          const interior::ProjectIdText& projectId) noexcept;
 [[nodiscard]] GpuDevice WithFrameGeneration(GpuDevice device, FrameGeneration generation) noexcept;
 // Motion Forge's generator of the kind asked for, made ready for pictures of the target's size on the device.
+// source: the size of the motion vectors and the depth plane (FSR's); ffxDirectory: where AMD's runtime is.
 [[nodiscard]] infra::Result<ForgeStart, ForgeText> StartForge(const GpuDevice& device, interior::FrameGenMethod method, const interior::ForgeSettings& settings,
-                                                              const interior::Extent& target) noexcept;
+                                                              const interior::Extent& target, const interior::Extent& source, const interior::DirectoryPath& ffxDirectory) noexcept;
 [[nodiscard]] GpuDevice WithForge(GpuDevice device, ForgeSession session) noexcept;
 // The adapters the session could run on, in the order DXGI reports them, skipping the ones it could not use.
 [[nodiscard]] AdapterList UsableAdapters(IDXGIFactory4* factory) noexcept;

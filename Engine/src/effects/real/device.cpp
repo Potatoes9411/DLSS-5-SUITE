@@ -321,7 +321,8 @@ void ForgeEnder::operator()(const ForgeStarted* started) const noexcept
     delete started; // WAIVER(R16): the session's one record, made by StartForge with new.
 }
 
-Result<ForgeStart, ForgeText> StartForge(const GpuDevice& gpu, interior::FrameGenMethod method, const interior::ForgeSettings& settings, const interior::Extent& target) noexcept
+Result<ForgeStart, ForgeText> StartForge(const GpuDevice& gpu, interior::FrameGenMethod method, const interior::ForgeSettings& settings, const interior::Extent& target,
+                                         const interior::Extent& source, const interior::DirectoryPath& ffxDirectory) noexcept
 {
     // Motion Forge's four kinds; the others never come here (main asks only for these).
     static constexpr auto KindOf = [] [[nodiscard]] (interior::FrameGenMethod method) noexcept -> forge::Kind {
@@ -331,6 +332,7 @@ Result<ForgeStart, ForgeText> StartForge(const GpuDevice& gpu, interior::FrameGe
         case interior::FrameGenMethod::Smt: return forge::Kind::Smt;
         case interior::FrameGenMethod::Smai: return forge::Kind::Smai;
         case interior::FrameGenMethod::Xess: return forge::Kind::Xess;
+        case interior::FrameGenMethod::Fsr: return forge::Kind::Fsr;
         case interior::FrameGenMethod::Blend:
         case interior::FrameGenMethod::Nvidia: break;
         }
@@ -343,7 +345,20 @@ Result<ForgeStart, ForgeText> StartForge(const GpuDevice& gpu, interior::FrameGe
         std::ranges::copy(answer.text, text.begin()); // WAIVER(R2): the text is this call's own, filled once.
         return text;
     };
-    const forge::Settings asked{ .flow = settings.flow.Get(), .keepStill = settings.keepStill, .lightSearch = settings.lightSearch, .rife = settings.rife };
+    // The folder's name ended by a zero, as forge.h takes it; it lives until Start has read it.
+    static constexpr auto Terminated = [] [[nodiscard]] (const interior::DirectoryPath& path) noexcept -> std::array<wchar_t, interior::DirectoryPath::Capacity + 1> {
+        std::array<wchar_t, interior::DirectoryPath::Capacity + 1> chars{}; // WAIVER(R2): filled once, here.
+        std::ranges::copy(path.Get(), chars.begin());
+        return chars;
+    };
+    const std::array<wchar_t, interior::DirectoryPath::Capacity + 1> ffx = Terminated(ffxDirectory);
+    const forge::Settings asked{ .flow = settings.flow.Get(),
+                                 .keepStill = settings.keepStill,
+                                 .lightSearch = settings.lightSearch,
+                                 .rife = settings.rife,
+                                 .ffxDirectory = ffx.data(),
+                                 .motionWidth = source.width.Get(),
+                                 .motionHeight = source.height.Get() };
     const forge::Device on{ .device = gpu.device.Get(), .queue = gpu.queue.Get(), .adapter = gpu.adapter.Get() };
     const forge::Answer answer = forge::Start(on, KindOf(method), asked, target.width.Get(), target.height.Get());
     if (!answer.ok)

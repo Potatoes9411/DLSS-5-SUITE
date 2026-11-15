@@ -1,7 +1,7 @@
 // forge.cpp - Motion Forge's generators, shared with the Screen Engine.
 //
-// SMFG (msm_fg.h), SMT (msm_tri.h, SMFG's triangle mesh), SMAI (msm_ai.h) and XeSS MFG (xe_mfg.inl with xe_api.h and
-// xe_tap.h) are MotionEngine/'s own files, included here as they are: the Screen Engine and Motion Forge run the
+// SMFG (msm_fg.h), SMT (msm_tri.h, SMFG's triangle mesh), SMAI (msm_ai.h), XeSS MFG (xe_mfg.inl with xe_api.h and
+// xe_tap.h) and FSR FG (fsr_fg.inl, AMD's FidelityFX API from external/fidelityfx) are MotionEngine/'s own files, included here as they are: the Screen Engine and Motion Forge run the
 // same code, and a fix in one is a fix in both. They lean on a few things of Motion Forge's engine - its device
 // core, a barrier, its log, a clock, small helpers for a texture and a list of its own - which this file gives them
 // over the Screen Engine's device and queue (the "engine's own" section below). lf_signature.h (the checks on a
@@ -215,6 +215,7 @@ typedef HRESULT(WINAPI *CompileFn)(LPCVOID, SIZE_T, LPCSTR, const void *, void *
 #include "msm_fg.h"
 #include "msm_ai.h"
 #include "xe_mfg.inl"
+#include "fsr_fg.inl"
 
 // --- the Screen Engine's door to them ----------------------------------------------------------------------
 
@@ -251,6 +252,7 @@ const char *NameOf(Kind kind)
     case Kind::Smt: return "SMT (SMFG's triangle mesh)";
     case Kind::Smai: return "SMAI 1.0";
     case Kind::Xess: return "XeSS MFG";
+    case Kind::Fsr: return "FSR 3.1 FG";
     }
     return "Motion Forge";
 }
@@ -367,14 +369,36 @@ bool MakeXe(ID3D12GraphicsCommandList *list, const Pair &p, const ListControl &c
     return true;
 }
 
+// FSR 3.1 FG: the current picture handed to AMD's runtime with the motion vectors and the flat depth plane, and the
+// picture between it and the one handed before drawn into the first picture between; FSR makes one a pair, so every
+// other picture between is that one (as Motion Forge shows FSR FG, at x2).
+bool MakeFsr(ID3D12GraphicsCommandList *list, const Pair &p)
+{
+    constexpr D3D12_RESOURCE_STATES kNonPixel = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    if (p.reset) fsrfg::Forget();
+    D3D12_RESOURCE_BARRIER told[] = { Barrier(p.motion, p.rest, kNonPixel), Barrier(p.depth, p.rest, kNonPixel) };
+    list->ResourceBarrier(2, told);
+    const bool made = fsrfg::Make(list, p.after, p.rest, p.motion, p.depth, p.into[0], p.rest, p.reset, 1.0 / 30.0);
+    D3D12_RESOURCE_BARRIER back[] = { Barrier(p.motion, kNonPixel, p.rest), Barrier(p.depth, kNonPixel, p.rest) };
+    list->ResourceBarrier(2, back);
+    if (!made)
+    {
+        ++g_run.xe_short;
+        for (UINT k = 0; k < p.count; ++k) CopyWhole(list, p.into[k], 2 * (k + 1) <= p.count ? p.before : p.after, p.rest, p.rest);
+        return true;
+    }
+    for (UINT k = 1; k < p.count; ++k) CopyWhole(list, p.into[k], p.into[0], p.rest, p.rest);
+    return true;
+}
+
 void SayNow()
 {
     const ULONGLONG now = GetTickCount64();
     if (g_run.told == 0) g_run.told = now;
     if (now - g_run.told < 10000) return;
-    if (g_run.kind == Kind::Xess)
-        Trace("[forge] %s: %u pairs in ten seconds, the library made %u a pair (%u pairs without - shown by the nearer picture)", NameOf(g_run.kind), g_run.pairs, XeMost(),
-              g_run.xe_short);
+    if (g_run.kind == Kind::Xess || g_run.kind == Kind::Fsr)
+        Trace("[forge] %s: %u pairs in ten seconds, the library made %u a pair (%u pairs without - shown by the nearer picture)", NameOf(g_run.kind), g_run.pairs,
+              g_run.kind == Kind::Xess ? XeMost() : 1u, g_run.xe_short);
     else
         Trace("[forge] %s: %u pairs in ten seconds", NameOf(g_run.kind), g_run.pairs);
     g_run.told = now;
@@ -419,10 +443,16 @@ Answer Start(const Device &device, Kind kind, const Settings &settings, std::uin
     case Kind::Xess:
         if (!XeReady(width, height, kFormat)) { snprintf(text, sizeof(text), "XeSS MFG did not start: %s", Lines().c_str()); return Said(false, text); }
         break;
+    case Kind::Fsr:
+        wcsncpy_s(g_ffx_dir, settings.ffxDirectory ? settings.ffxDirectory : L"", _TRUNCATE);
+        fsrfg::g.failed = false;
+        if (!fsrfg::Ready(width, height, settings.motionWidth, settings.motionHeight, kFormat)) { snprintf(text, sizeof(text), "FSR 3.1 FG did not start: %s", Lines().c_str()); return Said(false, text); }
+        break;
     }
     g_run.live = true;
     snprintf(text, sizeof(text), "%s makes the pictures between at %ux%u%s", NameOf(kind), width, height,
-             kind == Kind::Xess ? (XeMost() > 1 ? "" : ", one a pair (Intel's library on this card); the others are the nearest of it") : "");
+             kind == Kind::Xess ? (XeMost() > 1 ? "" : ", one a pair (Intel's library on this card); the others are the nearest of it")
+             : kind == Kind::Fsr ? ", one a pair (FSR 3.1); the others are that one" : "");
     return Said(true, text);
 }
 
@@ -445,6 +475,9 @@ bool Make(ID3D12GraphicsCommandList *list, const Pair &pair, const ListControl &
     case Kind::Xess:
         ok = MakeXe(list, pair, control);
         break;
+    case Kind::Fsr:
+        ok = MakeFsr(list, pair);
+        break;
     }
     SayNow();
     return ok;
@@ -464,6 +497,7 @@ void Stop() noexcept
     if (lfCore.device == nullptr) return;
     XeClose();
     g_xe.fence = nullptr;
+    fsrfg::Close();
     MsmClose();
     TriClose();
     // (Their passes were made on this device: made anew on the next one.)

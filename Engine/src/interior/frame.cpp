@@ -116,7 +116,8 @@ static_assert(kSingle.has_value());
     case FrameGenMethod::Smfg:
     case FrameGenMethod::Smt:
     case FrameGenMethod::Smai:
-    case FrameGenMethod::Xess: return controls.frameGen;
+    case FrameGenMethod::Xess:
+    case FrameGenMethod::Fsr: return controls.frameGen;
     }
     return *kSingle;
 }
@@ -139,7 +140,8 @@ static_assert(kSingle.has_value());
     case FrameGenMethod::Smfg:
     case FrameGenMethod::Smt:
     case FrameGenMethod::Smai:
-    case FrameGenMethod::Xess: return true;
+    case FrameGenMethod::Xess:
+    case FrameGenMethod::Fsr: return true;
     }
     return true;
 }
@@ -153,7 +155,8 @@ static_assert(kSingle.has_value());
     case FrameGenMethod::Smfg:
     case FrameGenMethod::Smt:
     case FrameGenMethod::Smai:
-    case FrameGenMethod::Xess: return std::nullopt;
+    case FrameGenMethod::Xess:
+    case FrameGenMethod::Fsr: return std::nullopt;
     }
     return std::nullopt;
 }
@@ -396,7 +399,8 @@ bool IsForge(FrameGenMethod method) noexcept
     case FrameGenMethod::Smfg:
     case FrameGenMethod::Smt:
     case FrameGenMethod::Smai:
-    case FrameGenMethod::Xess: return true;
+    case FrameGenMethod::Xess:
+    case FrameGenMethod::Fsr: return true;
     }
     return false;
 }

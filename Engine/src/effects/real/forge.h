@@ -1,6 +1,6 @@
 #pragma once
 // Motion Forge's generators (MotionEngine/, MFG SUPER MOTION's engine by NODIX TECH, MIT - MotionEngine/LICENSE.txt)
-// for the Screen Engine: SMFG, SMT, SMAI and Intel's XeSS Frame Generation, each making the pictures between two
+// for the Screen Engine: SMFG, SMT, SMAI, Intel's XeSS Frame Generation and AMD's FSR 3.1 Frame Generation, each making the pictures between two
 // processed pictures. Their code is Motion Forge's own, unchanged, read from MotionEngine/ by forge.cpp; this
 // header is the one door to it, in plain types, because that code is built to Motion Forge's rules rather than this
 // project's (forge.cpp is a library of its own in cmake/WindowsApp.cmake for that reason).
@@ -15,7 +15,7 @@
 
 namespace forge {
 
-enum class Kind : std::uint8_t { Smfg, Smt, Smai, Xess };
+enum class Kind : std::uint8_t { Smfg, Smt, Smai, Xess, Fsr };
 
 struct Settings
 {
@@ -23,6 +23,9 @@ struct Settings
     bool keepStill;     // read-outs and what stays on the screen are kept where they are
     bool lightSearch;   // SMFG: the lighter search
     bool rife;          // SMAI: RIFE 4.25 lite rather than SMFG Net
+    const wchar_t* ffxDirectory; // FSR: the folder amd_fidelityfx_dx12.dll is in (read during Start)
+    std::uint32_t motionWidth;   // FSR: the size of the motion vectors and the depth plane
+    std::uint32_t motionHeight;
 };
 
 // What the generators run on. Nothing is held: the caller keeps all three alive until Stop.

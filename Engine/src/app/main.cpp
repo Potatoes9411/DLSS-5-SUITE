@@ -236,6 +236,13 @@ using Caption = real::ChoiceText;
     return b.options.streamlinePath.IsEmpty() ? b.executableDirectory : b.options.streamlinePath;
 }
 
+// AMD's FidelityFX runtime (amd_fidelityfx_dx12.dll) for FSR 3.1 Frame Generation comes from --ffx-path when one is
+// given, else from beside the executable, where SUITE puts it.
+[[nodiscard]] interior::DirectoryPath FfxDirectoryOf(const Base& b) noexcept
+{
+    return b.options.ffxPath.IsEmpty() ? b.executableDirectory : b.options.ffxPath;
+}
+
 [[nodiscard]] interior::DirectoryPath CaptureFolderOf(const Base& b) noexcept
 {
     return b.options.captureFolder.IsEmpty() ? interior::DefaultCaptureFolder(CaptureRootOf(b)) : b.options.captureFolder;
@@ -614,7 +621,7 @@ struct Ended
             static constexpr auto WantsIt = [] [[nodiscard]] (const Options& o) noexcept -> bool { return interior::IsForge(interior::RequestedFrameGen(o)); };
             if (!WantsIt(b.options))
                 return d;
-            Result<real::ForgeStart, real::ForgeText> started = real::StartForge(d.device, interior::RequestedFrameGen(b.options), b.options.forge, b.geometry.targetExtent); // WAIVER(R2): moved from once, below.
+            Result<real::ForgeStart, real::ForgeText> started = real::StartForge(d.device, interior::RequestedFrameGen(b.options), b.options.forge, b.geometry.targetExtent, b.geometry.sourceExtent, FfxDirectoryOf(b)); // WAIVER(R2): moved from once, below.
             if (!started.has_value())
                 return FellBack(console, std::move(d), started.error());
             return Joined(console, std::move(d), std::move(*started));
@@ -649,7 +656,8 @@ struct Ended
                 case interior::FrameGenMethod::Smfg:
                 case interior::FrameGenMethod::Smt:
                 case interior::FrameGenMethod::Smai:
-                case interior::FrameGenMethod::Xess: return d.device.forge != nullptr;
+                case interior::FrameGenMethod::Xess:
+                case interior::FrameGenMethod::Fsr: return d.device.forge != nullptr;
                 }
                 return false;
             };
