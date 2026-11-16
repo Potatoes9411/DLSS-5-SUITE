@@ -113,6 +113,9 @@ module VerifiedDownload =
                                     (sprintf "Downloading %s — %.1f / %.1f MB (%.0f%%)" name (mb received) (mb total) (fraction * 100.0))
                                     (phaseStart + fraction * phaseSize)
                         target.Flush(true)
+                        // Closed before it is hashed and moved: Windows refuses
+                        // both while this handle still has it open for writing.
+                        target.Dispose()
                         if not (verified partial digest) then
                             File.Delete(partial)
                             failwithf "SHA-256 verification failed for %s" name
