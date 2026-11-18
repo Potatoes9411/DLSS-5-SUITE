@@ -763,8 +763,8 @@
                                                 <StackPanel Spacing="8" IsVisible="{Binding IsVideoReady}">
                                                     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                                         <TextBox Grid.Column="0" Text="{Binding VideoLink, Mode=TwoWay}" Watermark="Paste a YouTube or video link" FontSize="12" />
-                                                        <Button Grid.Column="1" Classes="AppleSecondaryBtn" Click="OnVideoPlayLinkClicked" Cursor="Hand" Content="Play" />
-                                                        <Button Grid.Column="2" Classes="AppleSecondaryBtn" Click="OnVideoOpenFileClicked" Cursor="Hand" Content="Open file" />
+                                                        <Button Grid.Column="1" Classes="AppleSecondaryBtn" Click="OnVideoPlayLinkClicked" Cursor="Hand" IsEnabled="{Binding VideoIdle}" Content="Play" />
+                                                        <Button Grid.Column="2" Classes="AppleSecondaryBtn" Click="OnVideoOpenFileClicked" Cursor="Hand" IsEnabled="{Binding VideoIdle}" Content="Open file" />
                                                     </Grid>
                                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                                         <Button Classes="AppleSecondaryBtn" Click="OnVideoWebcamClicked" Cursor="Hand" IsEnabled="{Binding VideoIdle}" Content="Webcam" />

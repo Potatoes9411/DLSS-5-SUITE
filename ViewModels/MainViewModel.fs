@@ -3508,14 +3508,17 @@ type MainViewModel() as this =
                 | Ok() -> "Playing (streamed through SUITE, so it plays from the start and can't be skipped through). F6 switches the neural pass; Home opens ReShade."
                 | Error why -> why)
         else
-            match VideoPlayer.play videoLink with
-            | Ok() -> this.VideoSay "Playing. F6 switches the neural pass; Home opens ReShade."
-            | Error why -> this.VideoSay why
+            let target = videoLink
+            this.VideoWork(fun () ->
+                match VideoPlayer.play target (fun s -> this.VideoSay s) with
+                | Ok() -> "Playing. F6 switches the neural pass; Home opens ReShade."
+                | Error why -> why)
 
     member this.PlayVideoFile(path: string) =
-        match VideoPlayer.play path with
-        | Ok() -> this.VideoSay("Playing " + System.IO.Path.GetFileName(path) + ".")
-        | Error why -> this.VideoSay why
+        this.VideoWork(fun () ->
+            match VideoPlayer.play path (fun s -> this.VideoSay s) with
+            | Ok() -> "Playing " + System.IO.Path.GetFileName(path) + "."
+            | Error why -> why)
 
     member this.StartWebcam() =
         this.VideoWork(fun () ->

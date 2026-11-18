@@ -131,10 +131,12 @@ module VideoPlayer =
 
     /// Writes the settings the neural pass needs into mpc-hc64.ini, byte-safe:
     /// keeps a BOM, drops blank lines (rewriting them had MPC-HC doubling them
-    /// until it crashed), CRLF throughout.
-    let private writeIni (dir: string) =
+    /// until it crashed), CRLF throughout. One player for everything: DLSS 5
+    /// is brought up once in it (see warmUp) and every video after that is
+    /// handed to the same window, where it starts at once.
+    let writeIni (dir: string) =
         let path = Path.Combine(dir, "mpc-hc64.ini")
-        let forced = [ "DSVidRen", "14"; "UpdaterAutoCheck", "0"; "AutoZoom", "0" ]
+        let forced = [ "DSVidRen", "14"; "UpdaterAutoCheck", "0"; "AutoZoom", "0"; "AllowMultipleInstances", "0" ]
         let defaults = [ "RememberWindowPos", "1"; "YDLMaxHeight", "1440" ]
         let bom = Encoding.UTF8.GetPreamble()
         let raw = if File.Exists path then File.ReadAllBytes path else [||]
@@ -182,6 +184,38 @@ module VideoPlayer =
             for (k, v) in forced @ defaults do out.Add(k + "=" + v)
         let body = Encoding.UTF8.GetBytes(String.Join("\r\n", out) + "\r\n")
         File.WriteAllBytes(path, (if hadBom || raw.Length = 0 then Array.append bom body else body))
+
+    /// One "key=value" set inside an ini section (the section is added when
+    /// missing); every other line is kept as it was.
+    let withIniKey (text: string) (section: string) (key: string) (value: string) =
+        let lines = Regex.Split(text, "\r\n|\r|\n") |> List.ofArray
+        let lines = if not lines.IsEmpty && List.last lines = "" then List.take (lines.Length - 1) lines else lines
+        let isSection (l: string) = l.Trim().StartsWith "["
+        let isKey (l: string) = l.Trim().StartsWith(key + "=", StringComparison.OrdinalIgnoreCase)
+        match lines |> List.tryFindIndex (fun l -> l.Trim().Equals(section, StringComparison.OrdinalIgnoreCase)) with
+        | None -> String.Join("\r\n", lines @ [ section; key + "=" + value ]) + "\r\n"
+        | Some start ->
+            let bodyEnd =
+                lines |> List.indexed |> List.tryFind (fun (i, l) -> i > start && isSection l) |> Option.map fst |> Option.defaultValue lines.Length
+            let body = lines.[start + 1 .. bodyEnd - 1]
+            let body =
+                if body |> List.exists isKey then body |> List.map (fun l -> if isKey l then key + "=" + value else l)
+                else
+                    // after the section's last real line, ahead of any blank gap
+                    let keep = body |> List.rev |> List.skipWhile (fun l -> l.Trim() = "") |> List.rev
+                    keep @ [ key + "=" + value ] @ List.replicate (body.Length - keep.Length) ""
+            String.Join("\r\n", lines.[.. start] @ body @ lines.[bodyEnd ..]) + "\r\n"
+
+    /// The ReShade settings the player wants on top of the DX11 install:
+    /// only the effects that are switched on (the DLSS 5 feed and its motion
+    /// vectors) are compiled. With everything compiled, a first start built
+    /// fourteen effects before the feed could begin.
+    let tuneReShade (dir: string) =
+        let ini = Path.Combine(dir, "ReShade.ini")
+        if File.Exists ini then
+            let text = File.ReadAllText ini
+            let tuned = withIniKey text "[GENERAL]" "SkipLoadingDisabledEffects" "1"
+            if tuned <> text then File.WriteAllText(ini, tuned)
 
     // ---------------------------------------------------------------- setup
 
@@ -273,10 +307,118 @@ module VideoPlayer =
         && Regex.IsMatch(text.Trim(), @"^https?://\S+$", RegexOptions.IgnoreCase)
         && text.Length < 2048
 
-    /// A file, or a link MPC-HC hands to yt-dlp; nothing is downloaded.
-    let play (fileOrUrl: string) =
+    // --------------------------------------------------------------- warm-up
+
+    /// How far DLSS 5 has come up in the player, read from the feed's log.
+    type WarmState =
+        /// Still loading: effects compiling, NGX starting, the feature building.
+        | Pending
+        /// The neural pass has run on a frame: anything played now starts at once.
+        | Ready
+        /// The feed will not run in this player (no NVIDIA GPU, switched off,
+        /// NGX refused): there is nothing to wait for.
+        | Off
+
+    /// The feed opens its D3D12 session and NGX on the player's render thread
+    /// at the first frame: on an RTX laptop that held the picture still for
+    /// 12-15 s (NVSDK_NGX_D3D12_Init and its feature queries), and the first
+    /// time after a driver install a further ~40 s while the DLSS feature was
+    /// built. Ready is the first "feature ready" or delivered frame.
+    let warmStateOf (log: string) =
+        if isNull log then Pending
+        elif log.Contains "feature ready:" || Regex.IsMatch(log, @"\bframe \d+ delivered") then Ready
+        elif log.Contains "stopped:" || log.Contains "NGX would not initialise" || log.Contains "enabled=0:" then Off
+        else Pending
+
+    let private feedLog () = Path.Combine(folder (), "dlss5-feed.log")
+    let private hasFeed () = File.Exists(Path.Combine(folder (), "dlss5-feed.addon64"))
+
+    let private readShared (path: string) =
+        try
+            use fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite ||| FileShare.Delete)
+            use r = new StreamReader(fs)
+            r.ReadToEnd()
+        with _ -> ""
+
+    /// This player (not some other MPC-HC) is open.
+    let private playerRunning () =
+        Process.GetProcessesByName(Path.GetFileNameWithoutExtension PlayerExe)
+        |> Array.exists (fun p ->
+            try String.Equals(Path.GetFullPath(p.MainModule.FileName), Path.GetFullPath(exePath ()), StringComparison.OrdinalIgnoreCase)
+            with _ -> false)
+
+    /// A dark "DLSS 5 is starting..." clip for the player to show while the
+    /// neural pass comes up, made once by ffmpeg.
+    let private ensureCard (progress: string -> unit) : string option =
+        let card = Path.Combine(tools (), "dlss5-starting.mp4")
+        if File.Exists card then Some card
+        else
+            try
+                ensureFfmpeg progress
+                let make (withText: bool) =
+                    let psi = ProcessStartInfo(ffmpeg (), WorkingDirectory = tools (), UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true)
+                    let text = "drawtext=fontfile='C\\:/Windows/Fonts/segoeui.ttf':text='DLSS 5 is starting...':fontcolor=0xE0E0E0:fontsize=44:x=(w-text_w)/2:y=(h-text_h)/2"
+                    for a in [ yield! [ "-hide_banner"; "-loglevel"; "error"; "-y"; "-f"; "lavfi"; "-i"; "color=c=0x101014:size=1280x720:rate=30" ]
+                               if withText then yield! [ "-vf"; text ]
+                               yield! [ "-t"; "300"; "-c:v"; "libx264"; "-preset"; "veryfast"; "-tune"; "stillimage"; "-g"; "60"; "-pix_fmt"; "yuv420p"; "-an"; card + ".part.mp4" ] ] do
+                        psi.ArgumentList.Add a
+                    use p = Process.Start(psi)
+                    p.StandardError.ReadToEnd() |> ignore
+                    p.WaitForExit()
+                    p.ExitCode = 0
+                if make true || make false then
+                    File.Move(card + ".part.mp4", card, true)
+                    Some card
+                else None
+            with ex ->
+                AppLog.warn ("The DLSS 5 start-up clip could not be made: " + ex.Message)
+                None
+
+    /// Brings DLSS 5 up in the player before the real picture goes in. The
+    /// player opens on the start-up clip, which takes the render-thread stall,
+    /// and this returns once the feed's log says the neural pass has run (or
+    /// that it never will). Whatever is played next is handed to that same
+    /// window and its session opens in about a tenth of a second, so the
+    /// video itself never freezes. A player already warm is used as it is.
+    let warmUp (progress: string -> unit) =
+        if hasFeed () then
+            let wait (since: DateTime option) =
+                let watch = Stopwatch.StartNew()
+                let mutable state = Pending
+                while state = Pending && watch.Elapsed < TimeSpan.FromSeconds 150.0 do
+                    let log = feedLog ()
+                    let fresh =
+                        match since with
+                        | None -> true
+                        | Some t -> File.Exists log && File.GetLastWriteTimeUtc log >= t
+                    if fresh then state <- warmStateOf (readShared log)
+                    // closed by the user, or never came up
+                    if state = Pending && watch.Elapsed > TimeSpan.FromSeconds 10.0 && not (playerRunning ()) then state <- Off
+                    if state = Pending then Threading.Thread.Sleep(250)
+                state
+            if playerRunning () then
+                if warmStateOf (readShared (feedLog ())) = Pending then
+                    progress "Waiting for DLSS 5 to finish starting in the player..."
+                    wait None |> ignore
+            else
+                tuneReShade (folder ())
+                (try writeIni (folder ()) with _ -> ())
+                match ensureCard progress with
+                | None -> ()
+                | Some card ->
+                    let since = DateTime.UtcNow.AddSeconds(-1.0)
+                    startPlayer (sprintf "\"%s\" /play" card)
+                    progress "Starting DLSS 5 in the player (about 15 seconds; the first time can take a minute)..."
+                    match wait (Some since) with
+                    | Ready -> AppLog.info "Video player: DLSS 5 is up; handing the video over."
+                    | Off -> AppLog.info "Video player: the DLSS 5 feed is not running in the player; playing without waiting."
+                    | Pending -> AppLog.warn "Video player: DLSS 5 did not report ready within 150 s; playing anyway."
+
+    /// A file, or a link MPC-HC opens itself; nothing is downloaded.
+    let play (fileOrUrl: string) (progress: string -> unit) =
         if not (isSetUp ()) then Error "Set the player up first."
         elif looksLikeUrl fileOrUrl || File.Exists fileOrUrl then
+            warmUp progress
             startPlayer (sprintf "\"%s\" /play" (fileOrUrl.Trim()))
             Ok()
         else Error "That is not a file or a web link."
@@ -317,6 +459,7 @@ module VideoPlayer =
     let startWebcam (camera: string) (progress: string -> unit) : Result<unit, string> =
         try
             ensureFfmpeg progress
+            warmUp progress
             let tryRun (size: string) =
                 let p =
                     startFfmpeg (
@@ -341,6 +484,7 @@ module VideoPlayer =
     let startScreen (progress: string -> unit) : Result<unit, string> =
         try
             ensureFfmpeg progress
+            warmUp progress
             let monitors = GetSystemMetrics(80)
             let w = GetSystemMetrics(0)
             let h = GetSystemMetrics(1)
@@ -379,6 +523,10 @@ module VideoPlayer =
             if not (File.Exists ytdlp) then failwith "yt-dlp is missing from the player folder - set the player up again."
             ensureFfmpeg progress
             stopFeed ()
+            // DLSS 5 comes up in the player while yt-dlp looks the video up;
+            // nothing of the video is sent until it is ready, so it starts
+            // from its first frame instead of freezing on it.
+            let warming = Threading.Tasks.Task.Run(fun () -> warmUp progress)
             progress "Looking up the video..."
             let fetchInfo = ProcessStartInfo(ytdlp, WorkingDirectory = tools (), UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true)
             for a in [ "--no-playlist"; "-q"; "--no-warnings"
@@ -404,6 +552,8 @@ module VideoPlayer =
                 stopFeed ()
                 let why = lock errors (fun () -> errors.ToString().Trim().Split('\n') |> Array.tryLast |> Option.defaultValue "")
                 failwith ("yt-dlp could not get the video. " + why.Trim())
+            // yt-dlp simply waits on its full pipe meanwhile.
+            warming.Wait()
             streamer.StandardInput.BaseStream.Write(first, 0, got)
             Threading.Tasks.Task.Run(fun () ->
                 try
