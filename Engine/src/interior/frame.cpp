@@ -117,7 +117,13 @@ static_assert(kSingle.has_value());
     case FrameGenMethod::Smt:
     case FrameGenMethod::Smai:
     case FrameGenMethod::Xess:
-    case FrameGenMethod::Fsr: return controls.frameGen;
+    case FrameGenMethod::Fsr:
+    case FrameGenMethod::Repeat:
+    case FrameGenMethod::Crossfade:
+    case FrameGenMethod::Memc:
+    case FrameGenMethod::Dis:
+    case FrameGenMethod::MotionBlur:
+    case FrameGenMethod::Spacewarp: return controls.frameGen;
     }
     return *kSingle;
 }
@@ -141,7 +147,13 @@ static_assert(kSingle.has_value());
     case FrameGenMethod::Smt:
     case FrameGenMethod::Smai:
     case FrameGenMethod::Xess:
-    case FrameGenMethod::Fsr: return true;
+    case FrameGenMethod::Fsr:
+    case FrameGenMethod::Repeat:
+    case FrameGenMethod::Crossfade:
+    case FrameGenMethod::Memc:
+    case FrameGenMethod::Dis:
+    case FrameGenMethod::MotionBlur:
+    case FrameGenMethod::Spacewarp: return true;
     }
     return true;
 }
@@ -156,17 +168,30 @@ static_assert(kSingle.has_value());
     case FrameGenMethod::Smt:
     case FrameGenMethod::Smai:
     case FrameGenMethod::Xess:
-    case FrameGenMethod::Fsr: return std::nullopt;
+    case FrameGenMethod::Fsr:
+    case FrameGenMethod::Repeat:
+    case FrameGenMethod::Crossfade:
+    case FrameGenMethod::Memc:
+    case FrameGenMethod::Dis:
+    case FrameGenMethod::MotionBlur:
+    case FrameGenMethod::Spacewarp: return std::nullopt;
     }
     return std::nullopt;
 }
 
-// The multiplier Motion Forge's generator works to, when it is the one making the pictures between.
-[[nodiscard]] std::optional<FrameGen> ForgeMultiplier(const SessionPlan& plan, const LiveSettings& controls) noexcept
+// The multiplier Motion Forge's generator works to, when it is the one making the pictures between, and whether its
+// pictures come after the current one (Spacewarp) rather than between the history and it.
+struct ForgeShow
+{
+    FrameGen multiplier;
+    bool ahead;
+};
+
+[[nodiscard]] std::optional<ForgeShow> ForgeMultiplier(const SessionPlan& plan, const LiveSettings& controls) noexcept
 {
     if (!IsForge(plan.frameGenMethod) || !IsGenerating(controls.frameGen))
         return std::nullopt;
-    return controls.frameGen;
+    return ForgeShow{ controls.frameGen, ShowsAhead(plan.frameGenMethod) };
 }
 
 // Two captures further apart than a long pause do not belong together, and nothing is drawn between them.
@@ -390,6 +415,11 @@ Fraction BlendPoint(std::optional<Instant> lastCapture, std::optional<Microsecon
     return StepPoint(*lastCapture, *interval, now, multiplier);
 }
 
+bool ShowsAhead(FrameGenMethod method) noexcept
+{
+    return method == FrameGenMethod::Spacewarp;
+}
+
 bool IsForge(FrameGenMethod method) noexcept
 {
     switch (method)
@@ -400,7 +430,13 @@ bool IsForge(FrameGenMethod method) noexcept
     case FrameGenMethod::Smt:
     case FrameGenMethod::Smai:
     case FrameGenMethod::Xess:
-    case FrameGenMethod::Fsr: return true;
+    case FrameGenMethod::Fsr:
+    case FrameGenMethod::Repeat:
+    case FrameGenMethod::Crossfade:
+    case FrameGenMethod::Memc:
+    case FrameGenMethod::Dis:
+    case FrameGenMethod::MotionBlur:
+    case FrameGenMethod::Spacewarp: return true;
     }
     return false;
 }
@@ -503,7 +539,7 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
 
     static constexpr auto StepsFor = [] [[nodiscard]] (const SessionPlan& plan, const FrameState& state, const FrameInput& input, const LevelExtents& extents, FrameSlot slot) noexcept -> BuildResult {
         static constexpr auto BlitSteps = [] [[nodiscard]] (const Builder& b, bool hasOutput, ResourceKind source, const Display& display, const Blend& blend, BackBufferIndex index, bool vsync,
-                                                            const std::optional<Generation>& generation, const std::optional<FrameGen>& forge) noexcept -> BuildResult {
+                                                            const std::optional<Generation>& generation, const std::optional<ForgeShow>& forge) noexcept -> BuildResult {
             // What goes with a picture handed to NVIDIA DLSS Frame Generation is read when it is presented, so both are
             // left readable by shaders, which is the state it is told they are in.
             static constexpr auto GenerationInputs = [] [[nodiscard]] (const Builder& b, const std::optional<Generation>& generation) noexcept -> BuildResult {
@@ -515,20 +551,21 @@ Result<FramePlan, PlanFrameError> PlanFrame(const SessionPlan& plan, const Frame
             };
 
             static constexpr auto TargetContent = [] [[nodiscard]] (const Builder& b, bool hasOutput, ResourceKind source, const Display& display, const Blend& blend,
-                                                                    BackBufferIndex index, const std::optional<FrameGen>& forge) noexcept -> BuildResult {
+                                                                    BackBufferIndex index, const std::optional<ForgeShow>& forge) noexcept -> BuildResult {
                 // A picture Motion Forge made between the pair is shown as it is, in place of the processed one; at the
-                // pair's start, the picture before it (the history) is.
-                static constexpr auto ForgeSteps = [] [[nodiscard]] (const Builder& b, const Display& display, const Blend& blend, BackBufferIndex index, FrameGen multiplier) noexcept -> BuildResult {
-                    static constexpr auto SourceOf = [] [[nodiscard]] (const Blend& blend, FrameGen multiplier) noexcept -> ResourceId {
-                        return GeneratedAt(blend.point, multiplier).transform(GeneratedId).value_or(SimpleId(ResourceKind::History));
+                // pair's start, the picture before it (the history) is - or, with pictures made after the current one
+                // (Spacewarp), the current one itself, at once.
+                static constexpr auto ForgeSteps = [] [[nodiscard]] (const Builder& b, const Display& display, const Blend& blend, BackBufferIndex index, ForgeShow show) noexcept -> BuildResult {
+                    static constexpr auto SourceOf = [] [[nodiscard]] (const Blend& blend, ForgeShow show) noexcept -> ResourceId {
+                        return GeneratedAt(blend.point, show.multiplier).transform(GeneratedId).value_or(SimpleId(show.ahead ? ResourceKind::Current : ResourceKind::History));
                     };
 
-                    static constexpr auto DrawOf = [] [[nodiscard]] (const Display& display, const Blend& blend, BackBufferIndex index, FrameGen multiplier) noexcept -> Draw {
-                        return Draw{ SourceOf(blend, multiplier), SimpleId(ResourceKind::ModelColor), BackBufferId(index), display.mode, display.split, std::nullopt, std::nullopt, kWhole };
+                    static constexpr auto DrawOf = [] [[nodiscard]] (const Display& display, const Blend& blend, BackBufferIndex index, ForgeShow show) noexcept -> Draw {
+                        return Draw{ SourceOf(blend, show), SimpleId(ResourceKind::ModelColor), BackBufferId(index), display.mode, display.split, std::nullopt, std::nullopt, kWhole };
                     };
-                    return MoveTo(b, SourceOf(blend, multiplier), ResourceState::ShaderRead)
+                    return MoveTo(b, SourceOf(blend, show), ResourceState::ShaderRead)
                         .and_then([](const Builder& n) { return MoveTo(n, SimpleId(ResourceKind::ModelColor), ResourceState::ShaderRead); })
-                        .and_then([&](const Builder& n) { return Emit(n, Step{ DrawOf(display, blend, index, multiplier) }); });
+                        .and_then([&](const Builder& n) { return Emit(n, Step{ DrawOf(display, blend, index, show) }); });
                 };
 
                 static constexpr auto DrawSteps = [] [[nodiscard]] (const Builder& b, ResourceKind source, const Display& display, const Blend& blend, BackBufferIndex index) noexcept -> BuildResult {

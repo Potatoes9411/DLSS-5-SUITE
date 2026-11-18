@@ -253,13 +253,19 @@ constexpr std::array<infra::Choice<GridSize>, 3> kGridChoices{ { { L"1", GridSiz
 constexpr std::array<infra::Choice<PerfLevel>, 6> kPerfChoices{
     { { L"slow", PerfLevel::Slow }, { L"5", PerfLevel::Slow }, { L"medium", PerfLevel::Medium }, { L"10", PerfLevel::Medium }, { L"fast", PerfLevel::Fast }, { L"20", PerfLevel::Fast } }
 };
-constexpr std::array<infra::Choice<FrameGenMethod>, 7> kMethodChoices{ { { L"blend", FrameGenMethod::Blend },
+constexpr std::array<infra::Choice<FrameGenMethod>, 13> kMethodChoices{ { { L"blend", FrameGenMethod::Blend },
                                                                           { L"nvidia", FrameGenMethod::Nvidia },
                                                                           { L"smfg", FrameGenMethod::Smfg },
                                                                           { L"smt", FrameGenMethod::Smt },
                                                                           { L"smai", FrameGenMethod::Smai },
                                                                           { L"xess", FrameGenMethod::Xess },
-                                                                          { L"fsr", FrameGenMethod::Fsr } } };
+                                                                          { L"fsr", FrameGenMethod::Fsr },
+                                                                          { L"repeat", FrameGenMethod::Repeat },
+                                                                          { L"crossfade", FrameGenMethod::Crossfade },
+                                                                          { L"memc", FrameGenMethod::Memc },
+                                                                          { L"dis", FrameGenMethod::Dis },
+                                                                          { L"blur", FrameGenMethod::MotionBlur },
+                                                                          { L"spacewarp", FrameGenMethod::Spacewarp } } };
 constexpr std::array<infra::Choice<NgxLogLevel>, 3> kNgxLogChoices{ { { L"0", NgxLogLevel::Off }, { L"1", NgxLogLevel::On }, { L"2", NgxLogLevel::Verbose } } };
 constexpr std::array<infra::Choice<LogLevel>, 8> kLogChoices{ { { L"0", LogLevel::Debug },
                                                                 { L"debug", LogLevel::Debug },

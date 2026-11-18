@@ -760,7 +760,9 @@ struct Replay
     return framePlan.has_value() && std::ranges::none_of(PresentsOf(framePlan->steps), [](const Present& p) { return p.generation.has_value(); });
 }
 
-constexpr std::array<FrameGenMethod, 5> kForgeKinds{ FrameGenMethod::Smfg, FrameGenMethod::Smt, FrameGenMethod::Smai, FrameGenMethod::Xess, FrameGenMethod::Fsr };
+constexpr std::array<FrameGenMethod, 11> kForgeKinds{ FrameGenMethod::Smfg,   FrameGenMethod::Smt,       FrameGenMethod::Smai, FrameGenMethod::Xess,
+                                                      FrameGenMethod::Fsr,    FrameGenMethod::Repeat,    FrameGenMethod::Crossfade, FrameGenMethod::Memc,
+                                                      FrameGenMethod::Dis,    FrameGenMethod::MotionBlur, FrameGenMethod::Spacewarp };
 
 [[nodiscard]] SessionPlan WithForge(const SessionPlan& p, std::uint32_t multiplier, FrameGenMethod method) noexcept
 {
@@ -778,7 +780,7 @@ constexpr std::array<FrameGenMethod, 5> kForgeKinds{ FrameGenMethod::Smfg, Frame
     return pairs;
 }
 
-// Exactly Motion Forge's five kinds make the pictures between a pair themselves.
+// Exactly Motion Forge's eleven kinds make the pictures between a pair themselves.
 [[nodiscard]] bool OnlyMotionForgesKindsAreForge(infra::RngState&) noexcept
 {
     const bool forge = std::ranges::all_of(kForgeKinds, IsForge);
@@ -834,6 +836,24 @@ constexpr std::array<FrameGenMethod, 5> kForgeKinds{ FrameGenMethod::Smfg, Frame
         state = framePlan->next;
     }
     return true;
+}
+
+// At a pair's start the picture before it (the history) is shown - or, with Spacewarp, whose pictures come after the
+// current one, the current picture itself, at once. Only Spacewarp shows ahead.
+[[nodiscard]] bool SpacewarpShowsTheCurrentPictureAtOnce(infra::RngState& rng) noexcept
+{
+    const std::uint32_t multiplier = proptest::DrawBetween(rng, 2, 6);
+    const FrameGenMethod method = kForgeKinds[proptest::DrawBelow(rng, static_cast<std::uint32_t>(kForgeKinds.size()))];
+    const SessionPlan plan = WithForge(RandomPlan(rng), multiplier, method);
+    const auto first = PlanFrame(plan, InitialFrameState(plan), CaptureAt(0, true));
+    const auto second = first.has_value() ? PlanFrame(plan, first->next, CaptureAt(40000, true)) : first;
+    if (!second.has_value())
+        return false;
+    const ResourceId expected = SimpleId(ShowsAhead(method) ? ResourceKind::Current : ResourceKind::History);
+    const std::vector<Draw> draws = DrawsOf(second->steps);
+    const bool shown = std::ranges::any_of(draws, [&expected](const Draw& d) { return d.target.kind == ResourceKind::BackBuffer && d.processed == expected; });
+    const bool onlySpacewarp = std::ranges::all_of(kForgeKinds, [](FrameGenMethod m) { return ShowsAhead(m) == (m == FrameGenMethod::Spacewarp); }) && !ShowsAhead(FrameGenMethod::Blend);
+    return shown && onlySpacewarp && ReplayPlan(first->next.states, *second).valid;
 }
 
 // Over random sequences with any of Motion Forge's generators, every plan replays, presents once, and asks for a
@@ -899,6 +919,7 @@ std::uint32_t FrameSuite(std::uint64_t seed) noexcept
     failures += Failures(proptest::ForAll("Motion Forge's pairs are made once and shown at their moments", seed, 300, ForgePairsAreMadeOnceAndShownAtTheirMoments));
     failures += Failures(proptest::ForAll("Motion Forge at one times makes nothing", seed, 200, ForgeAtOneTimesMakesNothing));
     failures += Failures(proptest::ForAll("Motion Forge plans are valid over random sequences", seed, 400, ForgePlansAreValidOverRandomSequences));
+    failures += Failures(proptest::ForAll("Spacewarp shows the current picture at once", seed, 300, SpacewarpShowsTheCurrentPictureAtOnce));
     return failures;
 }
 

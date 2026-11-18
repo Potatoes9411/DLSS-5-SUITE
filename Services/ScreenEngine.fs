@@ -123,7 +123,10 @@ module ScreenEngine =
     /// Streamline); or one of Motion Forge's generators, run by the Screen Engine on
     /// Motion Forge's own code: SMFG and SMT (any GPU), SMAI (a network through DirectML,
     /// files from the Motion Forge page), XeSS MFG (the user's Intel-signed files, picked
-    /// on the Motion Forge page) and AMD FSR 3.1 FG (FidelityFX runtime beside the engine).
+    /// on the Motion Forge page) and AMD FSR 3.1 FG (FidelityFX runtime beside the engine);
+    /// or SUITE's more (MotionEngine/suite_xfg.inl, shared with Motion Forge, any GPU, x2-x6):
+    /// Repeat (no frame generation, to compare), Crossfade, MEMC (block matching), DIS
+    /// (dense optical flow), Motion-blur blend and Spacewarp (extrapolation: less delay).
     /// One that cannot start is logged and the engine's blend is used.
     type FrameGenerator =
         | OwnBlend
@@ -133,11 +136,18 @@ module ScreenEngine =
         | Smai
         | XessMfg
         | Fsr31
+        | RepeatFrames
+        | Crossfade
+        | Memc
+        | Dis
+        | MotionBlur
+        | Spacewarp
 
     module FrameGenerator =
         /// The engine's name for each, and the order the page lists them in.
         let all =
-            [ OwnBlend, "blend"; NvidiaDlssg, "nvidia"; Smfg, "smfg"; Smt, "smt"; Smai, "smai"; XessMfg, "xess"; Fsr31, "fsr" ]
+            [ OwnBlend, "blend"; NvidiaDlssg, "nvidia"; Smfg, "smfg"; Smt, "smt"; Smai, "smai"; XessMfg, "xess"; Fsr31, "fsr"
+              RepeatFrames, "repeat"; Crossfade, "crossfade"; Memc, "memc"; Dis, "dis"; MotionBlur, "blur"; Spacewarp, "spacewarp" ]
 
         let name (g: FrameGenerator) = all |> List.find (fun (x, _) -> x = g) |> snd
 
@@ -150,12 +160,26 @@ module ScreenEngine =
         let isForge (g: FrameGenerator) =
             match g with
             | Smfg | Smt | Smai | XessMfg | Fsr31 -> true
+            | RepeatFrames | Crossfade | Memc | Dis | MotionBlur | Spacewarp -> true
             | OwnBlend | NvidiaDlssg -> false
+
+        /// The generators that look for the motion themselves at Flow's share of the picture (--forge-flow).
+        let usesFlow (g: FrameGenerator) =
+            match g with
+            | Smfg | Smt | Memc | Dis | MotionBlur | Spacewarp -> true
+            | _ -> false
+
+        /// The most pictures shown for each processed one (--frame-gen): FSR 3.1 makes one between a pair, so x2;
+        /// the others up to x6.
+        let mostMultiplier (g: FrameGenerator) =
+            match g with
+            | Fsr31 -> 2
+            | _ -> 6
 
     /// What Motion Forge's generators are asked for beside the multiplier.
     [<CLIMutable>]
     type ForgeSettings =
-        { /// SMFG and SMT: the share of the picture the motion is looked for at, 10 to 100 percent.
+        { /// SMFG, SMT, MEMC, DIS, Motion-blur blend and Spacewarp: the share of the picture the motion is looked for at, 10 to 100 percent.
           Flow: int
           /// Read-outs and what stays on screen are kept still (SMFG, SMT, SMAI).
           KeepStill: bool

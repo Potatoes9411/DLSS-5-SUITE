@@ -73,7 +73,10 @@ type MotionForgeViewModel() as this =
 
     // The page's lists. The upscalers in the order the page shows them; the
     // engine's own numbers are upscalerOrder (his app put SMSR second).
-    let generatorNames = [| "DLSS MFG"; "XeSS MFG"; "SMFG 1.3"; "SMAI 1.0"; "SUITE FG"; "AMD FSR 3.1 FG" |]
+    let generatorNames =
+        [| "DLSS MFG"; "XeSS MFG"; "SMFG 1.3"; "SMAI 1.0"; "SUITE FG"; "AMD FSR 3.1 FG"
+           "Repeat (no FG, to compare)"; "Crossfade blend"; "SUITE MEMC (block matching)"; "SUITE DIS (optical flow)"; "Motion-blur blend"
+           "SUITE Spacewarp (extrapolation)" |]
     let upscalerOrder = [| 0; 5; 1; 2; 3; 4 |]
     let upscalerNames = [| "Off"; "SMSR 1.0"; "Sharpness only"; "Integer"; "Nearest Neighbor"; "Anime4K" |]
     let multiplierNames = [| "x2"; "x3"; "x4"; "x5"; "x6"; "Custom" |]
@@ -443,8 +446,8 @@ type MotionForgeViewModel() as this =
     member _.IsSuiteFg = (options ()).Generator = MotionPrefs.suiteFg
     member _.IsFsr = (options ()).Generator = MotionPrefs.fsrFg
     member _.IsDlssOrXess = (options ()).Generator <= 1
-    /// The generators that come with files to pick, download or check (SMFG and SUITE FG have none).
-    member _.HasGeneratorFiles = let g = (options ()).Generator in g <> 2 && g <> MotionPrefs.suiteFg
+    /// The generators that come with files to pick, download or check (SMFG, SUITE FG and SUITE's more have none).
+    member _.HasGeneratorFiles = let g = (options ()).Generator in g <> 2 && g <> MotionPrefs.suiteFg && not (MotionPrefs.isMore g)
 
     /// What the picked generator runs on, in a line.
     member _.GeneratorNote =
@@ -454,6 +457,12 @@ type MotionForgeViewModel() as this =
         | 2 -> "Motion Forge's own generator. Any graphics card, the lightest of all."
         | 4 -> "The Screen Engine's own frame generation: each frame in between drawn from the two real frames along the motion SUITE works out. Any graphics card, x2 to x6."
         | 5 -> "AMD FidelityFX Super Resolution 3.1 Frame Generation, which comes with SUITE. Any graphics card (AMD, NVIDIA or Intel); one frame in between a pair, so x2."
+        | 6 -> "No frame generation: the nearer real frame shown again, at the same frame rate - to compare the others with. Any graphics card, x2-x6."
+        | 7 -> "The two frames mixed at each moment: the lightest of all, smooth brightness but doubled edges where things move. Any graphics card, x2-x6."
+        | 8 -> "Motion smoothing as TVs do it: 8x8 blocks matched between the two frames, hidden and uncovered places handled. Any graphics card (heavier than SMFG), x2-x6; strong on pans and scrolling."
+        | 9 -> "Dense optical flow (Dense Inverse Search): a motion for every pixel, coarse to fine, hidden and uncovered places handled. Any graphics card, x2-x6; good on fine and uneven motion."
+        | 10 -> "DIS's motion with a camera shutter's blur along it: a softer, cinematic look with less judder, not as sharp. Any graphics card, x2-x6."
+        | 11 -> "Extrapolation, as VR's spacewarp: the frames after each real one are drawn from it alone, so nothing waits for the next - about a frame less delay. Edges of moving things are guessed. Any graphics card, x2-x6 (whole multipliers)."
         | _ -> "A neural network (SMFG Net) on your card through DirectML - best on cards with AI units. Heavier than SMFG; a one-time download."
 
     member _.FrameModeIndex
@@ -480,6 +489,8 @@ type MotionForgeViewModel() as this =
         let most = MotionPrefs.mostMultiplier o.Generator
         if most < 6 && (o.Adaptive || MotionPrefs.multiplierTenths o > most * 10) then
             sprintf "FSR 3.1 makes one frame in between each pair: it runs at x%d whatever is picked here." most
+        elif MotionPrefs.extrapolates o.Generator && (o.Adaptive || MotionPrefs.multiplierTenths o % 10 <> 0) then
+            sprintf "Spacewarp runs by whole multipliers: x%d here." (if o.Adaptive then 6 else max 2 (MotionPrefs.multiplierTenths o / 10))
         else ""
 
     member this.HasMultiplierNote = this.MultiplierNote <> ""
@@ -522,7 +533,8 @@ type MotionForgeViewModel() as this =
     member _.FlowNote =
         let o = options ()
         if o.Generator = 2 || o.Generator = 3 then "SMFG and SMAI make their frames at the picture's full size."
-        elif o.Generator = MotionPrefs.suiteFg || o.Generator = MotionPrefs.fsrFg then
+        elif o.Generator = MotionPrefs.repeatFg || o.Generator = MotionPrefs.crossfadeFg then "Frames are made at the picture's full size; no motion is looked for."
+        elif o.Generator = MotionPrefs.suiteFg || o.Generator = MotionPrefs.fsrFg || MotionPrefs.looksForMotion o.Generator then
             sprintf "Frames in between are made at the picture's full size; the motion is worked out at %d%% of it." (MotionPrefs.effectiveFlow o)
         else sprintf "Frames in between are made at %d%% of the picture, then rebuilt at full size." (MotionPrefs.effectiveFlow o)
 

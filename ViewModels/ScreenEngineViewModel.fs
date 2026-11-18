@@ -76,7 +76,13 @@ type ScreenEngineViewModel() as this =
           Smt, "SMT triangle mesh (Motion Forge)"
           Smai, "SMAI neural network (DirectML)"
           XessMfg, "Intel XeSS MFG"
-          Fsr31, "AMD FSR 3.1 Frame Generation" ]
+          Fsr31, "AMD FSR 3.1 Frame Generation"
+          Memc, "SUITE MEMC block matching (any GPU)"
+          Dis, "SUITE DIS optical flow (any GPU)"
+          Spacewarp, "SUITE Spacewarp extrapolation (any GPU)"
+          MotionBlur, "Motion-blur blend (any GPU)"
+          Crossfade, "Crossfade blend (any GPU)"
+          RepeatFrames, "Repeat - no frame generation (compare)" ]
     let smaiModels = [ false, "SMFG Net (Motion Forge's own)"; true, "RIFE 4.25 lite" ]
     let mutable smaiProgress = ""
     let mutable isGettingSmai = false
@@ -651,7 +657,7 @@ type ScreenEngineViewModel() as this =
     member this.IsNvidiaGenerator = this.IsScreenEngine && settings.Generator = NvidiaDlssg
     member this.IsForgeGenerator = this.IsScreenEngine && FrameGenerator.isForge settings.Generator
     /// SMFG and SMT look for the motion at a share of the picture; SMAI keeps SMFG's still pixels too.
-    member _.UsesFlow = (match settings.Generator with Smfg | Smt -> true | _ -> false)
+    member _.UsesFlow = FrameGenerator.usesFlow settings.Generator
     member _.UsesKeepStill = (match settings.Generator with Smfg | Smt | Smai -> true | _ -> false)
     member _.IsSmfgGenerator = settings.Generator = Smfg
     member _.IsSmaiGenerator = settings.Generator = Smai
@@ -709,6 +715,12 @@ type ScreenEngineViewModel() as this =
         | Fsr31 ->
             if File.Exists(Path.Combine(AppContext.BaseDirectory, "engine", "amd_fidelityfx_dx12.dll")) then "AMD's FidelityFX runtime ships with SUITE (AMD's signature is checked). FSR 3.1 makes one frame a pair: best at 2x."
             else "AMD's FidelityFX runtime (amd_fidelityfx_dx12.dll) is not in SUITE's engine folder; SUITE's blend is used."
+        | RepeatFrames -> "No frame generation: the nearer real picture shown again, at the same frame rate - to compare the others with. Any GPU, x2-x6."
+        | Crossfade -> "The two pictures mixed at each moment: the lightest of all, smooth brightness but doubled edges where things move. Any GPU, x2-x6."
+        | Memc -> "Motion smoothing as TVs do it: 8x8 blocks matched between the two pictures, hidden and uncovered places handled. Any GPU (heavier than SMFG), x2-x6; strong on pans and scrolling."
+        | Dis -> "Dense optical flow (Dense Inverse Search): a motion for every pixel, coarse to fine, hidden and uncovered places handled. Any GPU, x2-x6; good on fine and uneven motion."
+        | MotionBlur -> "DIS's motion with a camera shutter's blur along it: a softer, cinematic look with less judder, not as sharp. Any GPU, x2-x6."
+        | Spacewarp -> "Extrapolation, as VR's spacewarp: the pictures after each real one are drawn from it alone, so nothing waits for the next - about a frame less delay. Edges of moving things are guessed. Any GPU, x2-x6 (whole multipliers)."
 
     member _.SmaiNeedsFiles = settings.Generator = Smai && not (MotionAi.isInstalled ())
     member _.SmaiProgress = smaiProgress

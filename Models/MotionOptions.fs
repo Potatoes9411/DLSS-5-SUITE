@@ -18,7 +18,7 @@ open System.Text.Json
 [<CLIMutable>]
 type MotionOptions =
     { FrameGeneration: bool
-      Generator: int        // 0 DLSS MFG, 1 XeSS MFG, 2 SMFG, 3 SMAI, 4 SUITE FG, 5 FSR 3.1 FG
+      Generator: int        // 0 DLSS MFG, 1 XeSS MFG, 2 SMFG, 3 SMAI, 4 SUITE FG, 5 FSR 3.1 FG, 6 Repeat, 7 Crossfade, 8 MEMC, 9 DIS, 10 Motion-blur blend, 11 Spacewarp
       Mode: int             // the Fixed multiplier: 0..4 = x2..x6
       MultiplierCustom: int // "Custom": tenths, 11..60 (x1.1..x6.0); 0 = Mode's whole one
       Flow: int             // percent of the picture, used when GameType is Custom
@@ -121,11 +121,24 @@ module MotionPrefs =
     /// A setting is kept as its place + 1, so 0 (a file without it) is the default.
     let triPlace (list: int[]) (which: int) (kept: int) = if kept >= 1 && kept <= list.Length then kept - 1 else triDefaults[which]
     let triValue (list: int[]) (which: int) (kept: int) = list[triPlace list which kept]
-    let generators = 6
+    let generators = 12
     /// The generators SUITE added after MFG SUPER MOTION's four: the Screen Engine's own frame generation and
-    /// AMD FSR 3.1 Frame Generation.
+    /// AMD FSR 3.1 Frame Generation; then SUITE's more (MotionEngine/suite_xfg.inl, shared with the Screen Engine):
+    /// Repeat, Crossfade, MEMC, DIS, Motion-blur blend and Spacewarp - every one any card, x2 to x6.
     let suiteFg = 4
     let fsrFg = 5
+    let repeatFg = 6
+    let crossfadeFg = 7
+    let memcFg = 8
+    let disFg = 9
+    let blurFg = 10
+    let spacewarpFg = 11
+    /// SUITE's more: drawn in the engine from the two real frames, no files of anyone's.
+    let isMore (generator: int) = generator >= repeatFg && generator <= spacewarpFg
+    /// The ones of them that look for the motion (at Flow's share of the picture).
+    let looksForMotion (generator: int) = generator >= memcFg && generator <= spacewarpFg
+    /// Spacewarp's frames come after each real frame (extrapolated), by whole multipliers: not by Adaptive's beat.
+    let extrapolates (generator: int) = generator = spacewarpFg
     let countdowns = [| 3; 5; 10 |]
     /// Flow % for each kind of game (the engine's own table, sm_options.h kGameKinds).
     let gameFlows = [| 35; 75; 50; 35; 35; 35; 35 |]

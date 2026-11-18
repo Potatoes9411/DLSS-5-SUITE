@@ -15,11 +15,13 @@
 
 namespace forge {
 
-enum class Kind : std::uint8_t { Smfg, Smt, Smai, Xess, Fsr };
+// Repeat, Crossfade, Memc, Dis, MotionBlur and Spacewarp: SUITE's own (MotionEngine/suite_xfg.inl). Spacewarp's pictures
+// are made after the pair's second picture, at (k + 1) / (count + 1) of a pair past it.
+enum class Kind : std::uint8_t { Smfg, Smt, Smai, Xess, Fsr, Repeat, Crossfade, Memc, Dis, MotionBlur, Spacewarp };
 
 struct Settings
 {
-    std::uint32_t flow; // SMFG and SMT: percent of the picture the motion is looked for at, 10 to 100
+    std::uint32_t flow; // SMFG, SMT, MEMC, DIS, blur and Spacewarp: percent of the picture the motion is looked for at, 10 to 100
     bool keepStill;     // read-outs and what stays on the screen are kept where they are
     bool lightSearch;   // SMFG: the lighter search
     bool rife;          // SMAI: RIFE 4.25 lite rather than SMFG Net

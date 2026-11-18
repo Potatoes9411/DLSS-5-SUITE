@@ -216,6 +216,7 @@ typedef HRESULT(WINAPI *CompileFn)(LPCVOID, SIZE_T, LPCSTR, const void *, void *
 #include "msm_ai.h"
 #include "xe_mfg.inl"
 #include "fsr_fg.inl"
+#include "suite_xfg.inl"
 
 // --- the Screen Engine's door to them ----------------------------------------------------------------------
 
@@ -244,6 +245,19 @@ Answer Said(bool ok, const char *text)
     return a;
 }
 
+xfg::Mode XfgMode(Kind kind)
+{
+    switch (kind)
+    {
+    case Kind::Repeat: return xfg::Mode::Repeat;
+    case Kind::Crossfade: return xfg::Mode::Crossfade;
+    case Kind::Memc: return xfg::Mode::Memc;
+    case Kind::Dis: return xfg::Mode::Dis;
+    case Kind::MotionBlur: return xfg::Mode::Blur;
+    default: return xfg::Mode::Spacewarp;
+    }
+}
+
 const char *NameOf(Kind kind)
 {
     switch (kind)
@@ -253,6 +267,12 @@ const char *NameOf(Kind kind)
     case Kind::Smai: return "SMAI 1.0";
     case Kind::Xess: return "XeSS MFG";
     case Kind::Fsr: return "FSR 3.1 FG";
+    case Kind::Repeat:
+    case Kind::Crossfade:
+    case Kind::Memc:
+    case Kind::Dis:
+    case Kind::MotionBlur:
+    case Kind::Spacewarp: return xfg::NameOf(XfgMode(kind));
     }
     return "Motion Forge";
 }
@@ -391,6 +411,14 @@ bool MakeFsr(ID3D12GraphicsCommandList *list, const Pair &p)
     return true;
 }
 
+// SUITE's more generators: every picture between at its moment (or, Spacewarp, past the pair's second picture).
+bool MakeXfg(ID3D12GraphicsCommandList *list, const Pair &p)
+{
+    float moments[kMostBetween] = {};
+    for (UINT k = 0; k < p.count; ++k) moments[k] = static_cast<float>(k + 1) / static_cast<float>(p.count + 1);
+    return xfg::Frames(list, p.before, p.after, p.rest, p.into, p.rest, moments, p.count);
+}
+
 void SayNow()
 {
     const ULONGLONG now = GetTickCount64();
@@ -448,11 +476,21 @@ Answer Start(const Device &device, Kind kind, const Settings &settings, std::uin
         fsrfg::g.failed = false;
         if (!fsrfg::Ready(width, height, settings.motionWidth, settings.motionHeight, kFormat)) { snprintf(text, sizeof(text), "FSR 3.1 FG did not start: %s", Lines().c_str()); return Said(false, text); }
         break;
+    case Kind::Repeat:
+    case Kind::Crossfade:
+    case Kind::Memc:
+    case Kind::Dis:
+    case Kind::MotionBlur:
+    case Kind::Spacewarp:
+        xfg::g.failed = false;
+        if (!xfg::Ready(XfgMode(kind), width, height, static_cast<int>(settings.flow))) { snprintf(text, sizeof(text), "%s did not start: %s", NameOf(kind), Lines().c_str()); return Said(false, text); }
+        break;
     }
     g_run.live = true;
     snprintf(text, sizeof(text), "%s makes the pictures between at %ux%u%s", NameOf(kind), width, height,
              kind == Kind::Xess ? (XeMost() > 1 ? "" : ", one a pair (Intel's library on this card); the others are the nearest of it")
-             : kind == Kind::Fsr ? ", one a pair (FSR 3.1); the others are that one" : "");
+             : kind == Kind::Fsr ? ", one a pair (FSR 3.1); the others are that one"
+             : kind == Kind::Spacewarp ? ", after the current picture (extrapolated: shown a pair sooner)" : "");
     return Said(true, text);
 }
 
@@ -478,6 +516,14 @@ bool Make(ID3D12GraphicsCommandList *list, const Pair &pair, const ListControl &
     case Kind::Fsr:
         ok = MakeFsr(list, pair);
         break;
+    case Kind::Repeat:
+    case Kind::Crossfade:
+    case Kind::Memc:
+    case Kind::Dis:
+    case Kind::MotionBlur:
+    case Kind::Spacewarp:
+        ok = MakeXfg(list, pair);
+        break;
     }
     SayNow();
     return ok;
@@ -498,6 +544,7 @@ void Stop() noexcept
     XeClose();
     g_xe.fence = nullptr;
     fsrfg::Close();
+    xfg::Close();
     MsmClose();
     TriClose();
     // (Their passes were made on this device: made anew on the next one.)

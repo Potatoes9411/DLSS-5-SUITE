@@ -41,6 +41,9 @@ static void ShaderWarmStart()
             add(kMsmHlsl, sizeof(kMsmHlsl) - 1, "msm-fg.hlsl", entry, o3);
     // (DLSS 5 SUITE: SUITE FG's one pass - suite_fg.inl.)
     if (SuiteSelected()) add(kSuiteFgHlsl, sizeof(kSuiteFgHlsl) - 1, "suite-fg.hlsl", "SuiteFgMain", o3);
+    // (SUITE's more: their eight passes - suite_xfg.inl.)
+    if (XfgSelected())
+        for (const char *entry : xfg::kEntries) add(kXfgHlsl, sizeof(kXfgHlsl) - 1, "suite-xfg.hlsl", entry, o3);
     add(kUpscaleHlsl, sizeof(kUpscaleHlsl) - 1, "upscale.hlsl", "ScaleMain", o3);
     add(kUpscaleHlsl, sizeof(kUpscaleHlsl) - 1, "upscale.hlsl", "SharpMain", o3);
     add(kUpscaleHlsl, sizeof(kUpscaleHlsl) - 1, "upscale.hlsl", "AnimePushMain", o3);
@@ -120,6 +123,7 @@ static int ShaderWarmAll()
     jobs.push_back({ kHdrInHlsl, sizeof(kHdrInHlsl) - 1, "lf-order.hlsl", "CSMain", 0 });
     jobs.push_back({ kLumaHlsl, sizeof(kLumaHlsl) - 1, "lf-luma.hlsl", "CSMain", 0 });
     jobs.push_back({ kSuiteFgHlsl, sizeof(kSuiteFgHlsl) - 1, "suite-fg.hlsl", "SuiteFgMain", D3DCOMPILE_OPTIMIZATION_LEVEL3 });   // (DLSS 5 SUITE)
+    for (const char *entry : xfg::kEntries) jobs.push_back({ kXfgHlsl, sizeof(kXfgHlsl) - 1, "suite-xfg.hlsl", entry, o3 });   // (DLSS 5 SUITE: suite_xfg.inl)
     jobs.push_back({ kOfaGrow, sizeof(kOfaGrow) - 1, nullptr, "CSMain", o3 });
     jobs.push_back({ kHdrOutHlsl, sizeof(kHdrOutHlsl) - 1, "lf-hdr-out", "CSMain", 0 });
     std::atomic<size_t> next{0};

@@ -92,7 +92,13 @@ static wchar_t g_sl_dir[MAX_PATH] = {};
 //     drawn from the two real frames, moved along the engine's motion field (suite_fg.inl). Any card, any moment.
 //   4 FSR FG - AMD FidelityFX Super Resolution 3.1 Frame Generation (fsr_fg.inl): one frame in between a pair, from
 //     AMD's signed runtime, on any card that runs D3D12.
-static int g_generator = 0; // 0 DLSS, 1 XeSS, 2 MSM, 3 SUITE FG, 4 FSR FG
+//   5..10 SUITE's more generators (suite_xfg.inl, shared with the Screen Engine), all drawn in the engine from the two
+//     real frames, any card, x2..x6: 5 Repeat (the nearer real frame again, for comparison), 6 Crossfade (the two
+//     mixed), 7 MEMC (block matching), 8 DIS (dense optical flow), 9 Motion-blur blend (DIS's motion, a shutter's blur
+//     along it), 10 Spacewarp (extrapolated from the newest real frame along the last pair's motion: the real frame
+//     is shown as soon as it is there, its frames after it).
+static int g_generator = 0; // 0 DLSS, 1 XeSS, 2 MSM, 3 SUITE FG, 4 FSR FG, 5..10 SUITE's more (suite_xfg.inl)
+static constexpr int kFirstXfg = 5, kLastGenerator = 10;
 static bool g_generator_locked = false;
 static bool g_xess_tensor = false;  // round 85: XeSS MFG asked on the tensor cores and running so - by DLSS MFG's road (sm_engine.cpp)
 static bool NgxSelected() { return g_generator == 0; }
@@ -100,13 +106,20 @@ static bool XeSelected() { return g_generator == 1; }
 static bool MsmSelected() { return g_generator == 2; }
 static bool SuiteSelected() { return g_generator == 3; }
 static bool FsrSelected() { return g_generator == 4; }
+static bool XfgSelected() { return g_generator >= kFirstXfg && g_generator <= kLastGenerator; }
+static int XfgModeNumber() { return g_generator - kFirstXfg; }   // xfg::Mode
+static bool AheadSelected() { return g_generator == kFirstXfg + 5; }   // Spacewarp: its frames come after the real frame
 // The generators whose frames in between are drawn in the engine, each at its own moment, at the picture's own size,
-// from the two real frames alone (no history of their own): MSM FG and SUITE FG.
-static bool OwnMade() { return MsmSelected() || SuiteSelected(); }
+// from the two real frames alone (no history of their own): MSM FG, SUITE FG and SUITE's more.
+static bool OwnMade() { return MsmSelected() || SuiteSelected() || XfgSelected(); }
 // Round 96: "Ultra Smooth" is Even pacing and more; what Even pacing does, either asks for.
 static bool SmoothOn() { return smOpt.smooth.load() != 0; }
 static bool EvenOn() { return smOpt.fixed_beat.load() != 0 || smOpt.smooth.load() != 0; }
-static const char *GeneratorName() { return XeSelected() ? "XeSS MFG" : MsmSelected() ? "MSM FG" : SuiteSelected() ? "SUITE FG" : FsrSelected() ? "FSR FG" : "DLSS MFG"; }
+static const char *GeneratorName()
+{
+    static const char *const kXfg[] = { "Repeat", "Crossfade", "SUITE MEMC", "SUITE DIS", "Motion-blur blend", "SUITE Spacewarp" };
+    return XeSelected() ? "XeSS MFG" : MsmSelected() ? "MSM FG" : SuiteSelected() ? "SUITE FG" : FsrSelected() ? "FSR FG" : XfgSelected() ? kXfg[XfgModeNumber()] : "DLSS MFG";
+}
 
 // The kind of game the engine is told to expect ("Game type" in the app).
 //
@@ -179,6 +192,8 @@ static bool MotionGiven()
     // (SUITE FG has no motion of its own: it is drawn along the engine's field - NVIDIA Optical Flow when picked,
     // the GPU estimate otherwise, as the Screen Engine's "builtin" motion.)
     if (SuiteSelected()) return true;
+    // (SUITE's more find the motion themselves, as MSM FG does - suite_xfg.inl.)
+    if (XfgSelected()) return false;
     return !MsmSelected() && smOpt.motion.load() != 2;
 }
 

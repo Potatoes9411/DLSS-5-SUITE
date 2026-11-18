@@ -109,6 +109,7 @@
 #include "lf_shader_cache.inl"
 #include "fsr_fg.inl"
 #include "suite_fg.inl"
+#include "suite_xfg.inl"
 
 #include "capture_shortcuts.inl"
 #include "lf_show_relay.inl"
@@ -296,6 +297,7 @@ int wmain(int argc, wchar_t **argv)
     SpoutClose();
     if (NgxSelected()) { NgxShutdown(); slfg::Shutdown(); }
     if (FsrSelected()) fsrfg::Close();
+    if (XfgSelected()) xfg::Close();
     Status("@state stopped");
     Trace("[engine] ended with code %d", code);
     if (g_control.instance) { ReleaseMutex(g_control.instance); CloseHandle(g_control.instance); }

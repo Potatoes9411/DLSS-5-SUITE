@@ -537,6 +537,8 @@ static void CloseFgResources()
     if (MsmSelected() || g_msm.full_w) MsmClose();
     // (DLSS 5 SUITE: FSR FG's context is made for the pictures' size; SUITE FG's pass stays.)
     if (FsrSelected()) fsrfg::Close();
+    // (SUITE's more: what they work in is made for the pictures' size.)
+    if (XfgSelected()) xfg::Close();
     if (g_fg.depth.gpu_tex) { g_fg.depth.gpu_tex->Release(); g_fg.depth.gpu_tex = nullptr; }
     if (g_fg.depth.staging) { g_fg.depth.staging->Release(); g_fg.depth.staging = nullptr; }
     for (auto &image : g_fg.output) image = nullptr;
@@ -1366,7 +1368,8 @@ static void FgPresenter()
             const bool synthetic = f.synthetic;
             const unsigned index = f.index;
             const double began = LatencyNow();
-            const float phase = ad_phase_now >= 0.0 ? float(ad_phase_now) : synthetic ? float(index + 1) / float(chosen->count + 1) : 1.0f;
+            // (DLSS 5 SUITE, Spacewarp: its frames are of the real frame, moved on - what stays still is the real frame's.)
+            const float phase = ad_phase_now >= 0.0 ? float(ad_phase_now) : synthetic && !AheadSelected() ? float(index + 1) / float(chosen->count + 1) : 1.0f;
             // The generator's frame it goes by: its own, or the nearest there is.
             float made_phase = phase;
             // (Adaptive MFG with DLSS MFG: the generator's frame nearest the beat, or the real frame after.)
@@ -1549,9 +1552,14 @@ static void FgPresenter()
         }
         else if (chosen->interpolate && !irregular)
         {
+            // (DLSS 5 SUITE, Spacewarp: the real frame first, at the moment the pair's first frame in between would
+            // have had - a pair's count of steps sooner than it would come after them - and its frames after it, a
+            // step apart, the last at the real frame's own moment. suite_xfg.inl made them from it.)
+            const bool ahead = AheadSelected();
+            if (ahead) plan.push_back({ chosen->real->full.get(), false, chosen->prev_moment + step, chosen->source_time, 0, -1.0, 0.0, -1.0 });
             for (unsigned index = 0; index < chosen->count; ++index)
             {
-                const double moment = chosen->prev_moment + step * (index + 1);
+                const double moment = chosen->prev_moment + step * (index + (ahead ? 2 : 1));
                 // (A quick pair's frames are a millisecond and a half apart: up to three of them behind, a frame
                 // is still shown in its turn. Further behind it is passed over, and the count a pair follows what
                 // reaches the screen - more real frames with fewer between them, not pairs dropped whole: measured,
@@ -1560,7 +1568,7 @@ static void FgPresenter()
                                  dumped ? 0.0 : moment + (quick ? 3.0 : 0.75) * step, double(index + 1) / double(chosen->count + 1) });
             }
         }
-        if (!(chosen->ad_on && chosen->interpolate && !irregular))
+        if (!(chosen->ad_on && chosen->interpolate && !irregular) && !(AheadSelected() && chosen->interpolate && !irregular))
             plan.push_back({ chosen->real->full.get(), false, chosen->moment, chosen->source_time, 0, -1.0, 0.0, -1.0 });
         run(plan, FgDrawAhead(stamps != nullptr || dumping, plan.empty() ? 0u : static_cast<unsigned>(plan.size() - 1)));
         if (chosen->ad_on && chosen->interpolate && !irregular && chosen->real && chosen->real->full &&
@@ -1649,7 +1657,8 @@ static bool EnsureFg(Pipeline &v, DXGI_FORMAT format)
     const UINT w = scale < 1 ? (UINT(std::round(full_w * scale / 8.0)) * 8u) : full_w;
     const UINT height = scale < 1 ? lines : full_h;
     if ((XeSelected() ? XeLive() : MsmSelected() ? MsmLive(full_w, full_h, format, FlowShare()) : SuiteSelected() ? suitefg::Ready()
-         : FsrSelected() ? fsrfg::Live(full_w, full_h, format) : g_fg.feature != nullptr) &&
+         : FsrSelected() ? fsrfg::Live(full_w, full_h, format) : XfgSelected() ? xfg::Live(xfg::Mode(XfgModeNumber()), full_w, full_h, FlowShare())
+         : g_fg.feature != nullptr) &&
         g_fg.w == w && g_fg.height == height && g_fg.mw == v.work_w &&
         g_fg.mh == v.work_h && g_fg.full_w == full_w && g_fg.full_h == full_h &&
         g_fg.format == format && g_fg.room == FgRoom() && g_fg.thread.joinable()) return true;
@@ -1742,6 +1751,8 @@ static bool EnsureFg(Pipeline &v, DXGI_FORMAT format)
     // SUITE FG: its one pass. FSR FG: AMD's context, for frames at the picture's size and motion at the field's.
     if (SuiteSelected() && !suitefg::Ready()) return false;
     if (FsrSelected() && !fsrfg::Ready(full_w, full_h, v.work_w, v.work_h, format)) return false;
+    // SUITE's more: their passes, and what they look for the motion in, for frames of the picture's size.
+    if (XfgSelected() && !xfg::Ready(xfg::Mode(XfgModeNumber()), full_w, full_h, FlowShare())) return false;
     g_fg.w = w; g_fg.height = height; g_fg.full_w = full_w; g_fg.full_h = full_h;
     g_fg.mw = v.work_w; g_fg.mh = v.work_h; g_fg.format = format;
     g_fg.stop = false;
@@ -2326,7 +2337,8 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
     // the pair's even places, 1 to 9 ms apart on the screen. XeSS MFG stays a limit: its library's own count rules.)
     AdaptivePlan plan;
     const bool beat_rebuilt = !OwnMade() && !XeSelected() && !FsrSelected() && g_rebuild.ready && g_rebuild.repairs && g_fg.w < g_fg.full_w;
-    const bool by_beat = !idle && interpolate && (OwnMade() || beat_rebuilt) && AdaptiveTarget() > 0.0;
+    // (DLSS 5 SUITE, Spacewarp: its frames come after the real frame, by the pair's even places - never by the beat.)
+    const bool by_beat = !idle && interpolate && ((OwnMade() && !AheadSelected()) || beat_rebuilt) && AdaptiveTarget() > 0.0;
     if (by_beat)
     {
         // (The moment the clock will give this frame below, read off a copy of it - nothing moves it before then.)
@@ -2651,6 +2663,22 @@ static bool FgPresent(Pipeline &v, ID3D12Resource *color, D3D12_RESOURCE_STATES 
         suitefg::Frames(lfCore.cmd, before->full.get(), real->full.get(), D3D12_RESOURCE_STATE_COPY_SOURCE, ep.pMVecs, outputs,
                         D3D12_RESOURCE_STATE_COPY_SOURCE, moments, std::min(evaluated, 5u));
         FgCostMark(lfCore.cmd, "suite fg");
+    }
+    // DLSS 5 SUITE, SUITE's more (suite_xfg.inl): each frame in between at its moment from the two real frames and the
+    // motion it finds between them - or, Spacewarp, each frame after the real frame, that share of a pair past it.
+    if (XfgSelected() && evaluated && before)
+    {
+        ID3D12Resource *outputs[5] = {};
+        float moments[5] = {};
+        for (unsigned index = 0; index < evaluated && index < 5; ++index)
+        {
+            outputs[index] = g_fg.output[index].get();
+            moments[index] = static_cast<float>(index + 1) / static_cast<float>(evaluated + 1);
+            for (unsigned b = 0; b < plan.n; ++b) if (plan.what[b] == static_cast<signed char>(index)) moments[index] = plan.phase[b];
+        }
+        xfg::Frames(lfCore.cmd, before->full.get(), real->full.get(), D3D12_RESOURCE_STATE_COPY_SOURCE, outputs, D3D12_RESOURCE_STATE_COPY_SOURCE, moments,
+                    std::min(evaluated, 5u));
+        FgCostMark(lfCore.cmd, "suite xfg");
     }
     // DLSS 5 SUITE, FSR FG: the real frame handed to AMD's frame generation, which draws the frame between it and the
     // real frame before into the pair's picture (fsr_fg.inl). "FSR's own optical flow" picked: a field of noughts.

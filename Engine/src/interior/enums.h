@@ -13,7 +13,11 @@ enum class MotionBackend : std::uint8_t { BuiltIn, NvOpticalFlow, None };
 // DirectML), Intel's XeSS Frame Generation or AMD's FSR 3.1 Frame Generation (Motion Forge's fsr_fg.inl, through the
 // FidelityFX API in external/fidelityfx). The Forge ones make every picture between a pair at once, when the second
 // processed picture of the pair is there; the engine shows them at their moments.
-enum class FrameGenMethod : std::uint8_t { Blend, Nvidia, Smfg, Smt, Smai, Xess, Fsr };
+// SUITE's more generators (MotionEngine/suite_xfg.inl, shared with Motion Forge the same way): Repeat (the nearer
+// processed picture again, for comparison), Crossfade (the two mixed), Memc (block matching), Dis (dense optical
+// flow), MotionBlur (DIS's motion, a shutter's blur along it) and Spacewarp (extrapolated from the current picture
+// along the last pair's motion: its pictures come after the current one, which is shown at once).
+enum class FrameGenMethod : std::uint8_t { Blend, Nvidia, Smfg, Smt, Smai, Xess, Fsr, Repeat, Crossfade, Memc, Dis, MotionBlur, Spacewarp };
 enum class CompareMode : std::uint8_t { Off, Split, Original };
 enum class ColorFormat : std::uint8_t { Rgba8, Rgba16f };
 enum class NrStyle : std::uint8_t { Standard, Natural, Cinematic };

@@ -124,7 +124,7 @@ module MotionStatus =
 module MotionCommand =
     let private flag value = if value then "1" else "0"
 
-    /// Can this generator run on that card? (2 SMFG, 3 SMAI, 4 SUITE FG and 5 FSR FG run on any.)
+    /// Can this generator run on that card? (2 SMFG, 3 SMAI, 4 SUITE FG, 5 FSR FG and 6..11 SUITE's more run on any.)
     let runsOn (generator: int) (card: MotionCard) =
         match generator with
         | 0 -> card.Dlss
@@ -132,12 +132,11 @@ module MotionCommand =
         | _ -> true
 
     /// The engine's number for the page's generator: 0 DLSS MFG, 1 XeSS MFG, 2 SMFG (and SMAI, by msm_ai), 3 SUITE FG,
-    /// 4 FSR FG.
+    /// 4 FSR FG, 5..10 SUITE's more (Repeat, Crossfade, MEMC, DIS, Motion-blur blend, Spacewarp - sm_options.h).
     let engineGenerator (generator: int) =
         match generator with
         | 3 -> 2
-        | 4 -> 3
-        | 5 -> 4
+        | g when g >= 4 -> g - 1
         | g -> g
 
     /// A profile in the engine's own words - his optionLines, line for line,
@@ -147,6 +146,9 @@ module MotionCommand =
             cards |> Array.tryFind (fun c -> c.Name = o.Gpu && runsOn o.Generator c)
             |> Option.map (fun c -> c.Index) |> Option.defaultValue -1
         let tenths = MotionPrefs.multiplierTenths o
+        // Spacewarp goes by whole multipliers (its frames come after each real frame, a step apart): Adaptive and
+        // x2.5-like ones are run as the whole multiplier under them.
+        let ahead = MotionPrefs.extrapolates o.Generator
         let tri list which kept = string (MotionPrefs.triValue list which kept)
         [ // SMAI is the engine's SMFG path (generator 2) with the network making the frames (msm_ai 1); SUITE FG and
           // FSR FG are the engine's generators 3 and 4.
@@ -154,9 +156,9 @@ module MotionCommand =
           "gpu", string card
           "mfg", flag o.FrameGeneration
           // Adaptive and x2.5-like multipliers go by the beat: the generator is made for x6's most.
-          "multiplier", string (if o.Adaptive || tenths % 10 <> 0 then 6 else tenths / 10)
-          "ratio", (if o.Adaptive || tenths % 10 = 0 then "0" else string tenths)
-          "adaptive", (if not o.Adaptive then "0" elif o.AdaptiveFps >= 30 then string o.AdaptiveFps else "1")
+          "multiplier", string (if ahead then (if o.Adaptive then 6 else max 2 (tenths / 10)) elif o.Adaptive || tenths % 10 <> 0 then 6 else tenths / 10)
+          "ratio", (if ahead || o.Adaptive || tenths % 10 = 0 then "0" else string tenths)
+          "adaptive", (if ahead || not o.Adaptive then "0" elif o.AdaptiveFps >= 30 then string o.AdaptiveFps else "1")
           "flow", string (max 25 o.Flow)
           "game", string o.GameType
           "queue", string o.QueueTarget
@@ -215,6 +217,8 @@ module MotionCommand =
           (match o.Generator with
            | 1 -> (match o.XessMotionSource with | 1 -> "1" | 2 -> "0" | _ -> "2")
            | 2 | 3 -> "2"
+           // SUITE's more find their own (suite_xfg.inl).
+           | g when MotionPrefs.isMore g -> "2"
            // SUITE FG: the GPU estimate (the Screen Engine's builtin) or NVIDIA Optical Flow (its nvof).
            | 4 -> (match o.SuiteMotionSource with | 1 -> "0" | _ -> "1")
            // FSR FG: the GPU estimate, FSR's own optical flow alone (a field of noughts), or NVIDIA Optical Flow.

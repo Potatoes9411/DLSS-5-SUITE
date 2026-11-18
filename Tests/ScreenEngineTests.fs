@@ -99,7 +99,9 @@ let ``SUITE's blend makes the pictures between unless another generator is picke
 
 [<Fact>]
 let ``every generator is written as the engine's name for it`` () =
-    let expected = [ OwnBlend, "blend"; NvidiaDlssg, "nvidia"; Smfg, "smfg"; Smt, "smt"; Smai, "smai"; XessMfg, "xess"; Fsr31, "fsr" ]
+    let expected =
+        [ OwnBlend, "blend"; NvidiaDlssg, "nvidia"; Smfg, "smfg"; Smt, "smt"; Smai, "smai"; XessMfg, "xess"; Fsr31, "fsr"
+          RepeatFrames, "repeat"; Crossfade, "crossfade"; Memc, "memc"; Dis, "dis"; MotionBlur, "blur"; Spacewarp, "spacewarp" ]
     for g, name in expected do
         Assert.Equal(Some name, valueOf "--frame-gen-method" (args { defaults with Generator = g }))
         Assert.Equal(Some g, FrameGenerator.ofName name)
@@ -107,7 +109,21 @@ let ``every generator is written as the engine's name for it`` () =
 
 [<Fact>]
 let ``only Motion Forge's generators are forge ones`` () =
-    Assert.Equal<FrameGenerator list>([ Smfg; Smt; Smai; XessMfg; Fsr31 ], FrameGenerator.all |> List.map fst |> List.filter FrameGenerator.isForge)
+    Assert.Equal<FrameGenerator list>(
+        [ Smfg; Smt; Smai; XessMfg; Fsr31; RepeatFrames; Crossfade; Memc; Dis; MotionBlur; Spacewarp ],
+        FrameGenerator.all |> List.map fst |> List.filter FrameGenerator.isForge)
+
+[<Fact>]
+let ``SUITE's more generators look for the motion at Flow's share, all to x6, and are saved by name`` () =
+    Assert.Equal<FrameGenerator list>(
+        [ Smfg; Smt; Memc; Dis; MotionBlur; Spacewarp ],
+        FrameGenerator.all |> List.map fst |> List.filter FrameGenerator.usesFlow)
+    for g in [ RepeatFrames; Crossfade; Memc; Dis; MotionBlur; Spacewarp ] do
+        Assert.Equal(6, FrameGenerator.mostMultiplier g)
+        let a = args { defaults with Generator = g; FrameGen = 3; Forge = { forgeDefaults with Flow = 50 } }
+        Assert.Equal(Some "3", valueOf "--frame-gen" a)
+        Assert.Equal(Some "50", valueOf "--forge-flow" a)
+    Assert.Equal(2, FrameGenerator.mostMultiplier Fsr31)
 
 [<Fact>]
 let ``Motion Forge's settings are written as the engine's options, flow kept within ten and a hundred`` () =

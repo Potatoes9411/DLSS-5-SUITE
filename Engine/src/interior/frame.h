@@ -256,6 +256,9 @@ constexpr std::uint64_t kPauseResetMicroseconds = 1000000;
 [[nodiscard]] Fraction BlendPoint(std::optional<Instant> lastCapture, std::optional<Microseconds> interval, Instant now, FrameGen multiplier) noexcept;
 // Motion Forge's generators make the pictures between a pair themselves; the others draw them as they are shown.
 [[nodiscard]] bool IsForge(FrameGenMethod method) noexcept;
+// Spacewarp's pictures are made after the current picture (extrapolated), not between the history and it: the
+// current picture is shown when it is there, and the steps after it show Generated 0, 1 and so on.
+[[nodiscard]] bool ShowsAhead(FrameGenMethod method) noexcept;
 // Which of the pictures Motion Forge made between a pair is the one for a blend point short of one: the point is on
 // one of the multiplier's steps, and the picture at step k is Generated k - 1. At step 0 none is: the picture before.
 [[nodiscard]] std::optional<LevelIndex> GeneratedAt(Fraction point, FrameGen multiplier) noexcept;

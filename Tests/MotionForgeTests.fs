@@ -265,7 +265,7 @@ let ``SUITE FG and FSR FG go to the engine as its generators 3 and 4`` () =
         let l = lines { d with Generator = g; TriangleMesh = true; SmtAssist = true }
         Assert.Equal("0", l["msm_ai"])
         Assert.Equal("0", l["msm_tri"])
-    Assert.Equal<int list>([ 0; 1; 2; 2; 3; 4 ], [ 0 .. 5 ] |> List.map MotionCommand.engineGenerator)
+    Assert.Equal<int list>([ 0; 1; 2; 2; 3; 4; 5; 6; 7; 8; 9; 10 ], [ 0 .. 11 ] |> List.map MotionCommand.engineGenerator)
 
 [<Fact>]
 let ``SUITE FG is always drawn along a motion field of the engine's`` () =
@@ -314,3 +314,58 @@ let ``a profile keeps the new generators and their motion choices, within range`
     let old = MotionPrefs.deserialize """{ "Version": 1, "Profiles": [ { "Id": "default", "Name": "Default", "Options": { "Generator": 2, "Schema": 24 } } ] }"""
     Assert.Equal(0, old.Profiles[0].Options.SuiteMotionSource)
     Assert.Equal(0, old.Profiles[0].Options.FsrMotionSource)
+
+
+// ---- SUITE's more generators (MotionEngine/suite_xfg.inl) ------------------
+
+[<Fact>]
+let ``SUITE's more go to the engine as its generators 5 to 10, each finding its own motion`` () =
+    let more = [ MotionPrefs.repeatFg; MotionPrefs.crossfadeFg; MotionPrefs.memcFg; MotionPrefs.disFg; MotionPrefs.blurFg; MotionPrefs.spacewarpFg ]
+    Assert.Equal<int list>([ 6 .. 11 ], more)
+    Assert.Equal(MotionPrefs.generators, 12)
+    for g, engine in List.zip more [ 5 .. 10 ] do
+        let l = lines { d with Generator = g; TriangleMesh = true; SmtAssist = true; MotionSource = 1 }
+        Assert.Equal(string engine, l["generator"])
+        Assert.Equal("2", l["motion"])
+        Assert.Equal("0", l["msm_ai"])
+        Assert.Equal("0", l["msm_tri"])
+        Assert.True(MotionPrefs.isMore g)
+        Assert.Equal(6, MotionPrefs.mostMultiplier g)
+    for g in [ 0 .. 5 ] do Assert.False(MotionPrefs.isMore g)
+    Assert.Equal<int list>([ 8; 9; 10; 11 ], [ 0 .. 11 ] |> List.filter MotionPrefs.looksForMotion)
+
+[<Fact>]
+let ``SUITE's more run on any card and need no files`` () =
+    let amd = { Index = 0; Dlss = false; Xess = false; Name = "AMD Radeon" }
+    let dir = @"C:\SUITE\engine"
+    for g in [ 6 .. 11 ] do
+        Assert.True(MotionCommand.runsOn g amd)
+        let l = MotionCommand.optionLines [| amd |] { d with Gpu = "AMD Radeon"; Generator = g }
+        Assert.Equal("0", (l |> dict)["gpu"])
+        Assert.False((MotionCommand.withFidelityFx dir l |> dict).ContainsKey "ffx_dir")
+        Assert.False((MotionCommand.withStreamline dir l |> dict).ContainsKey "sl_dir")
+
+[<Fact>]
+let ``Spacewarp runs by whole multipliers, never by Adaptive's beat`` () =
+    let sw = { d with Generator = MotionPrefs.spacewarpFg }
+    Assert.True(MotionPrefs.extrapolates MotionPrefs.spacewarpFg)
+    for g in [ 0 .. 10 ] do Assert.False(MotionPrefs.extrapolates g)
+    let fixedX3 = lines { sw with Mode = 1; MultiplierCustom = 0 }
+    Assert.Equal("3", fixedX3["multiplier"])
+    Assert.Equal("0", fixedX3["ratio"])
+    let custom = lines { sw with MultiplierCustom = 35 }
+    Assert.Equal("3", custom["multiplier"])
+    Assert.Equal("0", custom["ratio"])
+    let adaptive = lines { sw with Adaptive = true; AdaptiveFps = 144 }
+    Assert.Equal("0", adaptive["adaptive"])
+    Assert.Equal("6", adaptive["multiplier"])
+    // (The others keep Adaptive and in-between multipliers as before.)
+    let dis = lines { d with Generator = MotionPrefs.disFg; MultiplierCustom = 35 }
+    Assert.Equal("35", dis["ratio"])
+    Assert.Equal("144", (lines { d with Generator = MotionPrefs.disFg; Adaptive = true; AdaptiveFps = 144 })["adaptive"])
+
+[<Fact>]
+let ``a profile keeps SUITE's more generators`` () =
+    for g in [ 6 .. 11 ] do
+        Assert.Equal(g, (MotionPrefs.normalizeOptions { d with Generator = g }).Generator)
+    Assert.Equal(11, (MotionPrefs.normalizeOptions { d with Generator = 99 }).Generator)

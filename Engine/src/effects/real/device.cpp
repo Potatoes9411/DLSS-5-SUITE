@@ -333,6 +333,12 @@ Result<ForgeStart, ForgeText> StartForge(const GpuDevice& gpu, interior::FrameGe
         case interior::FrameGenMethod::Smai: return forge::Kind::Smai;
         case interior::FrameGenMethod::Xess: return forge::Kind::Xess;
         case interior::FrameGenMethod::Fsr: return forge::Kind::Fsr;
+        case interior::FrameGenMethod::Repeat: return forge::Kind::Repeat;
+        case interior::FrameGenMethod::Crossfade: return forge::Kind::Crossfade;
+        case interior::FrameGenMethod::Memc: return forge::Kind::Memc;
+        case interior::FrameGenMethod::Dis: return forge::Kind::Dis;
+        case interior::FrameGenMethod::MotionBlur: return forge::Kind::MotionBlur;
+        case interior::FrameGenMethod::Spacewarp: return forge::Kind::Spacewarp;
         case interior::FrameGenMethod::Blend:
         case interior::FrameGenMethod::Nvidia: break;
         }

@@ -657,7 +657,13 @@ struct Ended
                 case interior::FrameGenMethod::Smt:
                 case interior::FrameGenMethod::Smai:
                 case interior::FrameGenMethod::Xess:
-                case interior::FrameGenMethod::Fsr: return d.device.forge != nullptr;
+                case interior::FrameGenMethod::Fsr:
+                case interior::FrameGenMethod::Repeat:
+                case interior::FrameGenMethod::Crossfade:
+                case interior::FrameGenMethod::Memc:
+                case interior::FrameGenMethod::Dis:
+                case interior::FrameGenMethod::MotionBlur:
+                case interior::FrameGenMethod::Spacewarp: return d.device.forge != nullptr;
                 }
                 return false;
             };

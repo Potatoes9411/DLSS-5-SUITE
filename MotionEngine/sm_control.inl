@@ -63,7 +63,7 @@ static unsigned ApplyOption(const char *key, const char *value)
 {
     if (KeyIs(key, "generator"))
     {
-        if (!g_generator_locked) g_generator = std::clamp(atoi(value), 0, 4);     // (DLSS 5 SUITE: 3 SUITE FG, 4 FSR FG)
+        if (!g_generator_locked) g_generator = std::clamp(atoi(value), 0, kLastGenerator);     // (DLSS 5 SUITE: 3 SUITE FG, 4 FSR FG, 5..10 suite_xfg.inl)
         return 0;
     }
     // The lines Adaptive Motion Learning shows while it studies a game, in the app's language: aml_say0 .. 8.
