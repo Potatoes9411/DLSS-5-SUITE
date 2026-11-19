@@ -559,6 +559,8 @@ type MainViewModel() as this =
 
     // ---- What the game itself turned out to be ---------------------------
     let mutable detectedApi = ""
+    /// Every API the open game ships with, the routing one first. Shown only.
+    let mutable detectedApis: string[] = [||]
     let mutable detectedArch = ""
     let mutable detectedDlss = false
 
@@ -2943,6 +2945,28 @@ type MainViewModel() as this =
         | "opengl" -> "OpenGL"
         | _ -> "Unknown API"
 
+    /// The other APIs the game ships with, for the chip beside the routing
+    /// one: "Also DX11 · Vulkan". SUITE still routes by the one above.
+    member this.DetectedOtherApisText =
+        let short api =
+            match api with
+            | "dx12" -> "DX12"
+            | "dx11" -> "DX11"
+            | "dx10" -> "DX10"
+            | "dx9" -> "DX9"
+            | "vulkan" -> "Vulkan"
+            | "opengl" -> "OpenGL"
+            | _ -> ""
+
+        let others =
+            detectedApis
+            |> Array.filter (fun a -> a <> detectedApi)
+            |> Array.map short
+            |> Array.filter (fun s -> s <> "")
+
+        if others.Length = 0 then "" else "Also " + String.Join(" · ", others)
+
+    member this.HasOtherApis = this.DetectedOtherApisText <> ""
     member this.DetectedArchText =
         match detectedArch with
         | "32" -> "32-bit"
@@ -2975,6 +2999,7 @@ type MainViewModel() as this =
         if not sameTarget then
             detectedFor <- manageExePath
             detectedApi <- GameAnalyzer.detectGraphicsApi manageExePath
+            detectedApis <- GameAnalyzer.detectGraphicsApis manageExePath
             detectedArch <- GameAnalyzer.detectArchitecture manageExePath
 
         let dlssFilesFound =
@@ -2998,6 +3023,8 @@ type MainViewModel() as this =
             dlssFilesFound && detectedApi <> "dx9" && detectedApi <> "dx10"
 
         this.RaisePropertyChanged("DetectedApiText")
+        this.RaisePropertyChanged("DetectedOtherApisText")
+        this.RaisePropertyChanged("HasOtherApis")
         this.RaisePropertyChanged("DetectedArchText")
         this.RaisePropertyChanged("HasDetectedArch")
         this.RaisePropertyChanged("HasDlssUpscaling")

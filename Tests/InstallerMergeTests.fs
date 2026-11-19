@@ -240,3 +240,19 @@ let ``an excluded game stays out by its executable or its title`` () =
     Assert.True(GameScanner.isExcluded set (game "" "alpha"))
     Assert.False(GameScanner.isExcluded set (game @"C:\Games\B\b.exe" "Beta"))
     Assert.Empty(GameScanner.excludedKeysFor "" "  ")
+
+[<Fact>]
+let ``several shipped APIs are listed with the routing one first`` () =
+    Assert.Equal<string[]>([| "dx12"; "vulkan"; "dx11" |], GameAnalyzer.otherApisFrom "dx12" [ "dx11"; "vulkan"; "dx12" ] true)
+    Assert.Equal<string[]>([| "dx11"; "dx12" |], GameAnalyzer.otherApisFrom "dx11" [ "dx12"; "dx11" ] true)
+
+[<Fact>]
+let ``a vestigial DirectX 9 path in a modern 64-bit game is not listed`` () =
+    Assert.Equal<string[]>([| "dx12"; "dx11" |], GameAnalyzer.otherApisFrom "dx12" [ "dx9"; "dx11"; "dx10" ] true)
+    Assert.Equal<string[]>([| "dx11"; "dx9" |], GameAnalyzer.otherApisFrom "dx11" [ "dx9" ] false)
+    Assert.Equal<string[]>([| "dx9" |], GameAnalyzer.otherApisFrom "dx9" [ "dx9"; "" ] true)
+
+[<Fact>]
+let ``nothing detected lists nothing`` () =
+    Assert.Empty(GameAnalyzer.otherApisFrom "" [] true)
+    Assert.Empty(GameAnalyzer.detectGraphicsApis "")

@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.ViewModels
+namespace DLSS_5_MANAGER.ViewModels
 
 open System
 open System.IO
@@ -117,14 +117,35 @@ type GameCardViewModel(game: GameItem) =
     member this.DetectedApiText =
         match AnalysisStore.tryGet currentGame with
         | Some a when not (isNull (box a.GraphicsApi)) ->
-            match a.GraphicsApi with
-            | "dx12" -> "DX12"
-            | "dx11" -> "DX11"
-            | "dx10" -> "DX10"
-            | "dx9" -> "DX9"
-            | "vulkan" -> "VULKAN"
-            | "opengl" -> "OPENGL"
-            | _ -> ""
+            let primary =
+                match a.GraphicsApi with
+                | "dx12" -> "DX12"
+                | "dx11" -> "DX11"
+                | "dx10" -> "DX10"
+                | "dx9" -> "DX9"
+                | "vulkan" -> "VULKAN"
+                | "opengl" -> "OPENGL"
+                | _ -> ""
+
+            // A game that ships more than one API says so, the routing one
+            // first: "DX12 +2". The tooltip spells them all out.
+            let others = GameCardViewModel.OtherApis a
+            if primary <> "" && others.Length > 0 then sprintf "%s +%d" primary others.Length else primary
+        | _ -> ""
+
+    /// The APIs a game ships with besides the one SUITE routes by.
+    static member OtherApis(a: AnalysisStore.GameAnalysis) : string[] =
+        if isNull a.GraphicsApis then [||]
+        else a.GraphicsApis |> Array.filter (fun x -> not (String.IsNullOrWhiteSpace(x)) && x <> a.GraphicsApi)
+
+    static member ApiName(api: string) =
+        match api with
+        | "dx12" -> "DirectX 12"
+        | "dx11" -> "DirectX 11"
+        | "dx10" -> "DirectX 10"
+        | "dx9" -> "DirectX 9"
+        | "vulkan" -> "Vulkan"
+        | "opengl" -> "OpenGL"
         | _ -> ""
 
     member this.HasDetectedApi = this.DetectedApiText <> ""
@@ -146,8 +167,15 @@ type GameCardViewModel(game: GameItem) =
                 | _ -> ""
             | _ -> ""
 
+        let also =
+            match AnalysisStore.tryGet currentGame with
+            | Some a ->
+                let names = GameCardViewModel.OtherApis a |> Array.map GameCardViewModel.ApiName |> Array.filter (fun n -> n <> "")
+                if names.Length = 0 then "" else "  \u00B7  also ships " + String.Join(", ", names)
+            | None -> ""
+
         if full = "" then Localization.current.ApiTooltip + "  \u00B7  " + Localization.current.ApiUnknown
-        else Localization.current.ApiTooltip + "  \u00B7  " + full
+        else Localization.current.ApiTooltip + "  \u00B7  " + full + also
 
     /// The card's own copy of the installed badge text. The template cannot
     /// bind to MainViewModel.Loc from in here - see Localization.current.

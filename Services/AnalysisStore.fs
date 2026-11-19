@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Services
+namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -38,6 +38,9 @@ module AnalysisStore =
           /// its string data - a few hundred milliseconds a game, which is
           /// fine once during the scan and unacceptable per repaint.
           GraphicsApi: string
+          /// Every API the game ships with, the one above first. Display only -
+          /// routing reads GraphicsApi. Null on entries written before it existed.
+          GraphicsApis: string[]
           /// When this game was actually put on the machine, taken from the
           /// install folder's creation time.
           ///
@@ -278,6 +281,7 @@ module AnalysisStore =
           Dlss5Missing = dlss5.Missing
           ModInstalled = dlss5.ManagedByApp
           GraphicsApi = GameAnalyzer.detectGraphicsApi exePath
+          GraphicsApis = GameAnalyzer.detectGraphicsApis exePath
           InstalledAtUtc = installedAt game
           ReleaseDateUtc = releaseDate (storeClient.Force()) game
           AnalyzedAtUtc = DateTime.UtcNow.ToString("o") }
@@ -317,6 +321,7 @@ module AnalysisStore =
           Dlss5Missing = dlss5.Missing
           ModInstalled = dlss5.ManagedByApp
           GraphicsApi = GameAnalyzer.detectGraphicsApi exePath
+          GraphicsApis = GameAnalyzer.detectGraphicsApis exePath
           InstalledAtUtc = installedAt game
           ReleaseDateUtc = releaseDate (storeClient.Force()) game
           AnalyzedAtUtc = DateTime.UtcNow.ToString("o") }

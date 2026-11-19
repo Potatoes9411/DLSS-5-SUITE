@@ -3056,6 +3056,10 @@
                                         <Border Classes="DetectChip">
                                             <TextBlock Text="{Binding DetectedApiText}" Classes="DetectChipText" />
                                         </Border>
+                                        <Border Classes="DetectChip" IsVisible="{Binding HasOtherApis}"
+                                                ToolTip.Tip="The game ships these too. SUITE picks its route from the API on the left.">
+                                            <TextBlock Text="{Binding DetectedOtherApisText}" Classes="DetectChipText" Opacity="0.75" />
+                                        </Border>
                                         <Border Classes="DetectChip" IsVisible="{Binding HasDetectedArch}">
                                             <TextBlock Text="{Binding DetectedArchText}" Classes="DetectChipText" />
                                         </Border>

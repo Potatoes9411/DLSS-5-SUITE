@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Services
+namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -1273,6 +1273,22 @@ module GameAnalyzer =
 
     /// "dx12" / "vulkan" / "dx11" / "dx10" / "dx9" / "opengl", or "" when the
     /// executable gave nothing away.
+    /// The evidence for one executable, kept for as long as the file is the
+    /// same size and age, so the routing answer and the full list below read
+    /// it once between them.
+    let private apiEvidenceMemo =
+        System.Collections.Concurrent.ConcurrentDictionary<string, ApiEvidence>(StringComparer.OrdinalIgnoreCase)
+
+    let private apiEvidenceFor (exePath: string) (exeDir: string) : ApiEvidence =
+        let stamp =
+            try
+                let fi = FileInfo(exePath)
+                sprintf "%s|%d|%d" exePath fi.Length fi.LastWriteTimeUtc.Ticks
+            with _ ->
+                exePath
+
+        apiEvidenceMemo.GetOrAdd(stamp, fun _ -> collectApiEvidence exePath exeDir)
+
     let detectGraphicsApi (exePath: string) : string =
         try
             if String.IsNullOrWhiteSpace(exePath) || not (File.Exists(exePath)) then
@@ -1285,7 +1301,7 @@ module GameAnalyzer =
                 if String.IsNullOrWhiteSpace(exeDir) || not (Directory.Exists(exeDir)) then
                     ""
                 else
-                    let evidence = collectApiEvidence exePath exeDir
+                    let evidence = apiEvidenceFor exePath exeDir
 
                     // One passing mention and nothing else is noise, not an
                     // answer, so a candidate clears a full signal first. The
@@ -1347,6 +1363,46 @@ module GameAnalyzer =
         with _ ->
             ""
 
+
+    /// Every API a game ships with, for showing - the routing answer stays
+    /// `detectGraphicsApi`, which always comes first here. The others are
+    /// the ones that cleared the same noise floor; a Direct3D 9 or 10 path in
+    /// a 64-bit binary that also reaches a modern API is vestigial, so it is
+    /// left out the same way the routing answer leaves it out.
+    let otherApisFrom (primary: string) (candidates: string seq) (is64: bool) : string[] =
+        let cands = candidates |> Seq.filter (fun a -> not (String.IsNullOrWhiteSpace(a))) |> Seq.distinct |> Seq.toArray
+        let has api = cands |> Array.contains api
+        let modern = has "dx12" || has "dx11" || has "vulkan"
+
+        let keep api =
+            match api with
+            | "dx9"
+            | "dx10" -> not is64 || not modern
+            | _ -> true
+
+        let rest =
+            apiPriority
+            |> Array.filter (fun api -> api <> primary && has api && keep api)
+
+        if String.IsNullOrWhiteSpace(primary) then rest else Array.append [| primary |] rest
+
+    let detectGraphicsApis (exePath: string) : string[] =
+        try
+            let primary = detectGraphicsApi exePath
+
+            if String.IsNullOrWhiteSpace(exePath) || not (File.Exists(exePath)) then
+                [||]
+            else
+                let exeDir = Path.GetDirectoryName(exePath)
+                let evidence = apiEvidenceFor exePath exeDir
+
+                let clearing (tier: Dictionary<string, float>) =
+                    tier |> Seq.filter (fun kv -> kv.Value >= noiseFloor) |> Seq.map (fun kv -> kv.Key)
+
+                let candidates = Seq.append (clearing evidence.Binary) (clearing evidence.Folder)
+                otherApisFrom primary candidates (Pe.architecture exePath = "64")
+        with _ ->
+            [||]
 
     /// "32" / "64" straight from the COFF header's machine type - no loading
     /// and no guessing. Shares the header reader the API detection uses.
