@@ -20,6 +20,9 @@ type ScreenEngineViewModel() as this =
     let nsHost = new NeuralScreen.Host()
     let robloxHost = new RobloxShadeHost.Host()
     let gpuName, gpuTier = NeuralScreen.detect ()
+    /// How many frames NeuralScreen's frame generation (NVIDIA DLSS-G) can
+    /// make per real one on this card: 0 on RTX 30, 2 on RTX 40, 4 on RTX 50.
+    let fgCeiling = NeuralScreen.frameGenerationCeiling gpuTier
 
     // Which program runs DLSS 5 over the screen. The Screen Engine needs an
     // RTX 50 card; NeuralScreen covers RTX 30/40 (and 50, as a second choice).
@@ -63,6 +66,9 @@ type ScreenEngineViewModel() as this =
     // start, so each change restarts it - but only once the settings have been
     // still for a moment, so dragging a slider restarts it once, not per tick.
     let applyTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds(600.0))
+    // NeuralScreen rebuilds its worker for a new exposure, so a dragged slider
+    // sends one request once it has been still for a moment, not one per tick.
+    let exposureTimer = DispatcherTimer(Interval = TimeSpan.FromMilliseconds(600.0))
 
     // Which DLSS Frame Generation NVIDIA frame gen runs (Services/DlssgVersions.fs, shared with Motion Forge).
     // The engine reads it at start, so a running engine with NVIDIA frame gen on is restarted.
@@ -120,6 +126,9 @@ type ScreenEngineViewModel() as this =
         applyTimer.Tick.Add(fun _ ->
             applyTimer.Stop()
             if this.IsRunning then this.Start())
+        exposureTimer.Tick.Add(fun _ ->
+            exposureTimer.Stop()
+            if useNeuralScreen && nsHost.IsRunning then nsHost.SetExposure(extras) |> ignore)
 
         let onState (message: string) =
             Dispatcher.UIThread.Post(fun () ->
@@ -287,8 +296,7 @@ type ScreenEngineViewModel() as this =
                 Directory.CreateDirectory(NeuralScreen.dataDir ()) |> ignore
                 File.WriteAllText(methodPath (), if neuralScreen then "neuralscreen" else "engine")
              with _ -> ())
-            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsRobloxShadeHost"; "IsAvailable"; "CanStart"; "Status"; "IsNvidiaGenerator"; "IsForgeGenerator" ] do
-                this.RaisePropertyChanged(name)
+            this.RaiseMethodProperties()
             if wasRunning then this.Start()
 
     member this.SelectRobloxShadeHost() =
@@ -301,9 +309,16 @@ type ScreenEngineViewModel() as this =
                 Directory.CreateDirectory(NeuralScreen.dataDir ()) |> ignore
                 File.WriteAllText(methodPath (), "robloxshadehost")
              with _ -> ())
-            for name in [ "IsNeuralScreen"; "IsScreenEngine"; "IsRobloxShadeHost"; "IsAvailable"; "CanStart"; "Status"; "IsNvidiaGenerator"; "IsForgeGenerator" ] do
-                this.RaisePropertyChanged(name)
+            this.RaiseMethodProperties()
             if wasRunning then this.Start()
+
+    /// Everything that reads differently once the method changes.
+    member private this.RaiseMethodProperties() =
+        for name in
+            [ "IsNeuralScreen"; "IsScreenEngine"; "IsRobloxShadeHost"; "IsAvailable"; "CanStart"; "Status"; "IsNvidiaGenerator"; "IsForgeGenerator"
+              "SourceOptions"; "SelectedSourceIndex" ] do
+            this.RaisePropertyChanged(name)
+        this.RaiseToneProperties()
 
     member this.Status =
         if status <> "" then status
@@ -337,13 +352,14 @@ type ScreenEngineViewModel() as this =
     /// NeuralScreen takes most changes live, the way its own menu sends them;
     /// only a different monitor needs a restart.
     member private this.PushToNeuralScreen(before: Settings, after: Settings) =
-        if before.Source <> after.Source then this.ScheduleApply()
+        // A different monitor or model DLL is read once, when NeuralScreen starts.
+        if before.Source <> after.Source || before.Advanced.ModelFolder <> after.Advanced.ModelFolder then this.ScheduleApply()
         else
             if before.Intensity <> after.Intensity then nsHost.SetParam("intensity", after.Intensity) |> ignore
-            if before.LocalTone <> after.LocalTone then nsHost.SetParam("local_tone", after.LocalTone) |> ignore
             if before.LocalStructure <> after.LocalStructure then nsHost.SetParam("local_structure", after.LocalStructure) |> ignore
             if before.Skin <> after.Skin then nsHost.SetParam("skin_structure", NeuralScreen.skinOf after.Skin) |> ignore
             if before.Style <> after.Style then nsHost.SetStyle(NeuralScreen.styleOf after.Style) |> ignore
+            if before.AutoMask <> after.AutoMask then nsHost.SetAutoMask(after.AutoMask) |> ignore
             if before.Passes <> after.Passes then nsHost.SetPasses(after.Passes) |> ignore
             if before.Compare <> after.Compare then nsHost.SetSplit(NeuralScreen.splitOf after.Compare) |> ignore
             if before.NeuralRendering <> after.NeuralRendering then nsHost.ToggleNeuralRendering() |> ignore
@@ -376,11 +392,23 @@ type ScreenEngineViewModel() as this =
             if before.RecordingIndicator <> extras.RecordingIndicator then nsHost.ToggleRecordingIndicator() |> ignore
             if before.MotionBackend <> extras.MotionBackend then nsHost.SetMotionBackend(extras.MotionBackend) |> ignore
             if before.Gpu <> extras.Gpu then nsHost.SetGpu(extras.Gpu) |> ignore
+            if before.LocalTone <> extras.LocalTone then nsHost.SetParam("local_tone", extras.LocalTone) |> ignore
+            if before.Exposure <> extras.Exposure || before.LiftDarkScenes <> extras.LiftDarkScenes then
+                exposureTimer.Stop()
+                exposureTimer.Start()
+            // Read once at start: NeuralScreen is restarted for these.
+            if before.FlowPreset <> extras.FlowPreset || before.RecordAudio <> extras.RecordAudio then this.ScheduleApply()
+        this.RaiseExtrasProperties()
+
+    member private this.RaiseExtrasProperties() =
         for name in
             [ "Boost"; "WorkScale"; "WorkScaleText"; "WorkScalePercent"; "SkipStatic"; "Hdr"; "Spout"
               "FrameGeneration"; "FrameMultiplier"; "FrameMultiplierText"; "RecordingIndicator"
-              "SelectedMotionBackendIndex"; "NeuralScreenGpu"; "NeuralScreenGpuText" ] do
+              "SelectedMotionBackendIndex"; "NeuralScreenGpu"; "NeuralScreenGpuText"
+              "NsExposure"; "NsExposureText"; "LiftDarkScenes"; "SelectedFlowPresetIndex"; "UsesCpuFlow"; "RecordAudio"
+              "SelectedPerformanceIndex"; "PerformanceNote" ] do
             this.RaisePropertyChanged(name)
+        this.RaiseToneProperties()
 
     member this.Boost
         with get () = extras.Boost
@@ -411,18 +439,33 @@ type ScreenEngineViewModel() as this =
         with get () = extras.Spout
         and set (v: bool) = if v <> extras.Spout then this.ChangeExtras { extras with Spout = v }
 
+    /// NeuralScreen's frame generation, which only RTX 40 and 50 cards can run.
     member this.FrameGeneration
-        with get () = extras.FrameGeneration
-        and set (v: bool) = if v <> extras.FrameGeneration then this.ChangeExtras { extras with FrameGeneration = v }
+        with get () = extras.FrameGeneration && fgCeiling > 0
+        and set (v: bool) =
+            let v = v && fgCeiling > 0
+            if v <> extras.FrameGeneration then this.ChangeExtras { extras with FrameGeneration = v }
+
+    member _.CanNeuralScreenFrameGen = fgCeiling > 0
+    /// More than one frame between (3x, 4x): RTX 50 only.
+    member _.CanNeuralScreenMultiFrame = fgCeiling > 2
+    member _.FrameMultiplierMaximum = float (max 2 fgCeiling)
+
+    member _.NeuralScreenFrameGenNote =
+        match gpuTier with
+        | NeuralScreen.Rtx50 -> "NVIDIA DLSS Frame Generation, run by NeuralScreen: 2x to 4x on this RTX 50 card."
+        | NeuralScreen.RtxOlder s when s >= 40 -> sprintf "NVIDIA DLSS Frame Generation, run by NeuralScreen: 2x on RTX %d cards (3x and 4x are RTX 50 only)." s
+        | NeuralScreen.RtxOlder s -> sprintf "Not available on RTX %d cards: NeuralScreen's frame generation is NVIDIA DLSS Frame Generation, which NVIDIA runs on RTX 40 and 50 only." s
+        | _ -> "Not available on this card: NeuralScreen's frame generation is NVIDIA DLSS Frame Generation, for RTX 40 and 50 cards."
 
     member this.FrameMultiplier
-        with get () = float extras.FrameMultiplier
+        with get () = float (if fgCeiling > 0 then min fgCeiling extras.FrameMultiplier else extras.FrameMultiplier)
         and set (v: float) =
-            let times = int (Math.Round(Math.Clamp(v, 2.0, 4.0)))
+            let times = int (Math.Round(Math.Clamp(v, 2.0, float (max 2 fgCeiling))))
             if times <> extras.FrameMultiplier then this.ChangeExtras { extras with FrameMultiplier = times }
 
     member this.FrameMultiplierText
-        with get () = string extras.FrameMultiplier
+        with get () = string (int this.FrameMultiplier)
         and set (text: string) =
             ScreenEngineViewModel.Parse text |> Option.iter (fun value -> this.FrameMultiplier <- value)
             this.RaisePropertyChanged("FrameMultiplierText")
@@ -453,6 +496,75 @@ type ScreenEngineViewModel() as this =
             ScreenEngineViewModel.Parse text |> Option.iter (fun value -> this.NeuralScreenGpu <- value)
             this.RaisePropertyChanged("NeuralScreenGpuText")
 
+    // ----- NeuralScreen's brightness -----
+    /// The exposure DLSS 5 is told the picture has, as a percentage. 100% is
+    /// neutral, as the Screen Engine sends.
+    member this.NsExposure
+        with get () = extras.Exposure * 100.0
+        and set (v: float) =
+            let e = Math.Clamp(v, 50.0, 150.0) / 100.0
+            if abs (e - extras.Exposure) > 1e-6 then this.ChangeExtras { extras with Exposure = e }
+
+    member this.NsExposureText
+        with get () = sprintf "%.0f%%" (extras.Exposure * 100.0)
+        and set (text: string) =
+            ScreenEngineViewModel.Parse text |> Option.iter (fun value -> this.NsExposure <- value)
+            this.RaisePropertyChanged("NsExposureText")
+
+    /// NeuralScreen's own adaptive exposure: up to 10% more in dark scenes.
+    member this.LiftDarkScenes
+        with get () = extras.LiftDarkScenes
+        and set (v: bool) = if v <> extras.LiftDarkScenes then this.ChangeExtras { extras with LiftDarkScenes = v }
+
+    // ----- NeuralScreen's performance -----
+    member _.FlowPresetOptions = [ "Ultrafast (lightest)"; "Fast"; "Medium (finest)" ]
+
+    member this.SelectedFlowPresetIndex
+        with get () = NeuralScreen.flowPresets |> List.tryFindIndex ((=) extras.FlowPreset) |> Option.defaultValue 1
+        and set (index: int) =
+            if index >= 0 && index < NeuralScreen.flowPresets.Length && NeuralScreen.flowPresets.[index] <> extras.FlowPreset then
+                this.ChangeExtras { extras with FlowPreset = NeuralScreen.flowPresets.[index] }
+
+    /// The optical flow preset only matters while motion is found on the CPU.
+    member _.UsesCpuFlow = extras.MotionBackend = "cpu"
+
+    member this.RecordAudio
+        with get () = extras.RecordAudio
+        and set (v: bool) = if v <> extras.RecordAudio then this.ChangeExtras { extras with RecordAudio = v }
+
+    member _.PerformanceOptions = [ "Quality"; "Balanced"; "Performance" ]
+
+    /// Which bundle the controls match; -1 once one of them is set by hand.
+    member this.SelectedPerformanceIndex
+        with get () =
+            match NeuralScreen.performanceOf extras with
+            | Some NeuralScreen.Quality -> 0
+            | Some NeuralScreen.Balanced -> 1
+            | Some NeuralScreen.Speed -> 2
+            | None -> -1
+        and set (index: int) =
+            let chosen =
+                match index with
+                | 0 -> Some NeuralScreen.Quality
+                | 1 -> Some NeuralScreen.Balanced
+                | 2 -> Some NeuralScreen.Speed
+                | _ -> None
+            match chosen with
+            | Some p when NeuralScreen.performanceOf extras <> Some p ->
+                this.ChangeExtras(NeuralScreen.withPerformance p extras)
+                // Extra passes multiply the network's cost; the light bundles run one.
+                if p <> NeuralScreen.Quality && settings.Passes > 1 then this.Passes <- 1.0
+            | _ -> ()
+
+    member _.PerformanceNote =
+        let recommended =
+            match NeuralScreen.performanceFor gpuTier with
+            | NeuralScreen.Speed -> "Performance"
+            | NeuralScreen.Balanced -> "Balanced"
+            | NeuralScreen.Quality -> "Quality"
+        let custom = if (NeuralScreen.performanceOf extras).IsNone then " Your own settings are in use." else ""
+        sprintf "Recommended for this card: %s. Performance runs the network at half resolution with NVIDIA Optical Flow and skips unchanged frames, which suits RTX 30 cards.%s" recommended custom
+
     member private this.ScheduleApply() =
         if this.IsRunning then
             applyTimer.Stop()
@@ -469,7 +581,8 @@ type ScreenEngineViewModel() as this =
     /// Primary, all, then each monitor by the engine's own numbering.
     member _.SourceOptions =
         [ yield "Primary monitor"
-          yield "All monitors"
+          // NeuralScreen captures one monitor; given this it takes the first.
+          yield (if useNeuralScreen then "All monitors (Screen Engine only)" else "All monitors")
           yield! monitors |> List.mapi describe ]
 
     member _.SelectedSourceIndex
@@ -605,36 +718,39 @@ type ScreenEngineViewModel() as this =
                 this.RaisePropertyChanged("LocalStructureSlider")
 
 
+    /// Each method keeps its own local tone: NeuralScreen's reads brighter
+    /// at the same number, so its default is its own 0.5 rather than 1.0.
     member _.LocalTone
-        with get () = settings.LocalTone
+        with get () = if useNeuralScreen then extras.LocalTone else settings.LocalTone
         and set value =
-            if value <> settings.LocalTone then
-                this.Change { settings with LocalTone = value }
-                this.RaisePropertyChanged("LocalTone")
-                this.RaisePropertyChanged("LocalToneText")
-                this.RaisePropertyChanged("LocalToneSlider")
-                this.RaisePropertyChanged("KeepOriginalColours")
-                this.RaisePropertyChanged("ColoursUnlocked")
+            if value <> this.LocalTone then
+                if useNeuralScreen then this.ChangeExtras { extras with LocalTone = value }
+                else this.Change { settings with LocalTone = value }
+                this.RaiseToneProperties()
+
+    member private this.RaiseToneProperties() =
+        for name in [ "LocalTone"; "LocalToneText"; "LocalToneSlider"; "KeepOriginalColours"; "ColoursUnlocked" ] do
+            this.RaisePropertyChanged(name)
 
 
     /// Local tone is the one control that changes colour: the model's own
     /// LocalToneStrength, which both methods pass to NVIDIA's DLL. At zero it
     /// leaves the picture's colours exactly as they came in, and style has
     /// nothing to act on either, so the lock reads as one switch.
-    member _.KeepOriginalColours
-        with get () = settings.LocalTone = 0.0
+    member this.KeepOriginalColours
+        with get () = this.LocalTone = 0.0
         and set (on: bool) =
-            if on <> (settings.LocalTone = 0.0) then
+            if on <> (this.LocalTone = 0.0) then
                 if on then
-                    toneBeforeColourLock <- (if settings.LocalTone > 0.0 then settings.LocalTone else toneBeforeColourLock)
+                    toneBeforeColourLock <- (if this.LocalTone > 0.0 then this.LocalTone else toneBeforeColourLock)
                     this.LocalTone <- 0.0
                 else
-                    this.LocalTone <- (if toneBeforeColourLock > 0.0 then toneBeforeColourLock else 1.0)
+                    this.LocalTone <- (if toneBeforeColourLock > 0.0 then toneBeforeColourLock elif useNeuralScreen then NeuralScreen.NaturalLocalTone else 1.0)
                 this.RaisePropertyChanged("KeepOriginalColours")
                 this.RaisePropertyChanged("ColoursUnlocked")
 
     /// The tone and style rows are dead while the colours are locked.
-    member _.ColoursUnlocked = settings.LocalTone <> 0.0
+    member this.ColoursUnlocked = this.LocalTone <> 0.0
 
     member _.Passes
         with get () = float settings.Passes
@@ -1060,13 +1176,13 @@ type ScreenEngineViewModel() as this =
         and set (v: float) = if abs (v - this.LocalStructureSlider) > 1e-6 then this.LocalStructure <- v
 
     member this.LocalToneText
-        with get () = ScreenEngineViewModel.Show settings.LocalTone
+        with get () = ScreenEngineViewModel.Show this.LocalTone
         and set (text: string) =
             ScreenEngineViewModel.Parse text |> Option.iter (fun v -> this.LocalTone <- v)
             this.RaisePropertyChanged("LocalToneText")
 
     member this.LocalToneSlider
-        with get () = ScreenEngineViewModel.Within(settings.LocalTone, 0.0, 5.0)
+        with get () = ScreenEngineViewModel.Within(this.LocalTone, 0.0, 5.0)
         and set (v: float) = if abs (v - this.LocalToneSlider) > 1e-6 then this.LocalTone <- v
 
     member this.PassesText
@@ -1267,6 +1383,7 @@ type ScreenEngineViewModel() as this =
               "FrameMultiplier"; "FrameMultiplierText"; "RecordingIndicator"; "SelectedMotionBackendIndex"
               "NeuralScreenGpu"; "NeuralScreenGpuText"; "IntensitySlider"; "Window" ] do
             this.RaisePropertyChanged(name)
+        this.RaiseExtrasProperties()
         this.RaiseSettingProperties()
 
     member this.ResetToDefaults() =

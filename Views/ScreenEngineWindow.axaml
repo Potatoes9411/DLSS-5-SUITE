@@ -210,7 +210,8 @@
                                         <ComboBox Classes="GlassComboBox" ItemsSource="{Binding StyleOptions}"
                                                   SelectedIndex="{Binding SelectedStyleIndex, Mode=TwoWay}" MinWidth="150" Height="34" />
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding IsScreenEngine}">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
+                                                ToolTip.Tip="DLSS 5's own mask for faces and skin. Skin strength does nothing while it is off.">
                                         <TextBlock Text="Auto mask" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                         <ToggleSwitch IsChecked="{Binding AutoMask, Mode=TwoWay}" OnContent="" OffContent="" />
                                     </StackPanel>
@@ -304,6 +305,40 @@
                             <StackPanel Spacing="10" IsVisible="{Binding IsNeuralScreen}">
                                 <TextBlock Text="NEURALSCREEN" FontSize="11" FontWeight="Bold" Foreground="#94A3B8" />
 
+                                <Grid ColumnDefinitions="110,*" ColumnSpacing="10"
+                                      ToolTip.Tip="Sets Boost, work scale, motion, the optical flow preset and skipping unchanged frames together. Any of them can still be changed below.">
+                                    <TextBlock Grid.Column="0" Text="Performance" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding PerformanceOptions}" SelectedIndex="{Binding SelectedPerformanceIndex, Mode=TwoWay}"
+                                              PlaceholderText="Custom" Height="34" HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <TextBlock Text="{Binding PerformanceNote}" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+
+                                <Grid ColumnDefinitions="110,*,84" ColumnSpacing="10"
+                                      ToolTip.Tip="The exposure DLSS 5 is told the picture has. 100% is neutral, the same as the Screen Engine; lower it if the picture comes out too bright. Changing it restarts NeuralScreen's worker for a moment.">
+                                    <TextBlock Grid.Column="0" Text="Exposure" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="50" Maximum="150" Value="{Binding NsExposure, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="2" Text="{Binding NsExposureText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" MinWidth="0" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Brighten dark scenes" FontSize="12" Foreground="#CBD5E1" />
+                                        <TextBlock Text="NeuralScreen's adaptive exposure: up to 10% more in dark scenes, against noise in the shadows. Off keeps the exposure fixed, as the Screen Engine does." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding LiftDarkScenes, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                </Grid>
+                                <TextBlock Text="Local tone is kept apart for NeuralScreen (default 0.5, its own Natural setting): the same number lifts shadows more here than in the Screen Engine. Lower it, or the exposure, if a bright game such as Roblox looks washed out." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="Skin follows structure" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding SkinFollowsStructure, Mode=TwoWay}" OnContent="" OffContent="" />
+                                </Grid>
+                                <Grid ColumnDefinitions="110,*,84" ColumnSpacing="10" IsVisible="{Binding !SkinFollowsStructure}" IsEnabled="{Binding AutoMask}"
+                                      ToolTip.Tip="How much structure DLSS 5 adds to skin. Needs Auto mask on.">
+                                    <TextBlock Grid.Column="0" Text="Skin strength" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="0" Maximum="2" Value="{Binding SkinStrengthSlider, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="2" Text="{Binding SkinStrengthText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" MinWidth="0" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" />
+                                </Grid>
+
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                                     <StackPanel Grid.Column="0">
                                         <TextBlock Text="Boost" FontSize="12" Foreground="#CBD5E1" />
@@ -321,20 +356,27 @@
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                                     <StackPanel Grid.Column="0">
                                         <TextBlock Text="Frame generation" FontSize="12" Foreground="#CBD5E1" />
-                                        <TextBlock Text="Inserts generated frames between real ones." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding NeuralScreenFrameGenNote}" FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding FrameGeneration, Mode=TwoWay}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding FrameGeneration, Mode=TwoWay}" IsEnabled="{Binding CanNeuralScreenFrameGen}" OnContent="" OffContent="" VerticalAlignment="Center" />
                                 </Grid>
 
-                                <Grid ColumnDefinitions="110,*,84" ColumnSpacing="10" IsEnabled="{Binding FrameGeneration}">
+                                <Grid ColumnDefinitions="110,*,84" ColumnSpacing="10" IsVisible="{Binding CanNeuralScreenMultiFrame}" IsEnabled="{Binding FrameGeneration}">
                                     <TextBlock Grid.Column="0" Text="Frames x" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
-                                    <Slider Grid.Column="1" Minimum="2" Maximum="4" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FrameMultiplier, Mode=TwoWay}" VerticalAlignment="Center" />
+                                    <Slider Grid.Column="1" Minimum="2" Maximum="{Binding FrameMultiplierMaximum}" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding FrameMultiplier, Mode=TwoWay}" VerticalAlignment="Center" />
                                     <TextBox Grid.Column="2" Text="{Binding FrameMultiplierText, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Height="30" MinHeight="30" MinWidth="0" Padding="6,4" FontSize="12" HorizontalContentAlignment="Right" VerticalAlignment="Center" />
                                 </Grid>
+                                <TextBlock Text="SUITE's own generators (SUITE blend, SMFG, SMT, SMAI, XeSS MFG, FSR 3.1, MEMC, DIS, Spacewarp and the rest) run inside the Screen Engine and are not offered here: NeuralScreen's picture is hidden from screen capture so it never processes itself, so no other program can pick it up to add frames to it."
+                                           FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
 
                                 <Grid ColumnDefinitions="110,*" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="Motion" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
-                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding MotionBackendOptions}" SelectedIndex="{Binding SelectedMotionBackendIndex, Mode=TwoWay}" Height="34" HorizontalAlignment="Stretch" ToolTip.Tip="NVIDIA Optical Flow is faster where the driver offers it; it falls back to the CPU on its own." />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding MotionBackendOptions}" SelectedIndex="{Binding SelectedMotionBackendIndex, Mode=TwoWay}" Height="34" HorizontalAlignment="Stretch" ToolTip.Tip="NVIDIA Optical Flow finds the motion on the card (RTX 20 and newer) and takes that work off the CPU; it falls back to the CPU on its own." />
+                                </Grid>
+                                <Grid ColumnDefinitions="110,*" ColumnSpacing="10" IsVisible="{Binding UsesCpuFlow}"
+                                      ToolTip.Tip="How hard the CPU looks for the motion. Ultrafast is lightest. NeuralScreen restarts to change it.">
+                                    <TextBlock Grid.Column="0" Text="Optical flow" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <ComboBox Grid.Column="1" Classes="GlassComboBox" ItemsSource="{Binding FlowPresetOptions}" SelectedIndex="{Binding SelectedFlowPresetIndex, Mode=TwoWay}" Height="34" HorizontalAlignment="Stretch" />
                                 </Grid>
 
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
@@ -352,6 +394,10 @@
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="Recording indicator" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
                                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding RecordingIndicator, Mode=TwoWay}" OnContent="" OffContent="" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <TextBlock Grid.Column="0" Text="Record sound" FontSize="12" Foreground="#CBD5E1" VerticalAlignment="Center" />
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding RecordAudio, Mode=TwoWay}" OnContent="" OffContent="" ToolTip.Tip="Recordings carry the system sound. NeuralScreen restarts to change it." />
                                 </Grid>
 
                                 <Grid ColumnDefinitions="110,*,84" ColumnSpacing="10">
@@ -382,7 +428,7 @@
                                     <Button Grid.Column="2" Content="Open" Click="OnScreenEngineOpenCaptureFolderClicked" />
                                 </Grid>
                                 <TextBlock Text="Screenshots, recordings and sweep comparisons are saved here." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
-                                <StackPanel Spacing="8" IsVisible="{Binding IsScreenEngine}">
+                                <StackPanel Spacing="8">
                                 <TextBlock Text="DLSS 5 model folder (nvngx_dlssnr.dll)" FontSize="11.5" FontWeight="SemiBold" Foreground="#94A3B8" />
                                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                     <TextBox Grid.Column="0" Text="{Binding ModelFolder, Mode=TwoWay}" PlaceholderText="Bundled: mod files\dlss 5" Height="34" />
@@ -390,6 +436,7 @@
                                     <Button Grid.Column="2" Content="Use bundled" Click="OnScreenEngineBundledModelClicked" />
                                 </Grid>
                                 <TextBlock Text="Empty loads the DLL SUITE bundles. Pick another folder to try a different nvngx_dlssnr.dll; the bundled file is never changed." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                <TextBlock IsVisible="{Binding IsNeuralScreen}" Text="NeuralScreen loads the DLL from this folder too, when it holds one; otherwise it uses its own. Changing it restarts NeuralScreen." FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
                                 </StackPanel>
                             </StackPanel>
 
@@ -471,6 +518,7 @@
                                        TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
                             </StackPanel>
                             <TextBlock IsVisible="{Binding IsNeuralScreen}" TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" Text="NeuralScreen runs in the background; every change here applies to the picture straight away. Needs an RTX 30, 40 or 50 series card and a current NVIDIA driver. Passes run the model up to four times on its own result; each extra pass costs frame rate." />
+                            <TextBlock IsVisible="{Binding IsNeuralScreen}" TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" Text="Screen Engine only, so hidden here: showing the picture on another monitor, capturing all monitors at once, super resolution, VSync, SUITE's frame generators, comparison sweeps and the advanced engine options. NeuralScreen presents without waiting for VSync." />
                             <TextBlock IsVisible="{Binding IsNeuralScreen}" TextWrapping="Wrap" Foreground="#FBBF24" FontSize="11" Text="One-window capture in NeuralScreen needs the screen to be driven by the NVIDIA card. On laptops whose screen runs through the integrated GPU it can only process the whole screen - use the Screen Engine tab for a single window there." />
                         </StackPanel>
                     </Border>

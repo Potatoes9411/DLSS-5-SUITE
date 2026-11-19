@@ -396,3 +396,91 @@ let ``NeuralScreen values stay inside its own ranges`` () =
     Assert.Equal(1.5, NeuralScreen.clampParam "local_structure" 20.0)
     Assert.Equal(1.0, NeuralScreen.clampParam "intensity" 3.0)
     Assert.Equal(-1.0, NeuralScreen.skinOf FollowStructure)
+
+// ---------------------------------------------------------------------------
+// NeuralScreen: what SUITE asks of it
+// ---------------------------------------------------------------------------
+
+[<Fact>]
+let ``NeuralScreen shows the original picture for Original only`` () =
+    Assert.Equal(0.0, NeuralScreen.splitOf CompareOff)
+    Assert.Equal(0.5, NeuralScreen.splitOf CompareSplit)
+    Assert.Equal(1.0, NeuralScreen.splitOf CompareOriginal)
+
+[<Fact>]
+let ``NeuralScreen frame generation is offered only where DLSS-G runs`` () =
+    Assert.Equal(0, NeuralScreen.frameGenerationCeiling (NeuralScreen.RtxOlder 30))
+    Assert.Equal(2, NeuralScreen.frameGenerationCeiling (NeuralScreen.RtxOlder 40))
+    Assert.Equal(4, NeuralScreen.frameGenerationCeiling NeuralScreen.Rtx50)
+    Assert.Equal(0, NeuralScreen.frameGenerationCeiling NeuralScreen.Rtx20)
+    let asked = { NeuralScreen.extrasDefaults with FrameGeneration = true; FrameMultiplier = 4 }
+    Assert.False((NeuralScreen.forCard (NeuralScreen.RtxOlder 30) asked).FrameGeneration)
+    let ada = NeuralScreen.forCard (NeuralScreen.RtxOlder 40) asked
+    Assert.True(ada.FrameGeneration)
+    Assert.Equal(2, ada.FrameMultiplier)
+    Assert.Equal(4, (NeuralScreen.forCard NeuralScreen.Rtx50 asked).FrameMultiplier)
+
+[<Fact>]
+let ``an RTX 30 card starts NeuralScreen on the performance bundle`` () =
+    Assert.Equal(NeuralScreen.Speed, NeuralScreen.performanceFor (NeuralScreen.RtxOlder 30))
+    Assert.Equal(NeuralScreen.Balanced, NeuralScreen.performanceFor (NeuralScreen.RtxOlder 40))
+    Assert.Equal(NeuralScreen.Quality, NeuralScreen.performanceFor NeuralScreen.Rtx50)
+    let rtx30 = NeuralScreen.defaultsFor (NeuralScreen.RtxOlder 30)
+    Assert.True(rtx30.Boost)
+    Assert.Equal(0.5, rtx30.WorkScale)
+    Assert.True(rtx30.SkipStatic)
+    Assert.Equal("nvofa", rtx30.MotionBackend)
+    Assert.Equal("ultrafast", rtx30.FlowPreset)
+    Assert.False(rtx30.FrameGeneration)
+    Assert.Equal(Some NeuralScreen.Speed, NeuralScreen.performanceOf rtx30)
+    Assert.Equal(None, NeuralScreen.performanceOf { rtx30 with WorkScale = 0.42 })
+
+[<Fact>]
+let ``NeuralScreen defaults to its own local tone and a neutral exposure`` () =
+    let d = NeuralScreen.extrasDefaults
+    Assert.Equal(NeuralScreen.NaturalLocalTone, d.LocalTone)
+    Assert.Equal(0.5, d.LocalTone)
+    Assert.Equal(1.0, d.Exposure)
+    Assert.False(d.LiftDarkScenes)
+    Assert.Equal<(string * string) list>(
+        [ "NS_PW", "1"; "NS_PW_MIN", "1.0000"; "NS_PW_MAX", "1.0000" ], NeuralScreen.exposureEnv d)
+    Assert.Equal<(string * string) list>(
+        [ "NS_PW", "1"; "NS_PW_MIN", "0.8000"; "NS_PW_MAX", "0.8800" ],
+        NeuralScreen.exposureEnv { d with Exposure = 0.8; LiftDarkScenes = true })
+
+[<Fact>]
+let ``NeuralScreen extras are pulled back into range`` () =
+    let wild =
+        { NeuralScreen.extrasDefaults with
+            LocalTone = 9.0; Exposure = 0.0; FlowPreset = null; WorkScale = nan; MotionBackend = "gpu" }
+    let e = NeuralScreen.normalizeExtras wild
+    Assert.Equal(1.5, e.LocalTone)
+    Assert.Equal(0.5, e.Exposure)
+    Assert.Equal("fast", e.FlowPreset)
+    Assert.Equal(1.0, e.WorkScale)
+    Assert.Equal("cpu", e.MotionBackend)
+
+[<Fact>]
+let ``NeuralScreen settings saved by an older SUITE are brought up to date once`` () =
+    // What 1.3.0 wrote: no local tone, exposure, flow preset, sound or version.
+    let old =
+        """{"Boost":true,"WorkScale":1.0,"SkipStatic":false,"Hdr":false,"Spout":false,"FrameGeneration":true,"FrameMultiplier":3,"RecordingIndicator":false,"MotionBackend":"cpu","Gpu":0}"""
+    let path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), sprintf "suite-ns-extras-%s.json" (System.Guid.NewGuid().ToString("N")))
+    try
+        System.IO.File.WriteAllText(path, old)
+        let e = (NeuralScreen.loadExtrasFor (NeuralScreen.RtxOlder 30) path).Value
+        Assert.Equal(NeuralScreen.ExtrasVersion, e.Version)
+        Assert.Equal(0.5, e.LocalTone)
+        Assert.Equal(1.0, e.Exposure)
+        Assert.True(e.RecordAudio)
+        Assert.Equal(0.5, e.WorkScale)
+        Assert.Equal("nvofa", e.MotionBackend)
+        // Choices that are not part of the bundle are kept.
+        Assert.False(e.RecordingIndicator)
+        // Once current, a file is read as it is.
+        NeuralScreen.saveExtrasTo path { e with WorkScale = 0.8; LocalTone = 1.2 }
+        let again = (NeuralScreen.loadExtrasFor (NeuralScreen.RtxOlder 30) path).Value
+        Assert.Equal(0.8, again.WorkScale)
+        Assert.Equal(1.2, again.LocalTone)
+    finally
+        try System.IO.File.Delete path with _ -> ()

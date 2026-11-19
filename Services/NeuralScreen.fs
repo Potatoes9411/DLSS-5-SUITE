@@ -141,10 +141,56 @@ module NeuralScreen =
         | ScreenEngine.FollowStructure -> -1.0
         | ScreenEngine.SkinStrength v -> clampParam "skin_structure" v
 
+    /// The share of the picture NeuralScreen leaves unprocessed, from the left.
+    /// "Original only" is all of it; it used to send 0 and show the processed
+    /// picture instead.
     let splitOf (compare: ScreenEngine.Compare) =
         match compare with
         | ScreenEngine.CompareSplit -> 0.5
-        | _ -> 0.0
+        | ScreenEngine.CompareOriginal -> 1.0
+        | ScreenEngine.CompareOff -> 0.0
+
+    // =====================================================================
+    // FRAME GENERATION
+    // =====================================================================
+    /// NeuralScreen's frame generation is NVIDIA DLSS Frame Generation
+    /// (native/frame_generation.inl, nvngx_dlssg.dll) and nothing else. NVIDIA
+    /// runs it on RTX 40 (one frame between, 2x) and RTX 50 (up to three, 4x
+    /// here); an RTX 30 card is refused when the feature is created, and the
+    /// worker then quietly shows the plain picture. 0 means it cannot run.
+    let frameGenerationCeiling (tier: GpuTier) =
+        match tier with
+        | Rtx50 -> 4
+        | RtxOlder s when s >= 40 -> 2
+        | _ -> 0
+
+    // =====================================================================
+    // PERFORMANCE
+    // =====================================================================
+    /// How much of the card NeuralScreen asks for. Each is a bundle of the
+    /// controls below; picking one only sets them.
+    type Performance =
+        | Quality
+        | Balanced
+        | Speed
+
+    /// RTX 30 cards get the light bundle: the network at full resolution is
+    /// what makes NeuralScreen lag on them.
+    let performanceFor (tier: GpuTier) =
+        match tier with
+        | RtxOlder s when s < 40 -> Speed
+        | RtxOlder _ -> Balanced
+        | _ -> Quality
+
+    /// NeuralScreen's own local tone default (its "Natural" profile). Upstream
+    /// halved it from 1.0 because local tone mapping lifts shadows and flattens
+    /// contrast - the over-bright picture - on top of NeuralScreen's exposure.
+    [<Literal>]
+    let NaturalLocalTone = 0.5
+
+    /// Bumped when Extras gains fields: older files are brought up to date once.
+    [<Literal>]
+    let ExtrasVersion = 2
 
     /// The controls NeuralScreen has and the Screen Engine does not. They are
     /// kept beside SUITE's own settings rather than inside ScreenEngine.Settings,
@@ -169,7 +215,22 @@ module NeuralScreen =
           /// "cpu" or "nvofa" (NVIDIA Optical Flow).
           MotionBackend: string
           /// Index of the graphics adapter NeuralScreen runs on.
-          Gpu: int }
+          Gpu: int
+          /// NeuralScreen's own local tone. Kept apart from the Screen
+          /// Engine's: the same number reads brighter through NeuralScreen.
+          LocalTone: float
+          /// The exposure DLSS 5 is told the picture has (the worker's
+          /// DLSS.Exposure.Scale). 1.0 is neutral, as the Screen Engine sends.
+          Exposure: float
+          /// NeuralScreen's adaptive exposure: up to 10% more in dark scenes.
+          LiftDarkScenes: bool
+          /// The CPU optical flow preset: "ultrafast", "fast" or "medium".
+          FlowPreset: string
+          /// Recordings carry the system sound.
+          RecordAudio: bool
+          /// ExtrasVersion of the file this came from; 0 for files from
+          /// before the field existed.
+          Version: int }
 
     let extrasDefaults =
         { Boost = true
@@ -180,34 +241,107 @@ module NeuralScreen =
           FrameGeneration = false
           FrameMultiplier = 2
           RecordingIndicator = true
-          MotionBackend = "cpu"
-          Gpu = 0 }
+          MotionBackend = "nvofa"
+          Gpu = 0
+          LocalTone = NaturalLocalTone
+          Exposure = 1.0
+          LiftDarkScenes = false
+          FlowPreset = "fast"
+          RecordAudio = true
+          Version = ExtrasVersion }
+
+    let flowPresets = [ "ultrafast"; "fast"; "medium" ]
 
     let normalizeExtras (e: Extras) =
+        let finite fallback value = if Double.IsFinite value then value else fallback
         { e with
-            WorkScale = Math.Clamp((if Double.IsFinite e.WorkScale then e.WorkScale else 1.0), 0.1, 1.0)
+            WorkScale = Math.Clamp(finite 1.0 e.WorkScale, 0.1, 1.0)
             FrameMultiplier = Math.Clamp(e.FrameMultiplier, 2, 4)
             MotionBackend = (if e.MotionBackend = "nvofa" then "nvofa" else "cpu")
-            Gpu = max 0 e.Gpu }
+            Gpu = max 0 e.Gpu
+            LocalTone = clampParam "local_tone" (finite NaturalLocalTone e.LocalTone)
+            Exposure = Math.Clamp(finite 1.0 e.Exposure, 0.5, 1.5)
+            FlowPreset = (if List.contains e.FlowPreset flowPresets then e.FlowPreset else "fast") }
+
+    /// The controls a performance bundle sets; everything else is left alone.
+    let withPerformance (performance: Performance) (e: Extras) =
+        match performance with
+        | Speed ->
+            { e with Boost = true; WorkScale = 0.5; SkipStatic = true; MotionBackend = "nvofa"; FlowPreset = "ultrafast"; FrameGeneration = false }
+        | Balanced ->
+            { e with Boost = true; WorkScale = 0.75; SkipStatic = true; MotionBackend = "nvofa"; FlowPreset = "fast" }
+        | Quality ->
+            { e with Boost = true; WorkScale = 1.0; SkipStatic = false; MotionBackend = "nvofa"; FlowPreset = "fast" }
+
+    /// Which bundle the controls match now, if any.
+    let performanceOf (e: Extras) =
+        [ Quality; Balanced; Speed ]
+        |> List.tryFind (fun p ->
+            let bundled = withPerformance p e
+            bundled.Boost = e.Boost && bundled.WorkScale = e.WorkScale && bundled.SkipStatic = e.SkipStatic
+            && bundled.MotionBackend = e.MotionBackend && bundled.FlowPreset = e.FlowPreset
+            && (p <> Speed || not e.FrameGeneration))
+
+    /// A first start on this card: its bundle on top of the defaults.
+    let defaultsFor (tier: GpuTier) = withPerformance (performanceFor tier) extrasDefaults
+
+    /// A file written before ExtrasVersion: the fields it lacks read as zero
+    /// (a local tone of 0 would lock the colours, an exposure of 0 is black),
+    /// and its work scale was SUITE's old 100%, which is what lagged on RTX 30.
+    let upgradeExtras (tier: GpuTier) (e: Extras) =
+        if e.Version >= ExtrasVersion then e
+        else
+            { withPerformance (performanceFor tier) e with
+                LocalTone = NaturalLocalTone
+                Exposure = 1.0
+                LiftDarkScenes = false
+                RecordAudio = true
+                Version = ExtrasVersion }
+
+    /// What the card can actually do: no frame generation on RTX 30, one
+    /// frame between on RTX 40.
+    let forCard (tier: GpuTier) (e: Extras) =
+        match frameGenerationCeiling tier with
+        | 0 -> { e with FrameGeneration = false }
+        | ceiling -> { e with FrameMultiplier = min ceiling e.FrameMultiplier }
+
+    /// The worker's NS_PW_* environment: Exposure in lit scenes, and with the
+    /// lift on up to 10% more in dark ones (NeuralScreen's own 1.0 to 1.1).
+    let exposureEnv (e: Extras) =
+        let low = e.Exposure
+        let high = if e.LiftDarkScenes then e.Exposure * 1.10 else e.Exposure
+        let show (v: float) = v.ToString("0.0000", CultureInfo.InvariantCulture)
+        [ "NS_PW", "1"; "NS_PW_MIN", show low; "NS_PW_MAX", show high ]
+
+    let private cardTier = lazy (snd (detect ()))
 
     let private extrasPath () = Path.Combine(dataDir (), "suite-extras.json")
 
-    let loadExtrasFrom (path: string) =
+    let loadExtrasFor (tier: GpuTier) (path: string) =
         try
             if File.Exists(path) then
-                Some(normalizeExtras (JsonSerializer.Deserialize<Extras>(File.ReadAllText(path))))
+                Some(normalizeExtras (upgradeExtras tier (JsonSerializer.Deserialize<Extras>(File.ReadAllText(path)))))
             else None
         with _ -> None
+
+    let loadExtrasFrom (path: string) = loadExtrasFor cardTier.Value path
 
     let saveExtrasTo (path: string) (e: Extras) =
         try
             Directory.CreateDirectory(Path.GetDirectoryName(path)) |> ignore
-            File.WriteAllText(path, JsonSerializer.Serialize(normalizeExtras e))
+            File.WriteAllText(path, JsonSerializer.Serialize(normalizeExtras { e with Version = ExtrasVersion }))
         with ex ->
             AppLog.error "Saving NeuralScreen settings failed" ex
 
-    let loadExtras () = loadExtrasFrom (extrasPath ()) |> Option.defaultValue extrasDefaults
+    let loadExtras () = loadExtrasFrom (extrasPath ()) |> Option.defaultWith (fun () -> defaultsFor cardTier.Value)
     let saveExtras (e: Extras) = saveExtrasTo (extrasPath ()) e
+
+    /// The model DLL a folder holds, for NeuralScreen's nr_dll; "" is its own.
+    let modelDll (folder: string) =
+        if String.IsNullOrWhiteSpace folder then None
+        else
+            let dll = Path.Combine(folder.Trim(), "nvngx_dlssnr.dll")
+            if File.Exists dll then Some dll else None
 
     /// The extras NeuralScreen is started with: the shared ones, or a game's
     /// when its preset is in use. Set by the Screen Engine card.
@@ -244,17 +378,27 @@ module NeuralScreen =
         set "fullscreen" (JsonValue.Create(true))
         if isNull cfg.["warmup"] then set "warmup" (JsonValue.Create(120))
         set "profile" (JsonValue.Create("Natural"))
+        // The NeuralScreen-only controls. Each of these is read once when it
+        // starts; while it runs the same values go through the bridge instead.
+        // What the card cannot run (frame generation on RTX 30) is not asked for.
+        let extras = forCard cardTier.Value (normalizeExtras (activeExtras |> Option.defaultWith loadExtras))
         set "intensity" (JsonValue.Create(clampParam "intensity" s.Intensity))
-        set "local_tone" (JsonValue.Create(clampParam "local_tone" s.LocalTone))
+        // NeuralScreen's own tone, not the Screen Engine's (see Extras.LocalTone).
+        set "local_tone" (JsonValue.Create(extras.LocalTone))
         set "local_structure" (JsonValue.Create(clampParam "local_structure" s.LocalStructure))
         set "skin_structure" (JsonValue.Create(skinOf s.Skin))
         set "style" (JsonValue.Create(styleOf s.Style))
+        // Read by the bridge's settings_io patch; every built-in profile has it on.
+        set "auto_mask" (JsonValue.Create(if s.AutoMask then 1 else 0))
         set "passes" (JsonValue.Create(Math.Clamp(s.Passes, 1, 4)))
         set "split" (JsonValue.Create(splitOf s.Compare))
         set "screenshot_dir" (JsonValue.Create(captureFolder))
-        // The NeuralScreen-only controls. Each of these is read once when it
-        // starts; while it runs the same values go through the bridge instead.
-        let extras = normalizeExtras (activeExtras |> Option.defaultWith loadExtras)
+        // The model folder the Screen Engine uses, for NeuralScreen's NS_NR_DLL.
+        match modelDll s.Advanced.ModelFolder with
+        | Some dll -> set "nr_dll" (JsonValue.Create(dll))
+        | None -> cfg.Remove("nr_dll") |> ignore
+        set "flow_preset" (JsonValue.Create(extras.FlowPreset))
+        set "record_audio" (JsonValue.Create(extras.RecordAudio))
         set "nr_small" (JsonValue.Create(extras.Boost))
         set "work_scale" (JsonValue.Create(extras.WorkScale))
         set "skip_static" (JsonValue.Create(extras.SkipStatic))
@@ -412,6 +556,9 @@ module NeuralScreen =
                         psi.ArgumentList.Add(a)
                     psi.Environment.["NS_SUITE_INBOX"] <- inboxDir ()
                     psi.Environment.["NS_SUITE_OUTBOX"] <- outboxDir ()
+                    // The worker reads its exposure from the environment once.
+                    for key, value in exposureEnv (normalizeExtras (activeExtras |> Option.defaultWith loadExtras)) do
+                        psi.Environment.[key] <- value
                     let p = new Process(StartInfo = psi, EnableRaisingEvents = true)
                     p.Exited.Add(fun _ ->
                         if not stopping then
@@ -458,6 +605,18 @@ module NeuralScreen =
         member _.ToggleSpout() = action [ JsonValue.Create("toggle"); JsonValue.Create("spout") ]
         member _.ToggleFrameGeneration() = action [ JsonValue.Create("toggle"); JsonValue.Create("frame_generation") ]
         member _.ToggleRecordingIndicator() = action [ JsonValue.Create("toggle"); JsonValue.Create("rec_indicator") ]
+
+        /// The auto mask has its own request: the wire carries it as an integer.
+        member _.SetAutoMask(on: bool) =
+            send (JsonObject([ Collections.Generic.KeyValuePair("auto_mask", JsonValue.Create(if on then 1 else 0) :> JsonNode) ]))
+
+        /// Exposure in lit and dark scenes; the bridge restarts the worker with it.
+        member _.SetExposure(e: Extras) =
+            let env = exposureEnv (normalizeExtras e) |> dict
+            let arr = JsonArray()
+            arr.Add(JsonValue.Create(Double.Parse(env.["NS_PW_MIN"], CultureInfo.InvariantCulture)))
+            arr.Add(JsonValue.Create(Double.Parse(env.["NS_PW_MAX"], CultureInfo.InvariantCulture)))
+            send (JsonObject([ Collections.Generic.KeyValuePair("exposure", arr :> JsonNode) ]))
 
         member _.SetWorkScale(scale: float) =
             action [ JsonValue.Create("nr_res"); JsonValue.Create(Math.Clamp(scale, 0.1, 1.0)) ]
