@@ -55,6 +55,63 @@ type App() =
         with ex ->
             DLSS_5_MANAGER.Services.AppLog.error "Setting up the tray icon" ex
 
+    /// Opens the window where it last was, and remembers where it is when it
+    /// closes. Only the normal (not maximised) size and place are kept, plus
+    /// whether it was maximised.
+    member private this.SetUpPlacement(window: MainWindow) =
+        let normal: DLSS_5_MANAGER.Services.WindowPlacement.Saved option ref = ref None
+
+        match DLSS_5_MANAGER.Services.WindowPlacement.load () with
+        | Some saved ->
+            window.Width <- saved.Width
+            window.Height <- saved.Height
+            window.WindowStartupLocation <- WindowStartupLocation.Manual
+            window.Position <- PixelPoint(saved.X, saved.Y)
+            normal.Value <- Some { saved with Maximized = false }
+
+            window.Opened.Add(fun _ ->
+                // Off every screen now (a monitor was unplugged): centre it.
+                let areas =
+                    try
+                        [ for s in window.Screens.All ->
+                              let a = s.WorkingArea
+                              (a.X, a.Y, a.Width, a.Height) ]
+                    with _ -> []
+
+                if not areas.IsEmpty && not (DLSS_5_MANAGER.Services.WindowPlacement.isReachable areas saved) then
+                    match window.Screens.Primary with
+                    | null -> ()
+                    | primary ->
+                        let a = primary.WorkingArea
+                        let scale = primary.Scaling
+                        let w = int (window.Width * scale)
+                        let h = int (window.Height * scale)
+                        window.Position <- PixelPoint(a.X + max 0 ((a.Width - w) / 2), a.Y + max 0 ((a.Height - h) / 2))
+
+                if saved.Maximized && window.WindowState = WindowState.Normal then
+                    window.WindowState <- WindowState.Maximized)
+        | None -> ()
+
+        let remember () =
+            if window.WindowState = WindowState.Normal && window.IsVisible then
+                normal.Value <-
+                    Some
+                        { X = window.Position.X
+                          Y = window.Position.Y
+                          Width = window.Width
+                          Height = window.Height
+                          Maximized = false }
+
+        window.PositionChanged.Add(fun _ -> remember ())
+        window.Resized.Add(fun _ -> remember ())
+
+        window.Closing.Add(fun _ ->
+            remember ()
+            match normal.Value with
+            | Some n ->
+                DLSS_5_MANAGER.Services.WindowPlacement.save { n with Maximized = (window.WindowState = WindowState.Maximized) }
+            | None -> ())
+
     override this.OnFrameworkInitializationCompleted() =
         match this.ApplicationLifetime with
         | :? IClassicDesktopStyleApplicationLifetime as desktop ->
@@ -69,6 +126,7 @@ type App() =
             // window leaves it running; the app ends with the last window.
             desktop.ShutdownMode <- Avalonia.Controls.ShutdownMode.OnLastWindowClose
             let window = MainWindow(DataContext = vm)
+            this.SetUpPlacement(window)
             vm.ScreenEngine.ControlsRequested.Add(fun () ->
                 Avalonia.Threading.Dispatcher.UIThread.Post(fun () -> window.ToggleScreenEngineOverlay()))
             // Started by the Start with Windows shortcut: come up minimized,

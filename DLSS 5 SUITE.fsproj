@@ -61,6 +61,7 @@
     <Compile Include="Models\MotionOptions.fs" />
     <Compile Include="Services\AppLog.fs" />
     <Compile Include="Services\WindowsStartup.fs" />
+    <Compile Include="Services\WindowPlacement.fs" />
     <Compile Include="Services\DiscordPresence.fs" />
     <Compile Include="Services\MenuSound.fs" />
     <Compile Include="Services\TestBridge.fs" />
