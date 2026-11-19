@@ -178,7 +178,12 @@ echo "--- packaging portable ZIP ---"
 # Compress-Archive gave up on the first file Windows touched while it ran (a
 # shader briefly locked, a desktop.ini that vanished). ZipFile reads each file
 # once, and a failed attempt is retried from scratch up to three times.
-powershell -NoProfile -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; \$ok = \$false; for (\$i = 1; \$i -le 3 -and -not \$ok; \$i++) { try { if (Test-Path '$PORTABLE_TARGET') { Remove-Item '$PORTABLE_TARGET' -Force }; [IO.Compression.ZipFile]::CreateFromDirectory('$APP/publish', '$PORTABLE_TARGET', [IO.Compression.CompressionLevel]::Optimal, \$false); \$ok = \$true } catch { Write-Host ('portable zip attempt ' + \$i + ' failed: ' + \$_.Exception.Message); Start-Sleep -Seconds 5 } }; if (-not \$ok) { exit 1 }"
+# PowerShell 7 (.NET 8) is used when present: Windows PowerShell's .NET
+# Framework ZipFile stores some paths with backslashes, which other zip
+# readers (the web setup among them) take as part of the file name.
+PS_ZIP=powershell
+command -v pwsh >/dev/null 2>&1 && PS_ZIP=pwsh
+"$PS_ZIP" -NoProfile -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; \$ok = \$false; for (\$i = 1; \$i -le 3 -and -not \$ok; \$i++) { try { if (Test-Path '$PORTABLE_TARGET') { Remove-Item '$PORTABLE_TARGET' -Force }; [IO.Compression.ZipFile]::CreateFromDirectory('$APP/publish', '$PORTABLE_TARGET', [IO.Compression.CompressionLevel]::Optimal, \$false); \$ok = \$true } catch { Write-Host ('portable zip attempt ' + \$i + ' failed: ' + \$_.Exception.Message); Start-Sleep -Seconds 5 } }; if (-not \$ok) { exit 1 }"
 
 echo "--- packaging installer ---"
 rm -rf "$APP/Setup/bin" "$APP/Setup/obj" "$ROOT/setup-out" "$ROOT/web-setup-out"
