@@ -32,6 +32,23 @@ type App() =
             // and keep that shortcut pointing at this executable.
             if DLSS_5_MANAGER.Services.WindowsStartup.launchedAtStartup desktop.Args then
                 window.WindowState <- Avalonia.Controls.WindowState.Minimized
+                // Restoring the saved placement can bring the window back up,
+                // so minimise once more after it has opened.
+                window.Opened.Add(fun _ ->
+                    Avalonia.Threading.Dispatcher.UIThread.Post(
+                        (fun () -> window.WindowState <- Avalonia.Controls.WindowState.Minimized),
+                        Avalonia.Threading.DispatcherPriority.Background))
+            // "--screen": open straight into the Screen Engine, for a shortcut
+            // that starts DLSS 5 on the desktop.
+            if not (isNull desktop.Args)
+               && desktop.Args |> Array.exists (fun a -> a.Equals("--screen", System.StringComparison.OrdinalIgnoreCase)) then
+                window.Opened.Add(fun _ ->
+                    try vm.ScreenEngine.Start()
+                    with ex -> DLSS_5_MANAGER.Services.AppLog.error "Starting the Screen Engine from --screen" ex)
+            // An exception on the window's thread is written to the log, the
+            // same as the ones Program.fs already catches off it.
+            Avalonia.Threading.Dispatcher.UIThread.UnhandledException.Add(fun e ->
+                DLSS_5_MANAGER.Services.AppLog.error "Unhandled exception on the window's thread" e.Exception)
             System.Threading.Tasks.Task.Run(fun () ->
                 try DLSS_5_MANAGER.Services.WindowsStartup.refresh () with _ -> ()) |> ignore
             desktop.MainWindow <- window
