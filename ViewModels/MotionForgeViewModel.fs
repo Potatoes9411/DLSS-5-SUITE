@@ -116,7 +116,7 @@ type MotionForgeViewModel() as this =
           "TriPitchIndex"; "TriRoundsIndex"; "TriFineIndex"; "TriFullIndex"; "TriHomeIndex"; "TriRangeIndex"; "TriExactIndex"; "TriRelaxIndex"
           "UltraSmooth"; "EvenPacing"; "LowLatency"; "AdaptiveLearning"; "AdaptiveFlow"; "AmlGuide"
           "UpscalerIndex"; "Stretch"; "SmsrBoost"; "Sharpness"; "OverSharpness"
-          "Vrr"; "Hdr"; "StillPixels"; "LimitToScreen"; "MultiDisplay"; "FpsCounter"; "FpsCounterModeIndex"; "FpsCounterSize"
+          "Vrr"; "Hdr"; "StillPixels"; "MotionGuard"; "LimitToScreen"; "MultiDisplay"; "FpsCounter"; "FpsCounterModeIndex"; "FpsCounterSize"
           "LockRefresh"; "QueueTargetIndex"; "FrameLimit"; "FrameLimitText"; "GameFpsIndex"; "SyncModeIndex"; "Bloom"; "BloomWide"
           "MotionSourceIndex"; "XessMotionSourceIndex"; "SuiteMotionSourceIndex"; "FsrMotionSourceIndex"; "MsmSearchIndex"; "CaptureApiIndex"; "WindowModeIndex"; "CountdownIndex"; "Spout"
           "GpuIndex"; "GpuPriorityIndex"; "CropLeft"; "CropTop"; "CropRight"; "CropBottom"
@@ -615,6 +615,7 @@ type MotionForgeViewModel() as this =
     member _.Vrr with get () = (options ()).Vrr and set v = this.Update([ "Vrr" ], fun o -> { o with Vrr = v; VrrChosen = true })
     member _.Hdr with get () = (options ()).Hdr and set v = this.Update([ "Hdr" ], fun o -> { o with Hdr = v })
     member _.StillPixels with get () = (options ()).StillPixels and set v = this.Update([ "StillPixels" ], fun o -> { o with StillPixels = v })
+    member _.MotionGuard with get () = (options ()).MotionGuard and set v = this.Update([ "MotionGuard" ], fun o -> { o with MotionGuard = v })
     member _.LimitToScreen with get () = (options ()).LimitToScreen and set v = this.Update([ "LimitToScreen" ], fun o -> { o with LimitToScreen = v })
     member _.MultiDisplay with get () = (options ()).MultiDisplay and set v = this.Update([ "MultiDisplay" ], fun o -> { o with MultiDisplay = v })
     member _.FpsCounter with get () = (options ()).FpsCounter and set v = this.Update([ "FpsCounter" ], fun o -> { o with FpsCounter = v })

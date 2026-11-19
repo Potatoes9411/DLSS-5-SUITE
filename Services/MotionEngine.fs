@@ -175,7 +175,7 @@ module MotionCommand =
           "tri_top", tri MotionPrefs.triRanges 5 o.TriRange
           "tri_exact", tri MotionPrefs.triExacts 6 o.TriExact
           "tri_relax", tri MotionPrefs.triRelaxes 7 o.TriRelax
-          "guard", "0"
+          "guard", flag o.MotionGuard
           "msm_search", string o.MsmSearch
           "aml", flag o.AdaptiveLearning
           "aml_flow", flag o.AdaptiveFlow

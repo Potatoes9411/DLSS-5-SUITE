@@ -12,9 +12,10 @@ open System.Text.Json
 /// Left out on purpose:
 /// - XessTensor (XeSS MFG on an RTX card's tensor cores) went through the
 ///   RTX 20/30 compatibility package, which SUITE's engine does not carry.
-/// - HudAi, MsmTensor, MsmAi, MotionGuard were already not offered in his
-///   1.1.0 (SMAI replaced the last two; the guard and SMHUD are put aside).
-///   A file that still has them is read; they are ignored.
+/// - HudAi, MsmTensor, MsmAi were already not offered in his 1.1.0 (SMAI
+///   replaced the last two; SMHUD is put aside). A file that still has them
+///   is read; they are ignored. MotionGuard came back in his 1.3.8 and is
+///   offered again.
 [<CLIMutable>]
 type MotionOptions =
     { FrameGeneration: bool
@@ -64,6 +65,7 @@ type MotionOptions =
       VrrChosen: bool       // VRR set by the person: no longer follows what the PC says at each start
       Spout: bool
       StillPixels: bool
+      MotionGuard: bool     // SMFG: the engine's fast motion guard ("guard"), offered again in his 1.3.8
       TriPitch: int
       TriRounds: int
       TriFine: int
@@ -160,7 +162,7 @@ module MotionPrefs =
           Vrr = false; SyncMode = 1; LowLatency = true; Hdr = false; GpuPriority = 0; Gpu = ""
           MotionSource = 0; XessMotionSource = 0; SuiteMotionSource = 0; FsrMotionSource = 0; MsmSearch = 1; Bloom = 0; BloomWide = 0
           AdaptiveLearning = false; DlssPreset = 2; AdaptiveFlow = true; AmlGuideOff = false; VrrChosen = false
-          Spout = false; StillPixels = true
+          Spout = false; StillPixels = true; MotionGuard = false
           TriPitch = 0; TriRounds = 0; TriFine = 0; TriFull = 0; TriHome = 0; TriRange = 0; TriExact = 0; TriRelax = 0
           TriangleMesh = false; SmtAssist = false; UltraSmooth = false; PairPacing = false
           FpsCounter = false; Stretch = false; LockRefresh = false; FpsCounterAdvanced = false; FpsCounterSize = 100

@@ -371,6 +371,10 @@
                                         <ToggleSwitch IsChecked="{Binding StillPixels, Mode=TwoWay}" />
                                         <TextBlock Text="Keep still pixels" />
                                     </StackPanel>
+                                    <StackPanel Classes="MfChip" ToolTip.Tip="SMFG: the engine's fast motion guard - steadies generated frames where the picture moves very fast. Off by default.">
+                                        <ToggleSwitch IsChecked="{Binding MotionGuard, Mode=TwoWay}" />
+                                        <TextBlock Text="Fast motion guard" />
+                                    </StackPanel>
                                     <StackPanel Classes="MfChip" ToolTip.Tip="Never more frames than your screen shows - the same as a frame limit at its refresh rate.">
                                         <ToggleSwitch IsChecked="{Binding LimitToScreen, Mode=TwoWay}" />
                                         <TextBlock Text="Limit to refresh rate" />

@@ -369,3 +369,10 @@ let ``a profile keeps SUITE's more generators`` () =
     for g in [ 6 .. 11 ] do
         Assert.Equal(g, (MotionPrefs.normalizeOptions { d with Generator = g }).Generator)
     Assert.Equal(11, (MotionPrefs.normalizeOptions { d with Generator = 99 }).Generator)
+
+[<Fact>]
+let ``the fast motion guard is off by default and reaches the engine when turned on`` () =
+    let d = MotionPrefs.defaultOptions
+    Assert.False(d.MotionGuard)
+    Assert.Equal("0", (lines d).["guard"])
+    Assert.Equal("1", (lines { d with MotionGuard = true }).["guard"])
