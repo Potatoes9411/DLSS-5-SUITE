@@ -20,6 +20,7 @@ let ``saving settings writes the fields that update detection depends on`` () =
     Assert.Contains("\"ShowNonGameApps\"", json)
     Assert.Contains("\"SortMode\"", json)
     Assert.Contains("\"NoScanOnStartup\"", json)
+    Assert.Contains("\"MinimizeToTray\"", json)
 
 [<Fact>]
 let ``a settings file from an older build still loads`` () =
@@ -34,7 +35,8 @@ let ``every field survives a save and load`` () =
         { GameScanner.defaultSettings () with
             LastRunVersion = "1.2.2-suite.1"
             ShowNonGameApps = true
-            NoScanOnStartup = true }
+            NoScanOnStartup = true
+            MinimizeToTray = true }
 
     let roundTripped =
         JsonSerializer.Deserialize<GameScanner.AppSettings>(JsonSerializer.Serialize(original), options)

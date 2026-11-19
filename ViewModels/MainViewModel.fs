@@ -387,6 +387,8 @@ type MainViewModel() as this =
     /// Scan for games when SUITE starts. On by default: that is what every
     /// build before this switch did.
     let mutable scanOnStartup = true
+    /// Minimise to the notification area instead of the taskbar.
+    let mutable minimizeToTray = false
 
     /// The community section. Built with the window so the tab can switch to it
     /// instantly; it does not touch the network until the tab is opened.
@@ -941,6 +943,7 @@ type MainViewModel() as this =
         isSidebarLayout <- settings.IsSidebarLayout
         showNonGameApps <- settings.ShowNonGameApps
         scanOnStartup <- not settings.NoScanOnStartup
+        minimizeToTray <- settings.MinimizeToTray
         selectedGeometricMotif <- settings.GeometricMotif
         applyAtmosphere settings.ColorAtmosphere
 
@@ -1021,7 +1024,8 @@ type MainViewModel() as this =
                   OverlayHotkey = overlayHotkey
                   SortMode = sortMode
                   ShowNonGameApps = showNonGameApps
-                  NoScanOnStartup = not scanOnStartup }
+                  NoScanOnStartup = not scanOnStartup
+                  MinimizeToTray = minimizeToTray }
 
         // Discord: "Playing <game> with DLSS 5 SUITE" while a game SUITE put
         // DLSS 5 into is running. The install manifests already record which
@@ -1089,7 +1093,8 @@ type MainViewModel() as this =
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
                       ShowNonGameApps = showNonGameApps
-                      NoScanOnStartup = not scanOnStartup })
+                      NoScanOnStartup = not scanOnStartup
+                      MinimizeToTray = minimizeToTray })
 
             supportPromptTimer.Start()
 
@@ -1334,7 +1339,8 @@ type MainViewModel() as this =
                           OverlayHotkey = overlayHotkey
                           SortMode = sortMode
                           ShowNonGameApps = showNonGameApps
-                          NoScanOnStartup = not scanOnStartup }
+                          NoScanOnStartup = not scanOnStartup
+                          MinimizeToTray = minimizeToTray }
 
     member _.FilterOptions =
         [| "All games"; "Installed"; "Steam"; "Epic Games"; "GOG"; "Other" |]
@@ -1507,7 +1513,8 @@ type MainViewModel() as this =
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
                       ShowNonGameApps = showNonGameApps
-                      NoScanOnStartup = not scanOnStartup }
+                      NoScanOnStartup = not scanOnStartup
+                      MinimizeToTray = minimizeToTray }
 
     /// Shown translated, stored in English: `AtmosphereOption.Key` is the
     /// identity. The collection instance is stable for the life of the window.
@@ -1554,7 +1561,8 @@ type MainViewModel() as this =
                           OverlayHotkey = overlayHotkey
                           SortMode = sortMode
                           ShowNonGameApps = showNonGameApps
-                          NoScanOnStartup = not scanOnStartup }
+                          NoScanOnStartup = not scanOnStartup
+                          MinimizeToTray = minimizeToTray }
 
     member this.SelectedColorAtmosphere
         with get () =
@@ -1594,7 +1602,8 @@ type MainViewModel() as this =
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
                       ShowNonGameApps = showNonGameApps
-                      NoScanOnStartup = not scanOnStartup }
+                      NoScanOnStartup = not scanOnStartup
+                      MinimizeToTray = minimizeToTray }
 
     // ---------------------------------------------------------------------
     // LANGUAGE
@@ -1649,7 +1658,8 @@ type MainViewModel() as this =
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
                       ShowNonGameApps = showNonGameApps
-                      NoScanOnStartup = not scanOnStartup }
+                      NoScanOnStartup = not scanOnStartup
+                      MinimizeToTray = minimizeToTray }
 
     /// "TOTAL GAMES: 42" in the current language.
     member this.TotalGamesText = loc.TotalGames(totalGamesCount)
@@ -1694,7 +1704,8 @@ type MainViewModel() as this =
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
                       ShowNonGameApps = showNonGameApps
-                      NoScanOnStartup = not scanOnStartup }
+                      NoScanOnStartup = not scanOnStartup
+                      MinimizeToTray = minimizeToTray }
 
     member this.IsOrbitalSpheresVisible = selectedGeometricMotif = "Orbital Spheres"
     member this.IsPrismAurorasVisible = selectedGeometricMotif = "Prism Auroras"
@@ -1724,7 +1735,8 @@ type MainViewModel() as this =
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
                       ShowNonGameApps = showNonGameApps
-                      NoScanOnStartup = not scanOnStartup }
+                      NoScanOnStartup = not scanOnStartup
+                      MinimizeToTray = minimizeToTray }
 
     member this.IsTopBarLayout = not isSidebarLayout
 
@@ -1973,7 +1985,8 @@ type MainViewModel() as this =
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
                       ShowNonGameApps = showNonGameApps
-                      NoScanOnStartup = not scanOnStartup }
+                      NoScanOnStartup = not scanOnStartup
+                      MinimizeToTray = minimizeToTray }
     /// Start with Windows: read from the shortcut itself every time, so one
     /// deleted by hand shows as off.
     member this.StartWithWindows
@@ -1982,6 +1995,14 @@ type MainViewModel() as this =
             if WindowsStartup.isEnabled () <> value then
                 WindowsStartup.set value |> ignore
             this.RaisePropertyChanged("StartWithWindows")
+
+    /// Minimise to the notification area. The tray icon is there while this
+    /// is on; clicking it brings SUITE back.
+    member this.IsMinimizeToTray
+        with get () = minimizeToTray
+        and set value =
+            if this.SetProperty(&minimizeToTray, value) then
+                GameScanner.saveSettings { GameScanner.loadSettings () with MinimizeToTray = value }
 
     /// Scan for games when SUITE starts. Off, the cached library loads and
     /// nothing is read from the drives until Rescan.
@@ -2549,7 +2570,8 @@ type MainViewModel() as this =
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
                       ShowNonGameApps = showNonGameApps
-                      NoScanOnStartup = not scanOnStartup }
+                      NoScanOnStartup = not scanOnStartup
+                      MinimizeToTray = minimizeToTray }
 
     /// True while the open sheet will install through the AMD payload.
     member this.IsAmdRouteActive = isAmdMode && not isEmulatorTarget
@@ -2627,7 +2649,8 @@ type MainViewModel() as this =
               OverlayHotkey = overlayHotkey
               SortMode = sortMode
               ShowNonGameApps = showNonGameApps
-              NoScanOnStartup = not scanOnStartup }
+              NoScanOnStartup = not scanOnStartup
+              MinimizeToTray = minimizeToTray }
 
     /// What the current sheet would install, so the manage sheet can say
     /// whether the overlay is coming along.

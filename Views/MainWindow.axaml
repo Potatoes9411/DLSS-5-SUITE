@@ -715,6 +715,27 @@
                                             </Grid>
                                         </Border>
 
+                                        <!-- Minimise to tray -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1AA78BFA"
+                                                        BorderBrush="#33A78BFA" BorderThickness="1" VerticalAlignment="Center">
+                                                    <PathIcon Data="M 3,17 H 21 V 20 H 3 Z M 15,8 H 19 V 12 H 15 Z"
+                                                              Width="14" Height="14" Foreground="#A78BFA" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="Minimise to tray" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                    <TextBlock Text="Minimising SUITE tucks it into the notification area. Click the icon to bring it back; right-click it to quit."
+                                                               FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                                </StackPanel>
+
+                                                <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsMinimizeToTray, Mode=TwoWay}"
+                                                              OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+
                                         <!-- Start-up scan -->
                                         <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
                                                 Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">

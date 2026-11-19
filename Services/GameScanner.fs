@@ -1203,6 +1203,9 @@ module GameScanner =
         /// Scan for games when SUITE starts, stored as its opposite so a
         /// settings file written before the switch existed reads as on.
         NoScanOnStartup: bool
+        /// Minimising SUITE sends it to the notification area. Off unless
+        /// the user turns it on.
+        MinimizeToTray: bool
     }
 
     /// The orders the library can be shown in, in the order they appear in the
@@ -1236,7 +1239,8 @@ module GameScanner =
           OverlayHotkey = "Shift+O"
           SortMode = sortModes.[0]
           ShowNonGameApps = false
-          NoScanOnStartup = false }
+          NoScanOnStartup = false
+          MinimizeToTray = false }
 
     /// Reads one settings file. Split out so the backup can be tried with
     /// exactly the same rules when the main file cannot be read.

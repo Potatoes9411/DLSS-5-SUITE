@@ -1,6 +1,7 @@
 namespace DLSS_5_MANAGER
 
 open Avalonia
+open Avalonia.Controls
 open Avalonia.Controls.ApplicationLifetimes
 open Avalonia.Markup.Xaml
 open DLSS_5_MANAGER.ViewModels
@@ -11,6 +12,48 @@ type App() =
 
     override this.Initialize() =
         AvaloniaXamlLoader.Load(this)
+
+    member private this.SetUpTray(desktop: IClassicDesktopStyleApplicationLifetime, window: MainWindow, vm: MainViewModel) =
+        try
+            let bringBack () =
+                window.Show()
+                if window.WindowState = Avalonia.Controls.WindowState.Minimized then
+                    window.WindowState <- Avalonia.Controls.WindowState.Normal
+                window.Activate()
+
+            let openItem = NativeMenuItem("Open DLSS 5 SUITE")
+            openItem.Click.Add(fun _ -> bringBack ())
+            let quitItem = NativeMenuItem("Quit")
+            quitItem.Click.Add(fun _ -> desktop.Shutdown())
+            let menu = NativeMenu()
+            menu.Items.Add(openItem)
+            menu.Items.Add(quitItem)
+
+            let tray = new TrayIcon()
+            tray.ToolTipText <- "DLSS 5 SUITE"
+            tray.Menu <- menu
+            tray.IsVisible <- vm.IsMinimizeToTray
+            try
+                use stream = Avalonia.Platform.AssetLoader.Open(System.Uri("avares://DLSS 5 SUITE/Assets/logo.ico"))
+                tray.Icon <- WindowIcon(stream)
+            with _ -> ()
+            tray.Clicked.Add(fun _ -> bringBack ())
+            let icons = TrayIcons()
+            icons.Add(tray)
+            TrayIcon.SetIcons(this, icons)
+
+            vm.PropertyChanged.Add(fun e ->
+                if e.PropertyName = "IsMinimizeToTray" then tray.IsVisible <- vm.IsMinimizeToTray)
+
+            window.PropertyChanged.Add(fun e ->
+                if e.Property = Window.WindowStateProperty
+                   && window.WindowState = Avalonia.Controls.WindowState.Minimized
+                   && vm.IsMinimizeToTray then
+                    window.Hide())
+
+            desktop.Exit.Add(fun _ -> try tray.Dispose() with _ -> ())
+        with ex ->
+            DLSS_5_MANAGER.Services.AppLog.error "Setting up the tray icon" ex
 
     override this.OnFrameworkInitializationCompleted() =
         match this.ApplicationLifetime with
@@ -36,8 +79,13 @@ type App() =
                 // so minimise once more after it has opened.
                 window.Opened.Add(fun _ ->
                     Avalonia.Threading.Dispatcher.UIThread.Post(
-                        (fun () -> window.WindowState <- Avalonia.Controls.WindowState.Minimized),
+                        (fun () ->
+                            window.WindowState <- Avalonia.Controls.WindowState.Minimized
+                            if vm.IsMinimizeToTray then window.Hide()),
                         Avalonia.Threading.DispatcherPriority.Background))
+            // Minimise to the notification area, when that is switched on in
+            // Settings: the window hides and the tray icon brings it back.
+            this.SetUpTray(desktop, window, vm)
             // "--screen": open straight into the Screen Engine, for a shortcut
             // that starts DLSS 5 on the desktop.
             if not (isNull desktop.Args)
