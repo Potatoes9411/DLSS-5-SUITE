@@ -73,7 +73,10 @@ fi
 
 echo "--- publishing application ---"
 rm -rf "$APP/publish"
-dotnet publish "$APP/DLSS 5 SUITE.fsproj" -c Release -r win-x64 --self-contained true $VERSION_PROPS -o "$APP/publish"
+dotnet build-server shutdown >/dev/null 2>&1 || true
+# One build node and no build servers: with several, the Avalonia XAML step
+# found its own .pdb still open and the publish failed.
+dotnet publish "$APP/DLSS 5 SUITE.fsproj" -c Release -r win-x64 --self-contained true -m:1 --disable-build-servers $VERSION_PROPS -o "$APP/publish"
 
 echo "ShaderGlass compatibility components download on demand"
 
