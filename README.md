@@ -6,7 +6,7 @@
 
 [![Download](https://img.shields.io/badge/DOWNLOAD-LATEST%20RELEASE-00e676?style=for-the-badge)](https://github.com/Potatoes9411/DLSS-5-SUITE/releases/latest)
 
-[![Version](https://img.shields.io/badge/Version-1.2.6-35d22b?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-1.3.0-35d22b?style=flat-square)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-24292e?style=flat-square)]()
 [![Framework](https://img.shields.io/badge/Framework-.NET%208%20|%20Avalonia%20UI-512bd4?style=flat-square)]()
 [![Language](https://img.shields.io/badge/Language-F%23-30b9db?style=flat-square)]()
@@ -58,6 +58,26 @@ Public access to this repository does **not** transfer ownership of DLSS 5 SUITE
 - **GTA V Enhanced with NaturalVision Enhanced**: the DLSS 5 Neural Rendering button upgrades NVE's ReShade to one that can load DLSS 5, keeps the game's own DLSS files, and Remove puts everything back. With 12 GB of graphics memory or less, use about 1080p-1200p and 1 pass. BattlEye switched off with -nobattleye is recognised as off.
 - Results shared by DLSS 5 Autopilot users order Autopilot's routes, and "It worked" / "It didn't" can be shared without a browser.
 - DLSS 5 SUITE themes, nebula and shooting-star effects, installer and update channel.
+
+### New in v1.3.0
+
+- **Four editions** in the edition menu:
+  - **Space Press**: frees drive space with Windows' own file compression, and has a Clean up tab for SUITE's own caches.
+  - **Upscaler Vault**: swaps and restores every game's DLSS, FSR, XeSS and XeLL DLLs.
+  - **Enabler Dock**: installs and removes DLSS Enabler.
+  - **Motion Forge**: a frame-generation overlay for any game or window.
+- **Frame generation in both overlays**:
+  - NVIDIA DLSS MFG with a DLSS-G version picker, AMD FSR 3.1 FG, Intel XeSS MFG, SMFG, SMT and SMAI.
+  - SUITE's own MEMC, DIS, Spacewarp, Motion-blur blend, Crossfade and Repeat.
+  - 2x to 6x.
+- **Advanced install**: turn each part of a route on or off by itself, or add your own files. Uninstall still removes everything.
+- **RenoDX options**: MFG unlock, Multipass and deep-fried chicken.
+- **Install options**: the emulator ReShade API, proxy DLL rename, ReShade/OptiScaler hotkeys, and the RTX 40 OptiScaler build.
+- **Library**: an install record kept in the game folder, "Remove and never scan again", and every graphics API shown on game cards.
+- **Settings**: Start with Windows (no registry), Minimise to tray, Scan at start-up, a custom background, and the window reopening where you left it.
+- **Fixes**: the YouTube/video player no longer freezes while DLSS 5 starts, the SMAI download no longer fails, and "Did it work?" shares settled answers.
+
+The full history is in [CHANGELOG.md](CHANGELOG.md).
 
 Compatibility varies by game, graphics hardware, anti-cheat system and game update. The project does not promise that every title will work, and it does not bypass anti-cheat protections.
 
