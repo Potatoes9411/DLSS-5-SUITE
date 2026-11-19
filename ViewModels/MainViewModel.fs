@@ -407,6 +407,15 @@ type MainViewModel() as this =
     // MOTION FORGE (edition "motion"): MFG SUPER MOTION's frame generation, its own engine and page.
     let motionForge = MotionForgeViewModel()
 
+    // ADVANCED INSTALL: the pick-your-parts sheet, opened from Manage. When a
+    // run ends, the Manage sheet and the card re-read the install it changed.
+    let advancedInstall =
+        AdvancedInstallViewModel(fun () ->
+            match this.ManageCardForAdvanced with
+            | Some (c: GameCardViewModel) -> c.RefreshModBadge()
+            | None -> ()
+            this.AnalyzeManageTarget())
+
     // ---- Manage sheet state ---------------------------------------------
     let mutable isManageOpen = false
     let mutable manageCard: GameCardViewModel option = None
@@ -4452,6 +4461,50 @@ type MainViewModel() as this =
     member this.StartBatchUninstall() = this.RunBatch(false)
 
     member this.StartInstall() = this.RunModTask(true)
+
+    member this.AdvancedInstall = advancedInstall
+    member internal this.ManageCardForAdvanced = manageCard
+
+    /// The route's name as the Advanced install sheet shows it.
+    member private this.RouteLabelForAdvanced =
+        let api =
+            match optiApi with
+            | ModInstaller.OptiDx12 -> "DirectX 12"
+            | ModInstaller.OptiVulkan -> "Vulkan"
+            | ModInstaller.OptiNeural -> "Neural upstream"
+
+        match installMode with
+        | ModInstaller.OptiScalerMode -> "OptiScaler · " + api
+        | ModInstaller.Dx12Auto -> "ReShade + RenoDX · DirectX 12"
+        | ModInstaller.Dx11 -> "ReShade + RenoDX · DirectX 11" + (if installArch = ModInstaller.Bit32 then " · 32-bit" else "")
+        | ModInstaller.Dx9 -> "ReShade + dgVoodoo · DirectX 9" + (if installArch = ModInstaller.Bit32 then " · 32-bit" else "")
+        | ModInstaller.Emulator -> "Emulator"
+        | ModInstaller.AmdMode -> "AMD RDNA 4"
+
+    /// Opens Advanced install on the game and route the Manage sheet has up.
+    member this.OpenAdvancedInstall() =
+        match manageCard with
+        | Some card when not isInstalling && not (String.IsNullOrWhiteSpace(manageExePath)) ->
+            let plan =
+                manageAnalysis
+                |> Option.map (fun a ->
+                    { ModInstaller.InstallPlan.DlssDirs = a.DlssDirs
+                      ModInstaller.InstallPlan.StreamlineDirs = a.StreamlineDirs })
+
+            advancedInstall.Open(
+                { Game = card.Game
+                  ExePath = manageExePath
+                  Plan = plan
+                  Mode = installMode
+                  Arch = installArch
+                  OptiApi = optiApi
+                  Neural = useNeuralAddon
+                  Feeder = useFeeder
+                  Options = this.InstallOptions
+                  Overlay = this.OverlayOptions
+                  RouteLabel = this.RouteLabelForAdvanced }
+            )
+        | _ -> ()
     member this.StartUninstall() = this.RunModTask(false)
 
     // ---------------------------------------------------------------------

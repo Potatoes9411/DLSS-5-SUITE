@@ -44,6 +44,8 @@ let private amdManifest (exeDir: string) (files: InstalledFile[]) : InstallManif
       Multipass = ""
       DeepFried = ""
       EmuApi = ""
+      Advanced = ""
+      UserFiles = [||]
       Files = files }
 
 [<Fact>]

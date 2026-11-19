@@ -67,6 +67,15 @@ module ModInstaller =
           /// Emulator installs only: the ReShade API the user picked - "dxgi",
           /// "vulkan", or "" for the catalogue's own choice.
           EmuApi: string
+          /// "1" once Advanced install took parts off this install or added
+          /// files of the user's own. Empty for a plain one-click install and
+          /// on every manifest written before Advanced install existed.
+          Advanced: string
+          /// Files the user added to this game from Advanced install, by full
+          /// path. Each one is also an ordinary entry in `Files`, so removal
+          /// handles it like any other; this list only says whose it is.
+          /// Null on older manifests.
+          UserFiles: string[]
           Files: InstalledFile[] }
 
     /// The mutually exclusive install routes offered in the Manage sheet.
@@ -2360,6 +2369,13 @@ module ModInstaller =
 
         let tracker = Tracker(backupRoot game, priorEntries)
 
+        // Files the user added in Advanced install ride along with the
+        // entries above, so a repair keeps knowing which ones were theirs.
+        let priorUserFiles =
+            match tryManifest game with
+            | Some m when not (isNull m.UserFiles) -> m.UserFiles
+            | _ -> [||]
+
         try
             report "Preparing installation..." 0.03
 
@@ -2445,6 +2461,10 @@ module ModInstaller =
                       Multipass = (if multipassWanted then "1" else "")
                       DeepFried = (if deepFriedWanted || deepFriedHost64 then "1" else "")
                       EmuApi = emulatorApiPicked
+                      // A one-click run puts every route part back, so the
+                      // advanced mark goes; the user's own files stay theirs.
+                      Advanced = ""
+                      UserFiles = priorUserFiles
                       Files = tracker.Entries }
 
                 let jsonOptions = JsonSerializerOptions()
@@ -3635,3 +3655,131 @@ module ModInstaller =
         if outcome.Success then
             try GameFixes.afterUninstall game with ex -> AppLog.error "Game fixes after uninstall" ex
         outcome
+
+    // =====================================================================
+    // ADVANCED INSTALL SUPPORT
+    // =====================================================================
+    // Advanced install never writes files of its own kind: it runs the normal
+    // install above and then takes single entries back off it. Everything it
+    // touches stays an ordinary manifest entry, so the one-click uninstall
+    // removes an advanced install exactly like any other.
+
+    /// Puts back what the matching entries replaced - the backed-up original,
+    /// or nothing when the file was ours alone - and returns the manifest
+    /// without them, with the count reverted. Files are touched on disk; the
+    /// manifest itself is not saved here.
+    let revertEntriesIn (manifest: InstallManifest) (shouldRevert: InstalledFile -> bool) : InstallManifest * int =
+        let files = if isNull (box manifest.Files) then [||] else manifest.Files
+        let mutable reverted = 0
+        let kept = List<InstalledFile>()
+
+        // Newest first, the same order the full removal uses, so a file that
+        // was written twice comes back to its very first state.
+        for entry in Array.rev files do
+            if not (String.IsNullOrWhiteSpace(entry.TargetPath)) && shouldRevert entry then
+                try
+                    if entry.WasExisting && File.Exists(entry.BackupPath) then
+                        File.Copy(entry.BackupPath, entry.TargetPath, true)
+                    elif not entry.WasExisting && File.Exists(entry.TargetPath) then
+                        File.Delete(entry.TargetPath)
+
+                    reverted <- reverted + 1
+                with ex ->
+                    AppLog.error ("Advanced install: reverting " + entry.TargetPath) ex
+                    kept.Add(entry)
+            else
+                kept.Add(entry)
+
+        let remaining = kept |> Seq.rev |> Seq.toArray
+
+        let stillThere =
+            HashSet<string>(remaining |> Array.map (fun e -> e.TargetPath), StringComparer.OrdinalIgnoreCase)
+
+        let userFiles =
+            if isNull manifest.UserFiles then [||]
+            else manifest.UserFiles |> Array.filter stillThere.Contains
+
+        ({ manifest with Files = remaining; UserFiles = userFiles }, reverted)
+
+    /// Copies a file of the user's own into the game, backing up whatever it
+    /// replaces, and returns the manifest with the new entry. `targetPath`
+    /// must sit inside the game's folder.
+    let addUserFileIn (manifest: InstallManifest) (backupDir: string) (source: string) (targetPath: string) : Result<InstallManifest, string> =
+        try
+            let exeDir = Path.GetDirectoryName(manifest.ExecutablePath)
+            let full = Path.GetFullPath(targetPath)
+            let rel = Path.GetRelativePath(exeDir, full)
+
+            if not (File.Exists(source)) then
+                Error "That file is gone."
+            elif rel.StartsWith("..") || Path.IsPathRooted(rel) then
+                Error "Files of your own can only go inside the game's folder."
+            elif Path.GetFileName(full).Equals(GameAnalyzer.dlssnrFileName, StringComparison.OrdinalIgnoreCase) then
+                // The model is the install's own; it is never swapped from here.
+                Error "nvngx_dlssnr.dll is part of the install itself and cannot be added as a file of your own."
+            else
+                let files = if isNull (box manifest.Files) then [||] else manifest.Files
+                let known = files |> Array.exists (fun e -> String.Equals(e.TargetPath, full, StringComparison.OrdinalIgnoreCase))
+                let wasExisting = File.Exists(full)
+                let mutable backupPath = ""
+
+                if wasExisting && not known then
+                    Directory.CreateDirectory(backupDir) |> ignore
+                    backupPath <- Path.Combine(backupDir, shortHash full + "_" + Path.GetFileName(full))
+                    if not (File.Exists(backupPath)) then File.Copy(full, backupPath, false)
+
+                Directory.CreateDirectory(Path.GetDirectoryName(full)) |> ignore
+                File.Copy(source, full, true)
+
+                let entries =
+                    if known then files
+                    else Array.append files [| { TargetPath = full; BackupPath = backupPath; WasExisting = wasExisting } |]
+
+                let userFiles =
+                    let prior = if isNull manifest.UserFiles then [||] else manifest.UserFiles
+                    if prior |> Array.exists (fun p -> String.Equals(p, full, StringComparison.OrdinalIgnoreCase)) then prior
+                    else Array.append prior [| full |]
+
+                Ok { manifest with Files = entries; UserFiles = userFiles; Advanced = "1" }
+        with ex ->
+            Error ex.Message
+
+    /// The recorded manifest, for Advanced install's own reading.
+    let manifestOf (game: GameItem) : InstallManifest option = tryManifest game
+
+    /// Reverts the matching entries of this game's install and saves what is
+    /// left. `advanced` is written into the manifest's mark.
+    let revertWhere (game: GameItem) (shouldRevert: InstalledFile -> bool) (advanced: bool) : Result<int, string> =
+        match tryManifest game with
+        | None -> Error "Nothing is installed in this game yet."
+        | Some manifest ->
+            let (updated, count) = revertEntriesIn manifest shouldRevert
+            try
+                saveManifest game { updated with Advanced = (if advanced then "1" else "") }
+                Ok count
+            with ex ->
+                Error ex.Message
+
+    /// Sets or clears the Advanced mark on this game's install.
+    let markAdvanced (game: GameItem) (advanced: bool) =
+        match tryManifest game with
+        | Some m -> (try saveManifest game { m with Advanced = (if advanced then "1" else "") } with _ -> ())
+        | None -> ()
+
+    /// Adds a file of the user's own beside the game, as part of its install.
+    let addUserFile (game: GameItem) (source: string) (targetPath: string) : InstallOutcome =
+        match tryManifest game with
+        | None -> { Success = false; Message = "Install DLSS 5 in this game first - files of your own ride on its install." }
+        | Some manifest ->
+            let exeDir = try Path.GetDirectoryName(manifest.ExecutablePath) with _ -> ""
+            if not (canWriteTo exeDir) then
+                { Success = false; Message = elevationNeededMessage }
+            else
+                match addUserFileIn manifest (backupRoot game) source targetPath with
+                | Error e -> { Success = false; Message = e }
+                | Ok updated ->
+                    try
+                        saveManifest game updated
+                        { Success = true; Message = Path.GetFileName(targetPath) + " added. It comes off with the install." }
+                    with ex ->
+                        { Success = false; Message = ex.Message }

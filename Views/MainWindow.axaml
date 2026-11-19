@@ -3432,6 +3432,13 @@
                             <Button Grid.Column="1" Classes="AppleSecondaryBtn" Click="OnChangeExecutableClicked" Cursor="Hand"
                                     IsEnabled="{Binding IsManageReady}" Content="{Binding Loc.ChangeExe}" ToolTip.Tip="Pick the real game executable yourself" />
 
+                            <!-- Advanced install: the same route, cut into its parts. -->
+                            <Button Grid.Column="2" Classes="EmptyActionBtn" Click="OnAdvancedInstallClicked" Cursor="Hand"
+                                    IsEnabled="{Binding IsManageReady}" HorizontalAlignment="Right" Padding="11,7"
+                                    ToolTip.Tip="Install or remove each part of the mod - ReShade, RenoDX, host64, OptiScaler and the rest - on its own">
+                                <TextBlock Text="Advanced install..." FontSize="11" FontWeight="Bold" Foreground="#F1F5F9" />
+                            </Button>
+
                             <Button Grid.Column="3" Classes="ApplePrimaryBtn" Click="OnInstallDlssClicked" Cursor="Hand"
                                     IsVisible="{Binding ShowInstallButton}" IsEnabled="{Binding IsManageReady}"
                                     Content="{Binding Loc.BtnInstall}" />
@@ -3450,6 +3457,112 @@
                                     Content="{Binding Loc.RemoveDlss}" />
                         </Grid>
                         </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+            </Panel>
+
+            <!-- ============================================================ -->
+            <!-- ADVANCED INSTALL                                             -->
+            <!-- Opened from Manage. Every part of the route on its own; it   -->
+            <!-- runs SUITE's own installer, so Remove still takes it off.    -->
+            <!-- ============================================================ -->
+            <Panel IsVisible="{Binding AdvancedInstall.IsOpen}" ZIndex="9100">
+                <Border Background="#96000000" PointerPressed="OnAdvancedBackdropPressed" />
+
+                <Border Classes="GlassModalCard" Width="640" MaxHeight="780" Padding="26,22"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        DataContext="{Binding AdvancedInstall}" x:DataType="vm:AdvancedInstallViewModel">
+                    <DockPanel LastChildFill="True">
+                        <Grid DockPanel.Dock="Top" Margin="0,0,0,14" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border CornerRadius="6" Padding="7,2" Background="#1F7DD3FC" BorderBrush="#407DD3FC" BorderThickness="1"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="ADVANCED" FontSize="9" FontWeight="Bold" Foreground="#7DD3FC" LetterSpacing="0.8" />
+                                    </Border>
+                                    <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="Bold" Foreground="#FFFFFF"
+                                               TextTrimming="CharacterEllipsis" MaxWidth="430" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding RouteText}" FontSize="11" Foreground="#A3AEC0" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Classes="GlassWindowControlBtn Close" Click="OnAdvancedCloseClicked"
+                                    IsVisible="{Binding IsReady}" VerticalAlignment="Top" ToolTip.Tip="Close">
+                                <PathIcon Data="M 19,6.41 L 17.59,5 L 12,10.59 L 6.41,5 L 5,6.41 L 10.59,12 L 5,17.59 L 6.41,19 L 12,13.41 L 17.59,19 L 19,17.59 L 13.41,12 Z"
+                                          Width="10" Height="10" Foreground="#FF6961" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+
+                        <!-- Actions -->
+                        <Grid DockPanel.Dock="Bottom" Margin="0,14,0,0" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="9">
+                            <Button Grid.Column="0" Classes="AppleSecondaryBtn" Click="OnAdvancedRouteChoiceClicked" Cursor="Hand"
+                                    IsEnabled="{Binding IsReady}" Content="Route's own choice"
+                                    ToolTip.Tip="Tick exactly what the one-click install of this route puts in" />
+                            <Button Grid.Column="1" Classes="AppleSecondaryBtn" Click="OnAdvancedAddFileClicked" Cursor="Hand"
+                                    IsEnabled="{Binding IsReady}" IsVisible="{Binding IsInstalled}" Content="Add file..."
+                                    ToolTip.Tip="A file of your own beside this game's exe, for this game only. It comes off with the install." />
+                            <Button Grid.Column="2" Classes="AppleDangerBtn" Click="OnAdvancedRemoveAllClicked" Cursor="Hand"
+                                    IsEnabled="{Binding CanRemoveAll}" IsVisible="{Binding IsInstalled}" HorizontalAlignment="Right"
+                                    Content="Remove everything"
+                                    ToolTip.Tip="Takes every part off and puts back what it replaced - the same removal as the Manage sheet" />
+                            <Button Grid.Column="3" Classes="ApplePrimaryBtn" Click="OnAdvancedApplyClicked" Cursor="Hand"
+                                    IsEnabled="{Binding CanApply}" Content="{Binding ApplyText}"
+                                    ToolTip.Tip="Installs every part switched on that is not on the game yet, and takes off every part switched off that is" />
+                        </Grid>
+
+                        <!-- Progress and result -->
+                        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+                            <Border Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,11"
+                                    IsVisible="{Binding IsBusy}">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="{Binding StatusText}" FontSize="12" FontWeight="SemiBold" Foreground="#F1F5F9"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Progress, StringFormat={}{0:F0}%}" FontSize="12" FontWeight="Bold" Foreground="#FFFFFF" />
+                                    </Grid>
+                                    <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="100" Height="5"
+                                                 Foreground="{DynamicResource AppAccentBrush}" Background="#20FFFFFF" CornerRadius="3" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10"
+                                    IsVisible="{Binding HasResult}">
+                                <TextBlock Text="{Binding ResultText}" FontSize="11.5" FontWeight="SemiBold"
+                                           Foreground="{Binding ResultBrush}" TextWrapping="Wrap" LineHeight="18" />
+                            </Border>
+                            <Border Background="#14FBBF24" BorderBrush="#40FBBF24" BorderThickness="1" CornerRadius="14" Padding="14,10"
+                                    IsVisible="{Binding HasConflict}">
+                                <TextBlock FontSize="11" Foreground="#FDE68A" TextWrapping="Wrap" LineHeight="17"
+                                           Text="Deep-fried chicken and RenoDX take the same place in the game's DLSS 5 chain, so together they can clash or cancel each other out. SUITE will not stop you from installing them together." />
+                            </Border>
+                        </StackPanel>
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="10">
+                                <TextBlock FontSize="11.5" Foreground="#A3AEC0" TextWrapping="Wrap" LineHeight="17"
+                                           Text="The route's best parts are ticked for you - exactly what the one-click install puts in. Add or take off anything you like; Apply changes only what differs from the game. The model stays with the route and comes off with Remove everything." />
+                                <ItemsControl ItemsSource="{Binding Parts}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AdvancedPartViewModel">
+                                            <Border Classes="RowIn" Background="#5C121619" BorderBrush="#24FFFFFF" BorderThickness="1"
+                                                    CornerRadius="12" Padding="12,9" Margin="0,0,0,7" ToolTip.Tip="{Binding FilesTip}">
+                                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsWanted, Mode=TwoWay}"
+                                                              IsEnabled="{Binding CanToggle}" VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Label}" FontSize="12.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                        <TextBlock Text="{Binding Description}" FontSize="10.5" Foreground="#94A3B8"
+                                                                   TextWrapping="Wrap" LineHeight="15" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="{Binding StatusText}" FontSize="10.5" FontWeight="Bold"
+                                                               Foreground="{Binding StatusBrush}" VerticalAlignment="Center"
+                                                               TextAlignment="Right" MaxWidth="150" TextWrapping="Wrap" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                         </ScrollViewer>
                     </DockPanel>
                 </Border>

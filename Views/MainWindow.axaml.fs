@@ -2102,6 +2102,29 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.CloseManage()
         | _ -> ()
 
+    // ---- Advanced install sheet ----
+    member this.OnAdvancedInstallClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.OpenAdvancedInstall())
+    member this.OnAdvancedCloseClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.AdvancedInstall.Close())
+    member this.OnAdvancedApplyClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.AdvancedInstall.Apply())
+    member this.OnAdvancedRemoveAllClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.AdvancedInstall.RemoveAll())
+    member this.OnAdvancedRouteChoiceClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.AdvancedInstall.UseRouteChoice())
+    member this.OnAdvancedBackdropPressed(sender: obj, e: PointerPressedEventArgs) =
+        this.WithVm(fun vm -> vm.AdvancedInstall.Close())
+        e.Handled <- true
+
+    member this.OnAdvancedAddFileClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let top = TopLevel.GetTopLevel(this)
+            let options = Avalonia.Platform.Storage.FilePickerOpenOptions(Title = "Add files of your own to this game", AllowMultiple = true)
+            let! files = top.StorageProvider.OpenFilePickerAsync(options) |> Async.AwaitTask
+            let picks = [ for f in files do
+                              let p = f.TryGetLocalPath()
+                              if not (String.IsNullOrEmpty p) then yield (p, IO.Path.GetFileName(p)) ]
+            if not picks.IsEmpty then
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () -> this.WithVm(fun vm -> vm.AdvancedInstall.AddUserFiles(picks)))
+        }
+        |> Async.StartImmediate
+
     member this.OnManageBackdropPressed(sender: obj, e: PointerPressedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm ->
