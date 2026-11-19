@@ -664,6 +664,10 @@ type MainViewModel() as this =
     /// tuned to read as a highlight against the background rather than to
     /// be the background.
     let mutable bgNebulaTintBrush: IBrush = SolidColorBrush(Color.Parse("#2A9E76"))
+    /// A picture of the user's own in place of the space plate. The copy
+    /// lives under SUITE's LocalAppData folder; it is decoded once.
+    let mutable background = BackgroundStore.load ()
+    let mutable customBackgroundImage: IImage = null
 
     /// Background animations run only while the window is in front.
     let mutable isWindowActive = true
@@ -1215,6 +1219,73 @@ type MainViewModel() as this =
     member this.NvidiaMarkSource : IImage =
         MainViewModel.LoadAsset("bg_nvidia_mark" + this.AtmosphereSlug + ".png")
 
+    // ---------------------------------------------------------------------
+    // CUSTOM BACKGROUND
+    // ---------------------------------------------------------------------
+    member this.HasCustomBackground = background.UseCustom && not (String.IsNullOrWhiteSpace(background.CustomFile))
+
+    /// The theme's own nebula and mark only show without a picture of the
+    /// user's own; the stars and the vignette stay either way.
+    member this.ShowThemeBackdrop = not this.HasCustomBackground
+
+    member this.CustomBackgroundSource : IImage =
+        if not this.HasCustomBackground then null
+        else
+            if isNull customBackgroundImage then
+                customBackgroundImage <-
+                    try new Bitmap(background.CustomFile) :> IImage
+                    with ex ->
+                        AppLog.error "Loading the custom background" ex
+                        null
+            customBackgroundImage
+
+    /// The dark wash over the picture: what the brightness setting holds back.
+    member this.CustomBackgroundDim =
+        1.0 - BackgroundStore.exposure background.Brightness background.CustomLuminance
+
+    member this.BackgroundBrightness
+        with get () = float background.Brightness
+        and set (value: float) =
+            let v = BackgroundStore.clampBrightness (int (Math.Round(value / 5.0) * 5.0))
+            if v <> background.Brightness then
+                background <- { background with Brightness = v }
+                BackgroundStore.save background
+                this.RaisePropertyChanged("BackgroundBrightness")
+                this.RaisePropertyChanged("CustomBackgroundDim")
+
+    member this.BackgroundStatusText =
+        if this.HasCustomBackground then "Your image - " + System.IO.Path.GetFileName(background.CustomFile).Replace("custom_", "")
+        else "The theme's own space backdrop"
+
+    member private this.RaiseBackground() =
+        for name in [ "HasCustomBackground"; "ShowThemeBackdrop"; "CustomBackgroundSource"; "CustomBackgroundDim"
+                      "BackgroundBrightness"; "BackgroundStatusText" ] do
+            this.RaisePropertyChanged(name)
+
+    /// Copies the picked picture under LocalAppData and shows it.
+    member this.SetCustomBackground(source: string) =
+        System.Threading.Tasks.Task.Run(fun () ->
+            match BackgroundStore.importCustom source with
+            | None -> None
+            | Some copy -> Some(copy, BackgroundStore.measureLuminance copy))
+            .ContinueWith(fun (t: System.Threading.Tasks.Task<(string * float) option>) ->
+                Dispatcher.UIThread.Post(fun () ->
+                    match t.Result with
+                    | Some(copy, luminance) ->
+                        background <- { background with UseCustom = true; CustomFile = copy; CustomLuminance = luminance }
+                        BackgroundStore.save background
+                        customBackgroundImage <- null
+                        this.RaiseBackground()
+                    | None -> ()))
+        |> ignore
+
+    /// Back to the theme's backdrop; SUITE's copy of the picture is deleted.
+    member this.ResetBackground() =
+        BackgroundStore.removeCustom ()
+        background <- { BackgroundStore.defaults with Brightness = background.Brightness }
+        BackgroundStore.save background
+        customBackgroundImage <- null
+        this.RaiseBackground()
     /// Drives the background animations: only while the window is the active
     /// one, and never in performance mode.
     member this.IsBackgroundMotionOn = isWindowActive && not isPerformanceMode

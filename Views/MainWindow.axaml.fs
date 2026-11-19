@@ -2102,6 +2102,26 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.CloseManage()
         | _ -> ()
 
+    // ---- Custom background ----
+    member this.OnPickBackgroundClicked(sender: obj, e: RoutedEventArgs) =
+        async {
+            let top = TopLevel.GetTopLevel(this)
+            let filter = Avalonia.Platform.Storage.FilePickerFileType("Images")
+            filter.Patterns <- [| "*.png"; "*.jpg"; "*.jpeg"; "*.bmp"; "*.webp" |]
+            let options =
+                Avalonia.Platform.Storage.FilePickerOpenOptions(
+                    Title = "Choose a background image", AllowMultiple = false, FileTypeFilter = [| filter |])
+            let! files = top.StorageProvider.OpenFilePickerAsync(options) |> Async.AwaitTask
+            let picked = files |> Seq.tryHead |> Option.map (fun f -> f.TryGetLocalPath())
+            match picked with
+            | Some p when not (String.IsNullOrEmpty p) ->
+                Avalonia.Threading.Dispatcher.UIThread.Post(fun () -> this.WithVm(fun vm -> vm.SetCustomBackground(p)))
+            | _ -> ()
+        }
+        |> Async.StartImmediate
+
+    member this.OnResetBackgroundClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.ResetBackground())
+
     // ---- Advanced install sheet ----
     member this.OnAdvancedInstallClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.OpenAdvancedInstall())
     member this.OnAdvancedCloseClicked(sender: obj, e: RoutedEventArgs) = this.WithVm(fun vm -> vm.AdvancedInstall.Close())

@@ -67,6 +67,7 @@
     <Compile Include="Services\DataMigration.fs" />
     <Compile Include="Services\Localization.fs" />
     <Compile Include="Services\ExtrasStore.fs" />
+    <Compile Include="Services\BackgroundStore.fs" />
     <Compile Include="Services\GameAnalyzer.fs" />
     <Compile Include="Services\AntiCheat.fs" />
     <Compile Include="Services\StorageCompressor.fs" />
