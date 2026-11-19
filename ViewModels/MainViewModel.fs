@@ -5055,11 +5055,61 @@ type MainViewModel() as this =
                         try System.IO.File.Delete(stale) with _ -> ()
 
                 System.IO.File.Copy(sourcePath, target, true)
+                // The artwork the scan found, kept so Restore original cover
+                // can put it back. Only the first pick records it.
+                if not card.HasCustomCover then MainViewModel.RememberOriginalCover(key, card.Game.LocalBannerPath)
                 card.SetBanner(target)
 
                 GameScanner.saveGamesToCache [ for c in allGames -> c.Game ]
             with _ ->
                 ()
+
+    static member private CoverKey(card: GameCardViewModel) =
+        let raw = if String.IsNullOrWhiteSpace(card.Game.AppId) then card.Game.Title else card.Game.AppId
+        Text.RegularExpressions.Regex.Replace(raw, @"[^A-Za-z0-9_\-]", "_")
+
+    static member private CoverMapPath() =
+        System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DLSS5Suite", "Cache", "Posters", "original_covers.json")
+
+    static member private ReadCoverMap() : Collections.Generic.Dictionary<string, string> =
+        try
+            let p = MainViewModel.CoverMapPath()
+            if System.IO.File.Exists(p) then
+                let d = Text.Json.JsonSerializer.Deserialize<Collections.Generic.Dictionary<string, string>>(System.IO.File.ReadAllText(p))
+                if isNull d then Collections.Generic.Dictionary<string, string>() else d
+            else Collections.Generic.Dictionary<string, string>()
+        with _ -> Collections.Generic.Dictionary<string, string>()
+
+    static member private RememberOriginalCover(key: string, original: string) =
+        try
+            let map = MainViewModel.ReadCoverMap()
+            map.[key] <- (if isNull original then "" else original)
+            System.IO.File.WriteAllText(MainViewModel.CoverMapPath(), Text.Json.JsonSerializer.Serialize(map))
+        with ex -> AppLog.error "Remembering a cover" ex
+
+    /// Right-click on a card: back to the artwork the scan found. SUITE's
+    /// copy of the user's picture goes; their own file is not touched.
+    member this.RestoreGameCover(card: GameCardViewModel) =
+        if not (isNull (box card)) && card.HasCustomCover then
+            try
+                let key = MainViewModel.CoverKey(card)
+                let map = MainViewModel.ReadCoverMap()
+                let original =
+                    match map.TryGetValue(key) with
+                    | true, p when not (String.IsNullOrWhiteSpace(p)) && System.IO.File.Exists(p) -> p
+                    | _ -> ""
+
+                let custom = card.Game.LocalBannerPath
+                card.SetBanner(original)
+                try System.IO.File.Delete(custom) with _ -> ()
+                if map.Remove(key) then
+                    System.IO.File.WriteAllText(MainViewModel.CoverMapPath(), Text.Json.JsonSerializer.Serialize(map))
+
+                if allGames.Contains(card) then GameScanner.saveGamesToCache [ for c in allGames -> c.Game ]
+                else GameScanner.saveEmulatorsToCache [ for c in allEmulators -> c.Game ]
+            with ex ->
+                AppLog.error "Restoring a cover" ex
 
     /// Right-click on a card: remove the title and keep it out of every later
     /// scan too. Nothing on disk is touched either way.

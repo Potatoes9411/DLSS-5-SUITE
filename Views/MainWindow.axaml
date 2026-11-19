@@ -1540,6 +1540,7 @@
                                                     <StackPanel.ContextFlyout>
                                                         <MenuFlyout>
                                                             <MenuItem Header="Change cover image..." Click="OnChangeCoverClicked" />
+                                                            <MenuItem Header="Restore original cover" Click="OnRestoreCoverClicked" IsVisible="{Binding HasCustomCover}" />
                                                             <MenuItem Header="Remove from library" Click="OnRemoveGameClicked" />
                                                             <MenuItem Header="Remove and never scan again" Click="OnRemoveAndExcludeGameClicked" />
                                                         </MenuFlyout>
@@ -1943,6 +1944,7 @@
                                                     <StackPanel.ContextFlyout>
                                                         <MenuFlyout>
                                                             <MenuItem Header="Change cover image..." Click="OnChangeCoverClicked" />
+                                                            <MenuItem Header="Restore original cover" Click="OnRestoreCoverClicked" IsVisible="{Binding HasCustomCover}" />
                                                             <MenuItem Header="Remove from library" Click="OnRemoveEmulatorClicked" />
                                                         </MenuFlyout>
                                                     </StackPanel.ContextFlyout>

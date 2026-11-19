@@ -71,6 +71,11 @@ type GameCardViewModel(game: GameItem) =
 
     member this.Game = currentGame
 
+    /// The card wears artwork the user picked (SetGameCover names it custom_*).
+    member this.HasCustomCover =
+        not (String.IsNullOrWhiteSpace(currentGame.LocalBannerPath))
+        && Path.GetFileName(currentGame.LocalBannerPath).StartsWith("custom_", StringComparison.OrdinalIgnoreCase)
+
     /// Replaces the auto-detected executable with a user supplied one.
     member this.SetExecutable(path: string) =
         let size =
@@ -97,6 +102,7 @@ type GameCardViewModel(game: GameItem) =
         this.RaisePropertyChanged("HasBannerImage")
         this.RaisePropertyChanged("IsVerticalCover")
         this.RaisePropertyChanged("IsAppIcon")
+        this.RaisePropertyChanged("HasCustomCover")
 
 
     /// Refreshed after an install or a removal, so the grid stays truthful

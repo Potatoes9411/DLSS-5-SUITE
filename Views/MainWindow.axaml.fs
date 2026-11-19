@@ -1809,6 +1809,15 @@ type MainWindow() as this =
             | _ -> ()
         | _ -> ()
 
+    /// Right-click flyout on a card: back to the artwork the scan found.
+    member this.OnRestoreCoverClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext, sender with
+        | (:? MainViewModel as vm), (:? Control as ctrl) ->
+            match ctrl.DataContext with
+            | :? GameCardViewModel as card -> vm.RestoreGameCover(card)
+            | _ -> ()
+        | _ -> ()
+
     /// Right-click flyout on a card: take the title out and keep it out of
     /// every later scan.
     member this.OnRemoveAndExcludeGameClicked(sender: obj, e: RoutedEventArgs) =
