@@ -1807,6 +1807,15 @@ type MainWindow() as this =
             | _ -> ()
         | _ -> ()
 
+    /// Right-click flyout on a card: take the title out and keep it out of
+    /// every later scan.
+    member this.OnRemoveAndExcludeGameClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext, sender with
+        | (:? MainViewModel as vm), (:? Control as ctrl) ->
+            match ctrl.DataContext with
+            | :? GameCardViewModel as card -> vm.RemoveAndExcludeGame(card)
+            | _ -> ()
+        | _ -> ()
     /// Right-click flyout on a card: take the title out of the library.
     member this.OnRemoveGameClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext, sender with
@@ -1905,6 +1914,31 @@ type MainWindow() as this =
                     vm.ReplaceOptiScalerNeural(folders.[0].Path.LocalPath)
             }
             |> Async.StartImmediate
+        | _ -> ()
+
+    member this.OnReplaceOptiScalerRtx40Clicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm ->
+            let options = FolderPickerOpenOptions()
+            options.Title <- "Select the OptiScaler RTX40 folder (must contain OptiScaler.dll)"
+            options.AllowMultiple <- false
+
+            async {
+                let! folders = this.StorageProvider.OpenFolderPickerAsync(options) |> Async.AwaitTask
+                if folders <> null && folders.Count > 0 then
+                    vm.ReplaceOptiScalerRtx40(folders.[0].Path.LocalPath)
+            }
+            |> Async.StartImmediate
+        | _ -> ()
+
+    member this.OnRestoreOptiScalerRtx40Clicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.RestoreOptiScalerRtx40()
+        | _ -> ()
+
+    member this.OnRenameProxyClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.RenameProxy()
         | _ -> ()
 
     member this.OnRestoreOptiScalerNeuralClicked(sender: obj, e: RoutedEventArgs) =
