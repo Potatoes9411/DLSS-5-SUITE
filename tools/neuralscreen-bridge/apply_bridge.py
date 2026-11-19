@@ -9,6 +9,8 @@ Each hook is checked before it is added, so a second run changes nothing:
     (its window is the menu) and saves recordings in the capture folder;
   * tray.py, taskbar.py and display.py use SUITE's name, icon and palette;
   * pipeline.py hides both output layers while a captured app is not focused;
+  * main.py latches the capture and computes the motion guide once per frame;
+  * settings_io.py lets a saved auto mask override the profile's;
   * the worker keeps the picture just above the captured window in one-window
     mode instead of above everything, and never covers SUITE's window.
 The worker change needs native\\build-host.bat afterwards.
@@ -132,6 +134,69 @@ patch("main.py",
             '                           prepared=bool(st.gray_active),',
             '                           passes=int(st.cfg.get("passes", 1)))'),
       'passes=int(st.cfg.get("passes", 1))')
+
+# ----- main.py: one capture latch and one motion field per frame -----
+# The frame loop prepared the capture and computed the motion guide twice per
+# frame: once with the bypass / NVIDIA Optical Flow handling, then again right
+# before the send without it. That was a second synchronous worker round trip
+# (capture latch, GPU gray readback, fence wait) on every frame, CPU optical
+# flow even when NVIDIA Optical Flow was picked, and optical flow while NR was
+# off. The guide from the first block is the one this frame needs.
+GUIDE_FAIL = lines(
+    "                except Exception as guide_exc:",
+    "                    # guides is not critical: ValueError/TypeError/cv2.error (the",
+    "                    # shape of the gray frame, a division by zero) must not take",
+    "                    # the process down. We skip the frame - the worker gets the",
+    "                    # next one. But a persistent error (an incompatible gray",
+    "                    # channel, a broken shape) would spin main at 100% CPU -",
+    "                    # after 5 failures in a row we fall back to zero motion: the",
+    "                    # frames keep flowing and the picture does not freeze.",
+    '                    print(f"[main] guides.process failed ({guide_exc}) - frame skipped",',
+    "                          file=sys.stderr)",
+    "                    st.guide_fails += 1",
+    "                    if st.guide_fails >= 5:",
+    '                        print(f"[main] guides.process is unstable - zero motion "',
+    '                              f"(frames keep flowing)", file=sys.stderr)',
+    "                        st.guide_fails = 0",
+    "                        guide = st.guides.zero_guide()",
+    "                    else:",
+    "                        continue")
+patch("main.py",
+      lines("            try:",
+            "                check_worker(st.worker, st.worker_logs)",
+            "                if st.gray_active:",
+            "                    prepare_capture(st.worker, st.reader, st.frame_index, st.pts)",
+            "                try:",
+            "                    t0 = time.perf_counter()",
+            "                    if st.gray_active:",
+            "                        guide = st.guides.process(gray=st.shm.read_gray())",
+            "                    else:",
+            "                        guide = st.guides.process(st.work_frame)",
+            '                    _perf("guides", t0)')
+      + GUIDE_FAIL
+      + lines("                t0 = time.perf_counter()",
+              "                send_frame(st.worker, st.frame_index, st.work_frame, guide.motion, guide.reset,"),
+      lines("            try:",
+            "                # DLSS 5 SUITE: the guide computed above is this frame's; a second",
+            "                # capture latch and motion field here doubled the per-frame cost.",
+            "                check_worker(st.worker, st.worker_logs)",
+            "                t0 = time.perf_counter()",
+            "                send_frame(st.worker, st.frame_index, st.work_frame, guide.motion, guide.reset,"),
+      "DLSS 5 SUITE: the guide computed above is this frame's")
+
+# ----- settings_io.py: the auto mask is SUITE's switch -----
+# Every built-in profile forces auto_mask=1, so the switch SUITE shows had no
+# way in. A saved value now wins over the profile's, as the style does.
+patch("settings_io.py",
+      lines("    if isinstance(style, int) and not isinstance(style, bool) and 0 <= style <= 2:",
+            '        params["style"] = style'),
+      lines("    if isinstance(style, int) and not isinstance(style, bool) and 0 <= style <= 2:",
+            '        params["style"] = style',
+            "    # DLSS 5 SUITE: a saved auto mask overrides the profile's, as the style does.",
+            '    auto_mask = cfg.get("auto_mask")',
+            "    if isinstance(auto_mask, (bool, int)) and int(auto_mask) in (0, 1):",
+            '        params["auto_mask"] = int(auto_mask)'),
+      "a saved auto mask overrides the profile's")
 
 # ----- tray.py -----
 patch("tray.py",

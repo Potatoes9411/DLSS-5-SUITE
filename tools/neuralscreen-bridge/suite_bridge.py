@@ -9,6 +9,8 @@ the tray and the hotkeys already use, so nothing is decided twice.
     {"action": ["param", "intensity", 0.8]}   what the menu would report
     {"command": "record"}                      what a hotkey would push
     {"shot": "C:/Captures/shot.png"}           a screenshot, no dialog
+    {"auto_mask": 1}                           DLSS 5's auto mask, live
+    {"exposure": [1.0, 1.1]}                   exposure lit/dark, restarts the worker
 
 Without NS_SUITE_INBOX this does nothing and NeuralScreen runs as it always has.
 """
@@ -110,5 +112,48 @@ def drain(st, apply_menu_action) -> None:
                 target = Path(request["shot"])
                 target.parent.mkdir(parents=True, exist_ok=True)
                 st.shot_paths.put(target)
+            elif "auto_mask" in request:
+                _set_auto_mask(st, request["auto_mask"])
+            elif "exposure" in request:
+                _set_exposure(st, request["exposure"])
         except Exception as exc:
             print(f"[suite] request {request!r} failed: {exc}", file=sys.stderr)
+
+
+def _set_auto_mask(st, value) -> None:
+    """DLSS 5's auto mask, live: it rides with the parameters, like the style.
+
+    The menu's "param" action stores floats, and the wire carries the mask as
+    an unsigned int, so it gets its own request.
+    """
+    import pipeline
+    on = 1 if value else 0
+    st.cfg["auto_mask"] = on
+    if int(st.params.get("auto_mask", 1)) == on:
+        return
+    new_params = dict(st.params)
+    new_params["auto_mask"] = on
+    pipeline.request_apply(st, st.work_scale, st.cfg["profile"], new_params)
+
+
+def exposure_env(low: float, high: float) -> dict:
+    """The worker's exposure (NS_PW_*): `low` in lit scenes, `high` in dark ones.
+
+    NS_PW stays on whatever the values are: with it off the worker forces 1.0,
+    and a fixed exposure is just low == high.
+    """
+    low = min(2.0, max(0.25, float(low)))
+    high = min(2.0, max(low, float(high)))
+    return {"NS_PW": "1", "NS_PW_MIN": f"{low:.4f}", "NS_PW_MAX": f"{high:.4f}"}
+
+
+def _set_exposure(st, value) -> None:
+    """The worker reads its exposure once per process: set it, then rebuild it."""
+    env = exposure_env(*value)
+    if all(os.environ.get(key) == text for key, text in env.items()):
+        return
+    os.environ.update(env)
+    import pipeline
+    print(f"[suite] exposure {env['NS_PW_MIN']}..{env['NS_PW_MAX']} - restarting the worker")
+    pipeline.teardown_pipeline(st)
+    pipeline.rebuild_pipeline(st, f"Exposure {float(env['NS_PW_MIN']):.2f}")
