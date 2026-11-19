@@ -175,7 +175,10 @@ fi
 
 mkdir -p "$DIST"
 echo "--- packaging portable ZIP ---"
-powershell -NoProfile -Command "Compress-Archive -Path '$APP/publish/*' -DestinationPath '$PORTABLE_TARGET' -CompressionLevel Optimal"
+# Compress-Archive gave up on the first file Windows touched while it ran (a
+# shader briefly locked, a desktop.ini that vanished). ZipFile reads each file
+# once, and a failed attempt is retried from scratch up to three times.
+powershell -NoProfile -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; \$ok = \$false; for (\$i = 1; \$i -le 3 -and -not \$ok; \$i++) { try { if (Test-Path '$PORTABLE_TARGET') { Remove-Item '$PORTABLE_TARGET' -Force }; [IO.Compression.ZipFile]::CreateFromDirectory('$APP/publish', '$PORTABLE_TARGET', [IO.Compression.CompressionLevel]::Optimal, \$false); \$ok = \$true } catch { Write-Host ('portable zip attempt ' + \$i + ' failed: ' + \$_.Exception.Message); Start-Sleep -Seconds 5 } }; if (-not \$ok) { exit 1 }"
 
 echo "--- packaging installer ---"
 rm -rf "$APP/Setup/bin" "$APP/Setup/obj" "$ROOT/setup-out" "$ROOT/web-setup-out"

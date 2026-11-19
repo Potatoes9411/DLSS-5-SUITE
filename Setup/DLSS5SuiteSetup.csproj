@@ -78,14 +78,13 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.0" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.0" />
   </ItemGroup>
+
+  <!-- SetupWindow declares its named controls itself. The property above no
+       longer stops Avalonia's name generator, which then adds every one a
+       second time (CS0102), so its analyzer is taken out before compiling. -->
+  <Target Name="DropAvaloniaNameGenerator" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)' == 'Avalonia.Generators'" />
+    </ItemGroup>
+  </Target>
 </Project>
-
-
-
-
-
-
-
-
-
-
