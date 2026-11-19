@@ -78,7 +78,7 @@ module ResultReporter =
         if clean.Length > n then clean.Substring(0, n).Trim() else clean
 
     /// Sends the record. Ok on 204; Error with a reason the UI can show.
-    let send (game: GameItem) (worked: bool) (byPerson: bool) : Result<unit, string> =
+    let private sendOnce (game: GameItem) (worked: bool) (byPerson: bool) : Result<unit, string> =
         try
             match ModInstaller.readManifest game, nvidiaCard.Value with
             | None, _ -> Error "Nothing of SUITE's is installed in this game."
@@ -135,3 +135,12 @@ module ResultReporter =
         with ex ->
             AppLog.warn ("Sharing a result failed: " + ex.Message)
             Error "The results service could not be reached."
+
+    /// Sends the record. Every refusal is logged too, so a result that
+    /// never reaches the site can be traced from the log, not only the UI.
+    let send (game: GameItem) (worked: bool) (byPerson: bool) : Result<unit, string> =
+        let result = sendOnce game worked byPerson
+        match result with
+        | Error why -> AppLog.warn (sprintf "Result for %s not shared: %s" game.Title why)
+        | Ok() -> ()
+        result

@@ -3385,6 +3385,11 @@ type MainViewModel() as this =
             System.Threading.Tasks.Task.Run(fun () ->
                 let report = try Diagnosis.analyse game with ex -> { Diagnosis.Report.Ran = false; Verdict = "The check failed: " + ex.Message; Route = ""; Findings = []; LogTime = None; NeverRan = false }
                 AppLog.info (sprintf "Did it work? %s: %s" game.Title report.Verdict)
+                // A check that settles it is shared the same way the
+                // after-close check is, when automatic sharing is on.
+                if ResultReporter.isAutoSharing () then
+                    if Diagnosis.isWorking report.Verdict then ResultReporter.send game true false |> ignore
+                    elif report.Ran && Diagnosis.routeFailed report.Verdict then ResultReporter.send game false false |> ignore
                 Dispatcher.UIThread.Post(fun () ->
                     lastVerdicts.[game.AppId] <- report
                     manageVerdictBusy <- false
