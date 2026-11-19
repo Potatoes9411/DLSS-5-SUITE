@@ -55,6 +55,11 @@ The Screen Engine and Motion Forge now share every generator:
 ### Fixes
 
 - **YouTube and video player no longer freeze.** DLSS 5 takes 12-16 seconds to start (about a minute the very first time). Your video now waits behind a short "DLSS 5 is starting..." clip and plays from its first frame. Clicking in the player during start-up no longer hangs it.
+- **NeuralScreen (RTX 30/40)**:
+  - Runs much faster. Each frame no longer captures twice or works out motion twice, and a Quality / Balanced / Performance choice is picked for your card (RTX 30 gets Performance).
+  - Roblox and other games are no longer too bright: NeuralScreen keeps its own tone setting, and there's a new Exposure slider and a "Brighten dark scenes" switch.
+  - The settings it was missing are now in the window: auto mask, skin strength, model folder, optical flow preset and recording sound. Settings that only the Screen Engine supports are labelled.
+  - Frame generation only offers what your card can run: off on RTX 30, 2x on RTX 40, up to 4x on RTX 50.
 - **SMAI download** no longer fails with "used by another process".
 - **Did it work?** shares a settled answer when automatic sharing is on. Every result that isn't shared is logged with its reason.
 - SUITE's own window runs at up to five times the frame rate.
