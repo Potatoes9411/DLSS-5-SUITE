@@ -18,6 +18,7 @@
     <Compile Include="DlssEnablerTests.fs" />
     <Compile Include="MotionForgeTests.fs" />
     <Compile Include="DlssgVersionsTests.fs" />
+    <Compile Include="InstallerMergeTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,4 +1,4 @@
-﻿namespace DLSS_5_MANAGER.Services
+namespace DLSS_5_MANAGER.Services
 
 open System
 open System.IO
@@ -1058,6 +1058,54 @@ module GameScanner =
             let cachePath = getCacheFilePath ()
             if File.Exists(cachePath) then File.Delete(cachePath)
         with _ -> ()
+
+    // -------------------------------------------------------------------------
+    // EXCLUDED GAMES
+    // -------------------------------------------------------------------------
+    /// Titles the user removed from the library and asked never to see again.
+    /// A plain removal only lasts until the next scan finds the game again;
+    /// these stay out. Each entry is an executable path or a title.
+    let private getExcludedPath () =
+        let localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+        let dir = Path.Combine(localAppData, "DLSS5Suite")
+        if not (Directory.Exists(dir)) then Directory.CreateDirectory(dir) |> ignore
+        Path.Combine(dir, "excluded.json")
+
+    let loadExcluded () : HashSet<string> =
+        try
+            let path = getExcludedPath ()
+
+            if File.Exists(path) then
+                let options = JsonSerializerOptions()
+                options.PropertyNameCaseInsensitive <- true
+                let items = JsonSerializer.Deserialize<string[]>(File.ReadAllText(path), options)
+                HashSet<string>((if isNull items then [||] else items), StringComparer.OrdinalIgnoreCase)
+            else
+                HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        with _ ->
+            HashSet<string>(StringComparer.OrdinalIgnoreCase)
+
+    /// The two keys a game is excluded under: its executable and its title.
+    let excludedKeysFor (exePath: string) (title: string) : string list =
+        [ if not (String.IsNullOrWhiteSpace(exePath)) then exePath.Trim()
+          if not (String.IsNullOrWhiteSpace(title)) then title.Trim() ]
+
+    let addExcluded (exePath: string) (title: string) : unit =
+        try
+            let set = loadExcluded ()
+
+            for key in excludedKeysFor exePath title do
+                set.Add(key) |> ignore
+
+            let options = JsonSerializerOptions()
+            options.WriteIndented <- true
+            File.WriteAllText(getExcludedPath (), JsonSerializer.Serialize(Array.ofSeq set, options))
+        with _ -> ()
+
+    /// True when either the game's executable or its title is on the list.
+    let isExcluded (set: HashSet<string>) (game: GameItem) : bool =
+        (not (String.IsNullOrWhiteSpace(game.TargetExecutablePath)) && set.Contains(game.TargetExecutablePath.Trim()))
+        || (not (String.IsNullOrWhiteSpace(game.Title)) && set.Contains(game.Title.Trim()))
 
     // -------------------------------------------------------------------------
     // EMULATORS

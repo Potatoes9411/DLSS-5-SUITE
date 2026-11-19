@@ -500,6 +500,34 @@ type MainViewModel() as this =
     let mutable installedNeural = false
     let mutable installedFeeder = false
 
+    /// The RenoDX options on the DX12 / DX11 / DX9 routes - the MFG unlock
+    /// add-on, the Multipass build of RenoDX and the deep-fried chicken
+    /// payload - and the ReShade API an emulator install uses ("" = auto).
+    /// All off / auto unless the user asks.
+    let mutable useMfgUnlock = false
+    let mutable useMultipass = false
+    let mutable useDeepFried = false
+    let mutable emulatorApiChoice = ""
+
+    let mutable installedMfgUnlock = false
+    let mutable installedMultipass = false
+    let mutable installedDeepFriedFlag = false
+    let mutable installedEmuApi = ""
+
+    /// The keys that open ReShade and OptiScaler's menu in game, kept across
+    /// installs and applied to every install that has the ini to apply to.
+    let mutable reshadeKey = ModInstaller.savedReShadeKey ()
+    let mutable optiMenuKey = ModInstaller.savedOptiMenuKey ()
+    let mutable keysStatus = ""
+
+    /// The proxy name typed into the manage sheet, and what the last rename said.
+    let mutable proxyNameInput = ""
+    let mutable proxyRenameStatus = ""
+
+    // The installer picks the RTX 40 build of DLSS-NR OptiScaler on an RTX 40
+    // card; the card is detected here, above the installer in the build.
+    do ModInstaller.gpuIsRtx40 <- Tuning.isRtx40
+
     /// True once the user has picked a route in the open sheet. Detection then
     /// stops overriding it - see SetInstallMode.
     let mutable routeChosenByUser = false
@@ -2116,8 +2144,13 @@ type MainViewModel() as this =
                             Dispatcher.UIThread.Post(fun () -> this.ScanStatusText <- progress))
                         |> Async.RunSynchronously
 
+                    // Games the user removed and asked never to see again stay
+                    // out, however many times a scan finds them.
+                    let excluded = GameScanner.loadExcluded ()
+
                     let combined =
                         GameScanner.deduplicateGames (scannedGames @ cachedCustomGames)
+                        |> List.filter (fun g -> not (GameScanner.isExcluded excluded g))
                         |> List.sortBy (fun g -> g.Title)
 
                     GameScanner.saveGamesToCache combined
@@ -2587,6 +2620,226 @@ type MainViewModel() as this =
         && installedRoute <> ""
         && installedRoute = ModInstaller.modeKey installMode
 
+    // ---------------------------------------------------------------------
+    // RENODX OPTIONS - MFG unlock, Multipass, deep-fried chicken
+    // ---------------------------------------------------------------------
+    /// The DX12 / DX11 / DX9 routes. MFG unlock and Multipass need RenoDX, so
+    /// 64-bit only; deep-fried chicken also goes into host64 on 32-bit DX9 /
+    /// DX11.
+    member private this.IsRenoDxRoute =
+        not isEmulatorTarget
+        && not isAmdMode
+        && (installMode = ModInstaller.Dx12Auto
+            || installMode = ModInstaller.Dx11
+            || installMode = ModInstaller.Dx9)
+
+    member this.IsRenoDxOptionsVisible = this.IsRenoDxRoute
+
+    member this.IsRenoDx64Visible =
+        this.IsRenoDxRoute
+        && not (ModInstaller.archMatters installMode && installArch = ModInstaller.Bit32)
+
+    member this.IsMfgUnlockEnabled
+        with get () = useMfgUnlock
+        and set (value: bool) =
+            if useMfgUnlock <> value then
+                useMfgUnlock <- value
+                this.RaiseInstallModeState()
+
+    member this.IsMultipassEnabled
+        with get () = useMultipass
+        and set (value: bool) =
+            if useMultipass <> value then
+                useMultipass <- value
+                this.RaiseInstallModeState()
+
+    member this.IsDeepFriedEnabled
+        with get () = useDeepFried
+        and set (value: bool) =
+            if useDeepFried <> value then
+                useDeepFried <- value
+                this.RaiseInstallModeState()
+
+    member this.DeepFriedHintText =
+        if ModInstaller.archMatters installMode && installArch = ModInstaller.Bit32 then
+            "Deep-fried chicken runs from host64 beside the 64-bit host on this 32-bit install."
+        else
+            "Deep-fried chicken goes in place of RenoDX - not beside it. Multipass is ignored while it is on."
+
+    member private this.InstallOptions: ModInstaller.InstallOptions =
+        { MfgUnlockAddon = useMfgUnlock
+          MultipassBuild = useMultipass
+          DeepFriedChicken = useDeepFried
+          EmulatorReShadeApi = emulatorApiChoice }
+
+    /// What the chosen options come to on the route on screen, the same way
+    /// the installer reads them - so a switch is only offered for a real change.
+    member private this.RenoDxOptionsDiffer =
+        let (mfg, multi, friedHere, friedHost) =
+            ModInstaller.effectiveRenoDxOptions installMode installArch this.InstallOptions
+
+        this.IsRenoDxRoute
+        && (installedMfgUnlock <> mfg
+            || installedMultipass <> multi
+            || installedDeepFriedFlag <> (friedHere || friedHost))
+
+    // ---------------------------------------------------------------------
+    // EMULATOR API
+    // ---------------------------------------------------------------------
+    /// What the emulator route can hook ReShade through. Auto leaves it to the
+    /// emulator catalogue, as the route always did.
+    member this.EmulatorApiOptions = [| "Auto"; "DirectX (dxgi)"; "Vulkan" |]
+
+    member this.IsEmulatorApiVisible = isEmulatorTarget
+
+    member this.SelectedEmulatorApiIndex
+        with get () =
+            match emulatorApiChoice with
+            | "dxgi" -> 1
+            | "vulkan" -> 2
+            | _ -> 0
+        and set (index: int) =
+            let value =
+                match index with
+                | 1 -> "dxgi"
+                | 2 -> "vulkan"
+                | _ -> ""
+
+            if index >= 0 && emulatorApiChoice <> value then
+                emulatorApiChoice <- value
+                this.RaisePropertyChanged("SelectedEmulatorApiIndex")
+                this.RaiseInstallModeState()
+
+    // ---------------------------------------------------------------------
+    // HOTKEYS
+    // ---------------------------------------------------------------------
+    member this.ReShadeKeyOptions = ModInstaller.reshadeKeys
+    member this.OptiMenuKeyOptions = ModInstaller.optiMenuKeys
+
+    /// The folder of the open game when this app installed into it, else "".
+    member private this.InstalledGameDir =
+        match manageCard with
+        | Some card when ModInstaller.isInstalled card.Game ->
+            try System.IO.Path.GetDirectoryName(manageExePath) with _ -> ""
+        | _ -> ""
+
+    member this.KeysStatus = keysStatus
+    member this.HasKeysStatus = not (String.IsNullOrWhiteSpace(keysStatus))
+
+    member private this.SetKeysStatus(text: string) =
+        keysStatus <- text
+        this.RaisePropertyChanged("KeysStatus")
+        this.RaisePropertyChanged("HasKeysStatus")
+
+    member this.SelectedReShadeKey
+        with get () = reshadeKey
+        and set (name: string) =
+            if not (isNull name) && ModInstaller.reshadeKeys |> Array.contains name && name <> reshadeKey then
+                reshadeKey <- name
+                ModInstaller.saveReShadeKey name
+                this.RaisePropertyChanged("SelectedReShadeKey")
+
+                let dir = this.InstalledGameDir
+
+                if dir <> "" && System.IO.File.Exists(System.IO.Path.Combine(dir, "ReShade.ini")) then
+                    ModInstaller.applyReShadeKey dir name
+                    this.SetKeysStatus("ReShade now opens with " + name + " in this game.")
+                else
+                    this.SetKeysStatus("")
+
+    member this.SelectedOptiMenuKey
+        with get () = optiMenuKey
+        and set (name: string) =
+            if not (isNull name) && ModInstaller.optiMenuKeys |> Array.contains name && name <> optiMenuKey then
+                optiMenuKey <- name
+                ModInstaller.saveOptiMenuKey name
+                this.RaisePropertyChanged("SelectedOptiMenuKey")
+
+                let dir = this.InstalledGameDir
+
+                if dir <> "" && System.IO.File.Exists(System.IO.Path.Combine(dir, "OptiScaler.ini")) then
+                    ModInstaller.applyOptiScalerMenuKey dir name
+                    let shown = if name = "Auto" then "Insert" else name
+                    this.SetKeysStatus("OptiScaler's menu now opens with " + shown + " in this game.")
+                else
+                    this.SetKeysStatus("")
+
+    /// After an install: the chosen keys go into whatever inis it put down.
+    member private this.ApplyKeysToInstall(exePath: string) =
+        try
+            let dir = System.IO.Path.GetDirectoryName(exePath)
+
+            if not (String.IsNullOrWhiteSpace(dir)) then
+                ModInstaller.applyReShadeKey dir reshadeKey
+                ModInstaller.applyOptiScalerMenuKey dir optiMenuKey
+        with _ ->
+            ()
+
+    // ---------------------------------------------------------------------
+    // PROXY RENAME
+    // ---------------------------------------------------------------------
+    /// Which kind of proxy the open install hooks through, and its file name.
+    member private this.CurrentProxy: (ModInstaller.ProxyKind * string) option =
+        match manageCard with
+        | Some card when ModInstaller.isInstalled card.Game ->
+            [ ModInstaller.OptiScalerProxyDll; ModInstaller.AmdProxyDll; ModInstaller.ReShadeProxyDll ]
+            |> List.tryPick (fun kind ->
+                match ModInstaller.installedProxyPath card.Game kind with
+                | "" -> None
+                | path -> Some(kind, System.IO.Path.GetFileName(path)))
+        | _ -> None
+
+    member this.HasRenamableProxy = this.CurrentProxy.IsSome && not isInstalling
+
+    member this.CurrentProxyText =
+        match this.CurrentProxy with
+        | Some(ModInstaller.OptiScalerProxyDll, name) -> "OptiScaler is hooked as " + name
+        | Some(ModInstaller.AmdProxyDll, name) -> "The AMD payload is hooked as " + name
+        | Some(_, name) -> "ReShade is hooked as " + name
+        | None -> ""
+
+    member this.ProxyNameInput
+        with get () = proxyNameInput
+        and set (value: string) = this.SetProperty(&proxyNameInput, value) |> ignore
+
+    member this.ProxyRenameStatus = proxyRenameStatus
+    member this.HasProxyRenameStatus = not (String.IsNullOrWhiteSpace(proxyRenameStatus))
+
+    member this.RenameProxy() =
+        match manageCard, this.CurrentProxy with
+        | Some card, Some(kind, _) ->
+            let outcome = ModInstaller.renameProxy card.Game kind proxyNameInput
+            proxyRenameStatus <- outcome.Message
+
+            if outcome.Success then
+                proxyNameInput <- ""
+                this.RaisePropertyChanged("ProxyNameInput")
+                card.RefreshModBadge()
+
+            this.RaisePropertyChanged("ProxyRenameStatus")
+            this.RaisePropertyChanged("HasProxyRenameStatus")
+            this.RaiseProxyState()
+        | _ -> ()
+
+    member private this.RaiseProxyState() =
+        this.RaisePropertyChanged("HasRenamableProxy")
+        this.RaisePropertyChanged("CurrentProxyText")
+
+    /// What the recorded install of the open game carried, beyond its route.
+    member private this.ReadInstalledOptions() =
+        match manageCard with
+        | Some card ->
+            let (mfg, multi) = ModInstaller.installedRenoDxOptions card.Game
+            installedMfgUnlock <- mfg
+            installedMultipass <- multi
+            installedDeepFriedFlag <- ModInstaller.installedDeepFried card.Game
+            installedEmuApi <- ModInstaller.installedEmulatorApi card.Game
+        | None ->
+            installedMfgUnlock <- false
+            installedMultipass <- false
+            installedDeepFriedFlag <- false
+            installedEmuApi <- ""
+
     member this.IsBit64 = (installArch = ModInstaller.Bit64)
     member this.IsBit32 = (installArch = ModInstaller.Bit32)
 
@@ -2614,6 +2867,14 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("IsFeederOff")
         this.RaisePropertyChanged("IsFeederEnabled")
         this.RaisePropertyChanged("IsFeederInstalled")
+        this.RaisePropertyChanged("IsRenoDxOptionsVisible")
+        this.RaisePropertyChanged("IsRenoDx64Visible")
+        this.RaisePropertyChanged("IsMfgUnlockEnabled")
+        this.RaisePropertyChanged("IsMultipassEnabled")
+        this.RaisePropertyChanged("IsDeepFriedEnabled")
+        this.RaisePropertyChanged("DeepFriedHintText")
+        this.RaisePropertyChanged("IsEmulatorApiVisible")
+        this.RaisePropertyChanged("SelectedEmulatorApiIndex")
         this.RaisePropertyChanged("IsBit64")
         this.RaisePropertyChanged("IsBit32")
         this.RaisePropertyChanged("InstallModeHintText")
@@ -2981,7 +3242,10 @@ type MainViewModel() as this =
             // Turning the neural upstream add-on on or off changes what is on
             // the game, so it is a switch like any other.
             || (this.IsNeuralAddonVisible && installedNeural <> useNeuralAddon)
-            || (this.IsFeederVisible && installedFeeder <> useFeeder))
+            || (this.IsFeederVisible && installedFeeder <> useFeeder)
+            // So do the RenoDX options and the emulator's ReShade API.
+            || this.RenoDxOptionsDiffer
+            || (installMode = ModInstaller.Emulator && installedEmuApi <> emulatorApiChoice))
 
     member this.ShowInstallButton = not dlss5Present && not isInstalling
     member this.ShowSwitchButton = this.IsSwitchingRoute && not isInstalling
@@ -3024,8 +3288,22 @@ type MainViewModel() as this =
 
         // The add-on is part of what gets installed, so the button has to say
         // which way the switch is going.
+        // One option is named; several are counted, so the text always fits
+        // the button instead of running out past the edge of the sheet.
+        let (mfg, multi, friedHere, friedHost) =
+            ModInstaller.effectiveRenoDxOptions installMode installArch this.InstallOptions
+
+        let options =
+            [ if this.IsNeuralAddonVisible && useNeuralAddon then "neural"
+              if this.IsRenoDxRoute && mfg then "MFG unlock"
+              if this.IsRenoDxRoute && multi then "multipass"
+              if this.IsRenoDxRoute && (friedHere || friedHost) then "deep-fried" ]
+
         let neural =
-            if this.IsNeuralAddonVisible && useNeuralAddon then " + neural" else ""
+            match options with
+            | [] -> ""
+            | [ one ] -> " + " + one
+            | many -> sprintf " + %d options" many.Length
 
         if ModInstaller.archMatters installMode then
             sprintf "Switch to %s %s-bit%s" route (ModInstaller.archKey installArch) neural
@@ -3064,6 +3342,7 @@ type MainViewModel() as this =
         this.RaisePropertyChanged("IsNeuralAddonInstalled")
         this.RaisePropertyChanged("ManageDlss5Text")
         this.RaisePropertyChanged("ManageDlss5Brush")
+        this.RaiseProxyState()
 
     member this.InstallProgress
         with get () = installProgress
@@ -3134,6 +3413,8 @@ type MainViewModel() as this =
             match manageCard with
             | Some card -> ModInstaller.installedFeeder card.Game
             | None -> false
+
+        this.ReadInstalledOptions()
 
         if not (String.IsNullOrWhiteSpace(analysis.ExecutablePath)) then
             manageExePath <- analysis.ExecutablePath
@@ -3778,6 +4059,20 @@ type MainViewModel() as this =
         useNeuralAddon <- installedNeural
         useFeeder <- installedFeeder
 
+        this.ReadInstalledOptions()
+        useMfgUnlock <- installedMfgUnlock
+        useMultipass <- installedMultipass
+        useDeepFried <- installedDeepFriedFlag
+        emulatorApiChoice <- installedEmuApi
+        proxyNameInput <- ""
+        proxyRenameStatus <- ""
+        keysStatus <- ""
+        this.RaisePropertyChanged("ProxyNameInput")
+        this.RaisePropertyChanged("ProxyRenameStatus")
+        this.RaisePropertyChanged("HasProxyRenameStatus")
+        this.RaisePropertyChanged("KeysStatus")
+        this.RaisePropertyChanged("HasKeysStatus")
+
         // A fresh sheet: nothing has been picked in it yet, and whether this
         // game arrived with an install is what decides if detection may route
         // it at all.
@@ -3870,6 +4165,7 @@ type MainViewModel() as this =
             let targetApi = optiApi
             let targetNeural = useNeuralAddon
             let targetFeeder = useFeeder
+            let targetOptions = this.InstallOptions
             let targetOverlay = this.OverlayOptions
 
             this.InstallResultText <- ""
@@ -3903,7 +4199,8 @@ type MainViewModel() as this =
                             (false, "Could not remove the previous install: " + removal.Message)
                         else
                             let outcome =
-                                ModInstaller.install game exePath plan target targetArch targetApi targetNeural targetFeeder targetOverlay (scaled 0.33 0.67)
+                                ModInstaller.installWithOptions game exePath plan target targetArch targetApi targetNeural targetFeeder targetOptions targetOverlay (scaled 0.33 0.67)
+                            if outcome.Success then this.ApplyKeysToInstall(exePath)
                             (outcome.Success, "Switched. " + outcome.Message)
                     with ex ->
                         (false, ex.Message)
@@ -3950,12 +4247,17 @@ type MainViewModel() as this =
                     { ModInstaller.InstallPlan.DlssDirs = a.DlssDirs
                       ModInstaller.InstallPlan.StreamlineDirs = a.StreamlineDirs })
 
+            let options = this.InstallOptions
+
             System.Threading.Tasks.Task.Run(fun () ->
                 let (succeeded, message) =
                     try
                         let outcome =
                             if isInstallAction then
-                                ModInstaller.install game exePath plan installMode installArch optiApi useNeuralAddon useFeeder this.OverlayOptions report
+                                let o =
+                                    ModInstaller.installWithOptions game exePath plan installMode installArch optiApi useNeuralAddon useFeeder options this.OverlayOptions report
+                                if o.Success then this.ApplyKeysToInstall(exePath)
+                                o
                             else
                                 let o = ModInstaller.uninstall game exePath plan report
                                 if o.Success && OpenXrLayer.isEnabled game then OpenXrLayer.disable game |> ignore
@@ -4568,6 +4870,13 @@ type MainViewModel() as this =
             with _ ->
                 ()
 
+    /// Right-click on a card: remove the title and keep it out of every later
+    /// scan too. Nothing on disk is touched either way.
+    member this.RemoveAndExcludeGame(card: GameCardViewModel) =
+        if not (isNull (box card)) then
+            try GameScanner.addExcluded card.Game.TargetExecutablePath card.Game.Title with _ -> ()
+            this.RemoveGame(card)
+
     /// Right-click on a card: drop the title from the library without touching
     /// anything on disk. Its cached analysis goes with it.
     member this.RemoveGame(card: GameCardViewModel) =
@@ -4675,6 +4984,20 @@ type MainViewModel() as this =
         let (ok, message) = ModInstaller.Payload.restoreOptiScalerNeural ()
         this.PayloadStatusText <- message
         if ok then this.RaisePropertyChanged("OptiScalerNeuralState")
+
+    /// The RTX 40 build of DLSS-NR OptiScaler, used in place of the neural
+    /// upstream one on an RTX 40 card. Swapped the same way.
+    member this.OptiScalerRtx40State = ModInstaller.Payload.describeOptiScalerRtx40 ()
+
+    member this.ReplaceOptiScalerRtx40(sourceDir: string) =
+        let (ok, message) = ModInstaller.Payload.replaceOptiScalerRtx40 sourceDir
+        this.PayloadStatusText <- message
+        if ok then this.RaisePropertyChanged("OptiScalerRtx40State")
+
+    member this.RestoreOptiScalerRtx40() =
+        let (ok, message) = ModInstaller.Payload.restoreOptiScalerRtx40 ()
+        this.PayloadStatusText <- message
+        if ok then this.RaisePropertyChanged("OptiScalerRtx40State")
 
     /// The AMD payload: replaceable, never switchable - the route cannot
     /// install without it.

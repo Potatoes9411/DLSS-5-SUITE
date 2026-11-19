@@ -1023,6 +1023,26 @@
                                                 </Grid>
                                             </Border>
 
+                                            <!-- The RTX 40 build of DLSS-NR OptiScaler: used in place of
+                                                 the neural-upstream one on an RTX 40 card -->
+                                            <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="OptiScaler RTX40 (used on RTX 40 cards)" FontSize="13" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                        <TextBlock Text="{Binding OptiScalerRtx40State}" FontSize="11" Foreground="#94A3B8" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <Button Classes="EmptyActionBtn" Click="OnReplaceOptiScalerRtx40Clicked" Cursor="Hand" Padding="14,7"
+                                                                ToolTip.Tip="Pick the folder the RTX40 build was extracted into - it must contain OptiScaler.dll">
+                                                            <TextBlock Text="{Binding Loc.Replace}" FontSize="11" FontWeight="Bold" Foreground="#FFFFFF" />
+                                                        </Button>
+                                                        <Button Classes="EmptyActionBtn" Click="OnRestoreOptiScalerRtx40Clicked" Cursor="Hand" Padding="14,7">
+                                                            <TextBlock Text="{Binding Loc.Restore}" FontSize="11" FontWeight="Bold" Foreground="#CBD5E1" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+
                                             <!-- AMD payload: swappable, but never switchable - the
                                                  route has nothing to install without it. -->
                                             <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,10">
@@ -1440,6 +1460,7 @@
                                                         <MenuFlyout>
                                                             <MenuItem Header="Change cover image..." Click="OnChangeCoverClicked" />
                                                             <MenuItem Header="Remove from library" Click="OnRemoveGameClicked" />
+                                                            <MenuItem Header="Remove and never scan again" Click="OnRemoveAndExcludeGameClicked" />
                                                         </MenuFlyout>
                                                     </StackPanel.ContextFlyout>
                                                     <StackPanel.Transitions>
@@ -3273,6 +3294,89 @@
                                 </Grid>
                                 <TextBlock Text="Default: without Feeder. Turn it on only for a game or guide that specifically needs DLSS 5 Feeder; standard ReShade + RenoDX installs do not."
                                            FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" LineHeight="16" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- RenoDX options: the MFG unlock add-on, the Multipass build of
+                             RenoDX and the deep-fried chicken payload. -->
+                        <Border Classes="RouteReveal" Classes.Shown="{Binding IsRenoDxOptionsVisible}" IsVisible="{Binding IsRenoDxOptionsVisible}"
+                                Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1"
+                                CornerRadius="16" Padding="16,13">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="RENODX OPTIONS" FontSize="9.5" FontWeight="Bold"
+                                           Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding IsRenoDx64Visible}">
+                                    <TextBlock Grid.Column="0" Text="MFG unlock add-on (renodx-mfgunlock) beside RenoDX"
+                                               FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsMfgUnlockEnabled, Mode=TwoWay}"
+                                                  IsEnabled="{Binding IsManageReady}" OffContent="Off" OnContent="On" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" IsVisible="{Binding IsRenoDx64Visible}">
+                                    <TextBlock Grid.Column="0" Text="Multipass build of RenoDX in place of the ordinary one"
+                                               FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsMultipassEnabled, Mode=TwoWay}"
+                                                  IsEnabled="{Binding IsManageReady}" OffContent="Off" OnContent="On" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <TextBlock Grid.Column="0" Text="Deep-fried chicken payload"
+                                               FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsDeepFriedEnabled, Mode=TwoWay}"
+                                                  IsEnabled="{Binding IsManageReady}" OffContent="Off" OnContent="On" />
+                                </Grid>
+                                <TextBlock Text="{Binding DeepFriedHintText}" FontSize="11" Foreground="#64748B" TextWrapping="Wrap" LineHeight="16" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Emulators: which API ReShade hooks. Auto keeps the catalogue's choice. -->
+                        <Border IsVisible="{Binding IsEmulatorApiVisible}"
+                                Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1"
+                                CornerRadius="16" Padding="16,13">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <StackPanel Grid.Column="0" Spacing="3">
+                                    <TextBlock Text="EMULATOR RESHADE API" FontSize="9.5" FontWeight="Bold"
+                                               Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                    <TextBlock Text="Auto picks what the emulator renders with; pin it if ReShade does not show up."
+                                               FontSize="10.5" Foreground="#94A3B8" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding EmulatorApiOptions}" MinWidth="150"
+                                          SelectedIndex="{Binding SelectedEmulatorApiIndex, Mode=TwoWay}"
+                                          IsEnabled="{Binding IsManageReady}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- The keys that open ReShade and OptiScaler's menu in game. -->
+                        <Border Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1"
+                                CornerRadius="16" Padding="16,13">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="HOTKEYS" FontSize="9.5" FontWeight="Bold"
+                                           Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <TextBlock Grid.Column="0" Text="ReShade opens with" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding ReShadeKeyOptions}" MinWidth="130"
+                                              SelectedItem="{Binding SelectedReShadeKey, Mode=TwoWay}" VerticalAlignment="Center" />
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <TextBlock Grid.Column="0" Text="OptiScaler's menu opens with" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding OptiMenuKeyOptions}" MinWidth="130"
+                                              SelectedItem="{Binding SelectedOptiMenuKey, Mode=TwoWay}" VerticalAlignment="Center" />
+                                </Grid>
+                                <TextBlock Text="{Binding KeysStatus}" FontSize="11" Foreground="#86EFAC" TextWrapping="Wrap" IsVisible="{Binding HasKeysStatus}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Rename the DLL an install hooks the game through. -->
+                        <Border IsVisible="{Binding HasRenamableProxy}"
+                                Background="#0CFFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1"
+                                CornerRadius="16" Padding="16,13">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="PROXY DLL" FontSize="9.5" FontWeight="Bold"
+                                           Foreground="#A3AEC0" LetterSpacing="0.8" />
+                                <TextBlock Text="{Binding CurrentProxyText}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <TextBox Grid.Column="0" Text="{Binding ProxyNameInput, Mode=TwoWay}" PlaceholderText="New name, e.g. winmm.dll" />
+                                    <Button Grid.Column="1" Classes="EmptyActionBtn" Content="Rename" Click="OnRenameProxyClicked" Padding="12,7" />
+                                </Grid>
+                                <TextBlock Text="{Binding ProxyRenameStatus}" FontSize="11" Foreground="#FDE68A" TextWrapping="Wrap" IsVisible="{Binding HasProxyRenameStatus}" />
                             </StackPanel>
                         </Border>
 
