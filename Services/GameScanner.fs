@@ -1200,6 +1200,9 @@ module GameScanner =
         SortMode: string
         /// Keep known creator tools in the library only when requested.
         ShowNonGameApps: bool
+        /// Scan for games when SUITE starts, stored as its opposite so a
+        /// settings file written before the switch existed reads as on.
+        NoScanOnStartup: bool
     }
 
     /// The orders the library can be shown in, in the order they appear in the
@@ -1232,7 +1235,8 @@ module GameScanner =
           OverlayTheme = "Neon Emerald"
           OverlayHotkey = "Shift+O"
           SortMode = sortModes.[0]
-          ShowNonGameApps = false }
+          ShowNonGameApps = false
+          NoScanOnStartup = false }
 
     /// Reads one settings file. Split out so the backup can be tried with
     /// exactly the same rules when the main file cannot be read.

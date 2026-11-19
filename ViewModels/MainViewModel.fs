@@ -384,6 +384,9 @@ type MainViewModel() as this =
     let mutable shaderGlassProgress = 0.0
     let mutable totalGamesCount = 0
     let mutable showNonGameApps = false
+    /// Scan for games when SUITE starts. On by default: that is what every
+    /// build before this switch did.
+    let mutable scanOnStartup = true
 
     /// The community section. Built with the window so the tab can switch to it
     /// instantly; it does not touch the network until the tab is opened.
@@ -931,6 +934,7 @@ type MainViewModel() as this =
         let settings = GameScanner.loadSettings ()
         isSidebarLayout <- settings.IsSidebarLayout
         showNonGameApps <- settings.ShowNonGameApps
+        scanOnStartup <- not settings.NoScanOnStartup
         selectedGeometricMotif <- settings.GeometricMotif
         applyAtmosphere settings.ColorAtmosphere
 
@@ -1010,7 +1014,8 @@ type MainViewModel() as this =
                   OverlayTheme = overlayTheme
                   OverlayHotkey = overlayHotkey
                   SortMode = sortMode
-                  ShowNonGameApps = showNonGameApps }
+                  ShowNonGameApps = showNonGameApps
+                  NoScanOnStartup = not scanOnStartup }
 
         // Discord: "Playing <game> with DLSS 5 SUITE" while a game SUITE put
         // DLSS 5 into is running. The install manifests already record which
@@ -1077,7 +1082,8 @@ type MainViewModel() as this =
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
-                      ShowNonGameApps = showNonGameApps })
+                      ShowNonGameApps = showNonGameApps
+                      NoScanOnStartup = not scanOnStartup })
 
             supportPromptTimer.Start()
 
@@ -1105,7 +1111,15 @@ type MainViewModel() as this =
             scanStatusText <- sprintf "%d Games Ready" cached.Length
             isScanning <- false
 
-        if firstRunOfThisBuild then
+        if not scanOnStartup then
+            // Scanning at start-up is switched off in Settings: the library is
+            // exactly the cached one until the user presses Rescan.
+            isScanning <- false
+            scanStatusText <-
+                if cached.Length > 0 then sprintf "%d Games Ready" cached.Length
+                else "Start-up scan is off - press Rescan to find your games"
+            if cached.Length > 0 then this.AnalyzePendingGames(cached)
+        elif firstRunOfThisBuild then
             // 2. Just updated: the cards above are shown straight away so the
             //    window is never blank, and the real scan replaces them.
             GameScanner.writeCacheVersion UpdateChecker.CurrentVersion
@@ -1246,7 +1260,8 @@ type MainViewModel() as this =
                           OverlayTheme = overlayTheme
                           OverlayHotkey = overlayHotkey
                           SortMode = sortMode
-                          ShowNonGameApps = showNonGameApps }
+                          ShowNonGameApps = showNonGameApps
+                          NoScanOnStartup = not scanOnStartup }
 
     member _.FilterOptions =
         [| "All games"; "Installed"; "Steam"; "Epic Games"; "GOG"; "Other" |]
@@ -1418,7 +1433,8 @@ type MainViewModel() as this =
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
-                      ShowNonGameApps = showNonGameApps }
+                      ShowNonGameApps = showNonGameApps
+                      NoScanOnStartup = not scanOnStartup }
 
     /// Shown translated, stored in English: `AtmosphereOption.Key` is the
     /// identity. The collection instance is stable for the life of the window.
@@ -1464,7 +1480,8 @@ type MainViewModel() as this =
                           OverlayTheme = overlayTheme
                           OverlayHotkey = overlayHotkey
                           SortMode = sortMode
-                          ShowNonGameApps = showNonGameApps }
+                          ShowNonGameApps = showNonGameApps
+                          NoScanOnStartup = not scanOnStartup }
 
     member this.SelectedColorAtmosphere
         with get () =
@@ -1503,7 +1520,8 @@ type MainViewModel() as this =
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
-                      ShowNonGameApps = showNonGameApps }
+                      ShowNonGameApps = showNonGameApps
+                      NoScanOnStartup = not scanOnStartup }
 
     // ---------------------------------------------------------------------
     // LANGUAGE
@@ -1557,7 +1575,8 @@ type MainViewModel() as this =
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
-                      ShowNonGameApps = showNonGameApps }
+                      ShowNonGameApps = showNonGameApps
+                      NoScanOnStartup = not scanOnStartup }
 
     /// "TOTAL GAMES: 42" in the current language.
     member this.TotalGamesText = loc.TotalGames(totalGamesCount)
@@ -1601,7 +1620,8 @@ type MainViewModel() as this =
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
-                      ShowNonGameApps = showNonGameApps }
+                      ShowNonGameApps = showNonGameApps
+                      NoScanOnStartup = not scanOnStartup }
 
     member this.IsOrbitalSpheresVisible = selectedGeometricMotif = "Orbital Spheres"
     member this.IsPrismAurorasVisible = selectedGeometricMotif = "Prism Auroras"
@@ -1630,7 +1650,8 @@ type MainViewModel() as this =
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
-                      ShowNonGameApps = showNonGameApps }
+                      ShowNonGameApps = showNonGameApps
+                      NoScanOnStartup = not scanOnStartup }
 
     member this.IsTopBarLayout = not isSidebarLayout
 
@@ -1878,7 +1899,8 @@ type MainViewModel() as this =
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
-                      ShowNonGameApps = showNonGameApps }
+                      ShowNonGameApps = showNonGameApps
+                      NoScanOnStartup = not scanOnStartup }
     /// Start with Windows: read from the shortcut itself every time, so one
     /// deleted by hand shows as off.
     member this.StartWithWindows
@@ -1888,6 +1910,13 @@ type MainViewModel() as this =
                 WindowsStartup.set value |> ignore
             this.RaisePropertyChanged("StartWithWindows")
 
+    /// Scan for games when SUITE starts. Off, the cached library loads and
+    /// nothing is read from the drives until Rescan.
+    member this.ScanOnStartup
+        with get () = scanOnStartup
+        and set value =
+            if this.SetProperty(&scanOnStartup, value) then
+                GameScanner.saveSettings { GameScanner.loadSettings () with NoScanOnStartup = not value }
     member this.AllGamesCount = totalGamesCount
     member this.HasGames = filteredGames.Count > 0
 
@@ -2446,7 +2475,8 @@ type MainViewModel() as this =
                       OverlayTheme = overlayTheme
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
-                      ShowNonGameApps = showNonGameApps }
+                      ShowNonGameApps = showNonGameApps
+                      NoScanOnStartup = not scanOnStartup }
 
     /// True while the open sheet will install through the AMD payload.
     member this.IsAmdRouteActive = isAmdMode && not isEmulatorTarget
@@ -2523,7 +2553,8 @@ type MainViewModel() as this =
               OverlayTheme = overlayTheme
               OverlayHotkey = overlayHotkey
               SortMode = sortMode
-              ShowNonGameApps = showNonGameApps }
+              ShowNonGameApps = showNonGameApps
+              NoScanOnStartup = not scanOnStartup }
 
     /// What the current sheet would install, so the manage sheet can say
     /// whether the overlay is coming along.

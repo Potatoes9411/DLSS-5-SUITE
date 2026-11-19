@@ -708,6 +708,27 @@
                                             </Grid>
                                         </Border>
 
+                                        <!-- Start-up scan -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1A38BDF8"
+                                                        BorderBrush="#3338BDF8" BorderThickness="1" VerticalAlignment="Center">
+                                                    <PathIcon Data="M 10,3 A 7,7 0 1 0 10,17 A 7,7 0 1 0 10,3 Z M 15,15 L 21,21"
+                                                              Width="14" Height="14" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="Scan for games when SUITE starts" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                    <TextBlock Text="Off, SUITE opens on the library it already knows and only scans when you press Rescan."
+                                                               FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                                </StackPanel>
+
+                                                <ToggleSwitch Grid.Column="2" IsChecked="{Binding ScanOnStartup, Mode=TwoWay}"
+                                                              OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+
                                         <!-- Discord Rich Presence -->
                                         <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
                                                 Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
