@@ -1879,6 +1879,15 @@ type MainViewModel() as this =
                       OverlayHotkey = overlayHotkey
                       SortMode = sortMode
                       ShowNonGameApps = showNonGameApps }
+    /// Start with Windows: read from the shortcut itself every time, so one
+    /// deleted by hand shows as off.
+    member this.StartWithWindows
+        with get () = WindowsStartup.isEnabled ()
+        and set (value: bool) =
+            if WindowsStartup.isEnabled () <> value then
+                WindowsStartup.set value |> ignore
+            this.RaisePropertyChanged("StartWithWindows")
+
     member this.AllGamesCount = totalGamesCount
     member this.HasGames = filteredGames.Count > 0
 

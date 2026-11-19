@@ -20,6 +20,7 @@
     <Compile Include="DlssgVersionsTests.fs" />
     <Compile Include="InstallerMergeTests.fs" />
     <Compile Include="AdvancedInstallTests.fs" />
+    <Compile Include="WindowsStartupTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

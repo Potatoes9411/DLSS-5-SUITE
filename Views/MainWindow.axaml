@@ -687,6 +687,27 @@
                                             </Grid>
                                         </Border>
 
+                                        <!-- Start with Windows: a shortcut in shell:startup, no registry. -->
+                                        <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
+                                                Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="11">
+                                                <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9" Background="#1A34D399"
+                                                        BorderBrush="#3334D399" BorderThickness="1" VerticalAlignment="Center">
+                                                    <PathIcon Data="M 3,5 L 11,4 V 11 H 3 Z M 13,3.8 L 21,3 V 11 H 13 Z M 3,13 H 11 V 20 L 3,19 Z M 13,13 H 21 V 21 L 13,20.2 Z"
+                                                              Width="14" Height="14" Foreground="#34D399" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="Start with Windows" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                    <TextBlock Text="Opens DLSS 5 SUITE minimized when you sign in to Windows, from a shortcut in your Startup folder."
+                                                               FontSize="11" Foreground="#A3AEC0" TextWrapping="Wrap" />
+                                                </StackPanel>
+
+                                                <ToggleSwitch Grid.Column="2" IsChecked="{Binding StartWithWindows, Mode=TwoWay}"
+                                                              OnContent="" OffContent="" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+
                                         <!-- Discord Rich Presence -->
                                         <Border Background="#5C121619" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="14"
                                                 Padding="14,11" IsVisible="{Binding ShowPerformanceCard}">

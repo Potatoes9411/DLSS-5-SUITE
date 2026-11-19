@@ -28,6 +28,12 @@ type App() =
             let window = MainWindow(DataContext = vm)
             vm.ScreenEngine.ControlsRequested.Add(fun () ->
                 Avalonia.Threading.Dispatcher.UIThread.Post(fun () -> window.ToggleScreenEngineOverlay()))
+            // Started by the Start with Windows shortcut: come up minimized,
+            // and keep that shortcut pointing at this executable.
+            if DLSS_5_MANAGER.Services.WindowsStartup.launchedAtStartup desktop.Args then
+                window.WindowState <- Avalonia.Controls.WindowState.Minimized
+            System.Threading.Tasks.Task.Run(fun () ->
+                try DLSS_5_MANAGER.Services.WindowsStartup.refresh () with _ -> ()) |> ignore
             desktop.MainWindow <- window
         | _ -> ()
 
