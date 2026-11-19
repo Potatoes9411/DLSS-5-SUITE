@@ -286,6 +286,32 @@ type DriveStat =
 /// from file metadata on a background-mode thread, compact.exe runs at idle
 /// priority, a squish pauses itself while a game from the library is
 /// running, and the hourly check walks one game at a time with gaps between.
+/// One line on the CLEAN UP tab: a kind of SUITE clutter, its size and
+/// exactly which files it is, ticked or not.
+type CleanRowViewModel(item: SuiteCleaner.CleanItem, changed: unit -> unit) =
+    inherit ViewModelBase()
+
+    let mutable selected = item.DefaultOn
+
+    member _.Item = item
+    member _.Label = item.Label
+    member _.Detail = item.Detail
+    member _.SizeText = SuiteCleaner.formatBytes item.Bytes
+    member _.CountText =
+        match item.Paths.Length with
+        | 1 -> "1 item"
+        | n -> sprintf "%d items" n
+
+    /// Every path that would go, for the tooltip - shown before anything is removed.
+    member _.PathsTip =
+        let shown = item.Paths |> List.truncate 15
+        let more = if item.Paths.Length > 15 then sprintf "%s... and %d more" Environment.NewLine (item.Paths.Length - 15) else ""
+        "Will be removed:" + Environment.NewLine + String.Join(Environment.NewLine, shown) + more
+
+    member this.IsSelected
+        with get () = selected
+        and set value =
+            if this.SetProperty(&selected, value) then changed ()
 type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as this =
     inherit ViewModelBase()
 
@@ -299,6 +325,11 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     let mutable search = ""
     let mutable sortIndex = 0
     let mutable appsScanned = false
+    /// The CLEAN UP tab: SUITE's own clutter, measured when the tab opens.
+    let cleanRows = ObservableCollection<CleanRowViewModel>()
+    let mutable cleanBusy = false
+    let mutable cleanStatus = ""
+    let mutable cleanNote = ""
     let mutable notice = ""
     let mutable selected: StorageRowViewModel option = None
     let mutable job: Job option = None
@@ -750,18 +781,78 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
     member _.IsGamesView = view = "games"
     member _.IsAppsView = view = "apps"
     member _.IsStatsView = view = "stats"
-    member _.IsListView = view <> "stats"
+    member _.IsListView = view = "games" || view = "apps"
+    member _.IsCleanView = view = "clean"
+
+    // ---- CLEAN UP: SUITE's own caches, old downloads and logs ----
+    member _.CleanRows = cleanRows
+    member _.HasCleanRows = cleanRows.Count > 0
+    member _.IsCleanBusy = cleanBusy
+    member _.CleanStatus = cleanStatus
+
+    member _.CleanSelectedBytes =
+        cleanRows |> Seq.filter (fun r -> r.IsSelected) |> Seq.sumBy (fun r -> r.Item.Bytes)
+
+    member this.CleanButtonText =
+        let b = this.CleanSelectedBytes
+        if b = 0L then "NOTHING SELECTED" else "CLEAN UP " + SuiteCleaner.formatBytes b
+
+    member this.CanClean = not cleanBusy && this.CleanSelectedBytes > 0L
+
+    member private this.RaiseClean() =
+        for p in [ "HasCleanRows"; "IsCleanBusy"; "CleanStatus"; "CleanSelectedBytes"; "CleanButtonText"; "CanClean" ] do
+            this.RaisePropertyChanged(p)
+
+    /// Measures what could go. Nothing is removed here.
+    member this.ScanCleanup() =
+        if not cleanBusy then
+            cleanBusy <- true
+            cleanStatus <- "Measuring SUITE's own data..."
+            this.RaiseClean()
+
+            Task.Run(fun () -> try SuiteCleaner.find () with _ -> [])
+                .ContinueWith(fun (t: Task<SuiteCleaner.CleanItem list>) ->
+                    Dispatcher.UIThread.Post(fun () ->
+                        cleanRows.Clear()
+                        for item in t.Result do
+                            cleanRows.Add(CleanRowViewModel(item, (fun () -> this.RaiseClean())))
+                        cleanBusy <- false
+                        cleanStatus <-
+                            cleanNote
+                            + (if cleanRows.Count = 0 then "Nothing to clean - SUITE's data is tidy."
+                               else "Hover a line to see exactly what it removes. Game files are never touched.")
+                        this.RaiseClean()))
+            |> ignore
+
+    /// Removes the ticked lines, then measures again.
+    member this.CleanSelected() =
+        let picked = cleanRows |> Seq.filter (fun r -> r.IsSelected) |> Seq.map (fun r -> r.Item) |> List.ofSeq
+        if not cleanBusy && not picked.IsEmpty then
+            cleanBusy <- true
+            cleanStatus <- "Cleaning up..."
+            this.RaiseClean()
+
+            Task.Run(fun () -> try SuiteCleaner.clean picked with _ -> 0L)
+                .ContinueWith(fun (t: Task<int64>) ->
+                    Dispatcher.UIThread.Post(fun () ->
+                        cleanBusy <- false
+                        cleanNote <- "Freed " + SuiteCleaner.formatBytes t.Result + ". "
+                        this.ScanCleanup()))
+            |> ignore
 
     /// Switches between the games, the apps and the statistics.
     member this.ShowView(name: string) =
         if name <> view then
             view <- name
-            for p in [ "IsGamesView"; "IsAppsView"; "IsStatsView"; "IsListView"; "BatchText" ] do
+            for p in [ "IsGamesView"; "IsAppsView"; "IsStatsView"; "IsListView"; "IsCleanView"; "BatchText" ] do
                 this.RaisePropertyChanged(p)
             if name = "apps" && not appsScanned then this.ScanApps()
             this.Refilter()
             if name = "stats" then this.RefreshStats()
-            this.MeasureUnknown()
+            if name = "clean" then
+                cleanNote <- ""
+                this.ScanCleanup()
+            elif name <> "stats" then this.MeasureUnknown()
 
     member this.SearchText
         with get () = search
@@ -806,7 +897,7 @@ type SpacePressViewModel(library: ObservableCollection<GameCardViewModel>) as th
         for r in shown do visibleRows.Add(r)
         this.RaisePropertyChanged("HasNoRows")
 
-    member _.HasNoRows = visibleRows.Count = 0
+    member _.HasNoRows = visibleRows.Count = 0 && (view = "games" || view = "apps")
 
     /// Reads the installed programs once, off the UI thread.
     member private this.ScanApps() =

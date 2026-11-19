@@ -22,6 +22,7 @@
     <Compile Include="AdvancedInstallTests.fs" />
     <Compile Include="WindowsStartupTests.fs" />
     <Compile Include="BackgroundStoreTests.fs" />
+    <Compile Include="SuiteCleanerTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2164,6 +2164,8 @@
                                                 <Button Classes="SegmentedTab" Classes.Active="{Binding IsGamesView}" Tag="games" Click="OnSpacePressTabClicked" Content="GAMES" />
                                                 <Button Classes="SegmentedTab" Classes.Active="{Binding IsAppsView}" Tag="apps" Click="OnSpacePressTabClicked" Content="APPS" />
                                                 <Button Classes="SegmentedTab" Classes.Active="{Binding IsStatsView}" Tag="stats" Click="OnSpacePressTabClicked" Content="STATISTICS" />
+                                                <Button Classes="SegmentedTab" Classes.Active="{Binding IsCleanView}" Tag="clean" Click="OnSpacePressTabClicked" Content="CLEAN UP"
+                                                        ToolTip.Tip="SUITE's own caches, old downloads and logs. Never game files." />
                                             </StackPanel>
                                         </Border>
                                         <TextBox Grid.Column="1" Text="{Binding SearchText, Mode=TwoWay}" PlaceholderText="Search..." IsVisible="{Binding IsListView}" Width="300" MinHeight="36" VerticalContentAlignment="Center"
@@ -2278,6 +2280,54 @@
                                     </ItemsControl>
                                 </ScrollViewer>
 
+                                <!-- CLEAN UP: SUITE's own clutter. Every line shows its size, and its
+                                     tooltip lists exactly what goes, before anything is removed. -->
+                                <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding IsCleanView}">
+                                    <StackPanel Spacing="12">
+                                        <Border Background="#66101418" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="16" Padding="18,14">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                                <StackPanel Spacing="4" VerticalAlignment="Center">
+                                                    <TextBlock Text="SUITE'S OWN DATA" FontSize="10" FontWeight="Bold" Foreground="#94A3B8" LetterSpacing="0.6" />
+                                                    <TextBlock Text="{Binding CleanStatus}" FontSize="12" Foreground="#CBD5E1" TextWrapping="Wrap" />
+                                                    <TextBlock Text="Install records, backups, mod files and anything holding a DLSS 5 model are never offered."
+                                                               FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="AppleSecondaryBtn" Click="OnSpacePressCleanRescanClicked" Cursor="Hand" Padding="14,8"
+                                                        IsEnabled="{Binding !IsCleanBusy}" VerticalAlignment="Center">
+                                                    <TextBlock Text="MEASURE AGAIN" FontSize="11" FontWeight="Bold" Foreground="#E2E8F0" />
+                                                </Button>
+                                                <Button Grid.Column="2" Classes="ApplePrimaryBtn" Click="OnSpacePressCleanClicked" Cursor="Hand" Padding="16,8"
+                                                        IsEnabled="{Binding CanClean}" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding CleanButtonText}" FontSize="11" FontWeight="Bold" Foreground="#F5F5F7" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                        <ItemsControl ItemsSource="{Binding CleanRows}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Spacing="6" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:CleanRowViewModel">
+                                                    <Border Background="#5C121619" BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="12" Padding="14,10"
+                                                            ToolTip.Tip="{Binding PathsTip}">
+                                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="14">
+                                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding Label}" FontSize="13.5" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                                                <TextBlock Text="{Binding Detail}" FontSize="11" Foreground="#94A3B8" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="2" Text="{Binding CountText}" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="3" Text="{Binding SizeText}" Width="80" TextAlignment="Right" FontSize="14" FontWeight="Bold"
+                                                                       Foreground="#F5F5F7" VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </ScrollViewer>
                                 <!-- Statistics: what squishing has done, per drive and per game -->
                                 <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding IsStatsView}">
                                     <StackPanel Spacing="12">

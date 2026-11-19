@@ -859,6 +859,8 @@ type MainWindow() as this =
         | _ -> ()
 
     member this.OnSpacePressSquishClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.SquishSelected())
+    member this.OnSpacePressCleanClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.CleanSelected())
+    member this.OnSpacePressCleanRescanClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.ScanCleanup())
     member this.OnSpacePressUnsquishClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.UnsquishSelected())
     member this.OnSpacePressPauseClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.PauseOrResume())
     member this.OnSpacePressStopClicked(sender: obj, e: RoutedEventArgs) = this.WithSpacePress(fun sp -> sp.StopJob())
