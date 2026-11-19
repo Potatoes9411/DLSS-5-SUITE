@@ -1582,6 +1582,16 @@ type MainWindow() as this =
         | :? MainViewModel as vm -> vm.ScreenEngine.Apply()
         | _ -> ()
 
+    member this.OnRobloxShadeHostStartClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.StartRobloxShadeHost()
+        | _ -> ()
+
+    member this.OnRobloxShadeHostStopClicked(sender: obj, e: RoutedEventArgs) =
+        match this.DataContext with
+        | :? MainViewModel as vm -> vm.ScreenEngine.StopRobloxShadeHost()
+        | _ -> ()
+
     member this.OnScreenEngineStopClicked(sender: obj, e: RoutedEventArgs) =
         match this.DataContext with
         | :? MainViewModel as vm -> vm.ScreenEngine.Stop()

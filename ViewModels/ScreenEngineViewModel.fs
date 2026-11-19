@@ -32,7 +32,12 @@ type ScreenEngineViewModel() as this =
         if savedMethod = "neuralscreen" && canNeuralScreen then true
         elif savedMethod = "engine" && canScreenEngine then false
         else not canScreenEngine && canNeuralScreen
-    let mutable useRobloxShadeHost = savedMethod = "robloxshadehost" && RobloxShadeHost.isAvailable ()
+    // RobloxShadeHost is Roblox's own method now, started from its card in
+    // Settings rather than chosen here, so this page never selects it.
+    let mutable useRobloxShadeHost = false
+    let mutable robloxStatus =
+        if RobloxShadeHost.isAvailable () then "Ready. Start it, then open Roblox; it waits until Roblox is available."
+        else "RobloxShadeHost is not included in this SUITE build."
     let mutable settings = load ()
     let mutable extras = NeuralScreen.loadExtras ()
     /// The game whose own settings are in use, as (library id, title); None
@@ -128,7 +133,11 @@ type ScreenEngineViewModel() as this =
                 this.RaisePropertyChanged("CanStart"))
         host.StateChanged.Add onState
         nsHost.StateChanged.Add onState
-        robloxHost.StateChanged.Add onState
+        robloxHost.StateChanged.Add(fun message ->
+            Dispatcher.UIThread.Post(fun () ->
+                robloxStatus <- message
+                for n in [ "RobloxShadeHostStatus"; "IsRobloxShadeHostRunning"; "CanStartRobloxShadeHost" ] do
+                    this.RaisePropertyChanged(n)))
         nsHost.RecordingChanged.Add(fun active ->
             Dispatcher.UIThread.Post(fun () ->
                 isRecording <- active
@@ -163,6 +172,26 @@ type ScreenEngineViewModel() as this =
         | NeuralScreen.Rtx20 -> "RTX 20 series cards cannot run the DLSS 5 model, with either method."
         | NeuralScreen.NoRtx -> "DLSS 5 needs an NVIDIA RTX 30, 40 or 50 series card."
         | _ -> "NeuralScreen is a separate download. Install the add-on to use it."
+
+    // ----- RobloxShadeHost, Roblox's own card -----
+    member _.RobloxShadeHostStatus = robloxStatus
+    member _.IsRobloxShadeHostRunning = robloxHost.IsRunning
+    member _.CanStartRobloxShadeHost = RobloxShadeHost.isAvailable () && not robloxHost.IsRunning
+
+    /// Starts the host beside Roblox. It captures the screen as the Screen
+    /// Engine does, so it takes the screen overlay's turn and stops that first.
+    member this.StartRobloxShadeHost() =
+        if this.IsRunning && not robloxHost.IsRunning then this.Stop()
+        OverlayArbiter.claim "screen" |> ignore
+        if not (robloxHost.Start()) && not robloxHost.IsRunning then
+            robloxStatus <- "RobloxShadeHost is not included in this SUITE build."
+        for n in [ "RobloxShadeHostStatus"; "IsRobloxShadeHostRunning"; "CanStartRobloxShadeHost"; "IsRunning"; "CanStart" ] do
+            this.RaisePropertyChanged(n)
+
+    member this.StopRobloxShadeHost() =
+        robloxHost.Stop()
+        for n in [ "RobloxShadeHostStatus"; "IsRobloxShadeHostRunning"; "CanStartRobloxShadeHost"; "IsRunning"; "CanStart" ] do
+            this.RaisePropertyChanged(n)
 
     member _.RobloxShadeHostTip =
         if RobloxShadeHost.isAvailable () then

@@ -46,6 +46,7 @@ The Screen Engine and Motion Forge now share every generator:
 - **Restore original cover** after picking your own.
 - The window reopens where you last closed it.
 - Settings' back button returns to the page you came from.
+- **RobloxShadeHost** now has its own Roblox card in Settings, beside ShaderGlass and Lossless Scaling, instead of a tab in the Screen Engine window.
 
 ## Fixes
 

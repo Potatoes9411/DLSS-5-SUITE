@@ -1312,6 +1312,18 @@
                                         <TextBlock Text="Security: only the exact official v1.3.0 executable is allowed. MV 2.7 and eurotrucks2.exe are not used."
                                                    TextWrapping="Wrap" Foreground="#86EFAC" FontSize="11" />
                                         <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
+                                        <StackPanel Spacing="8" DataContext="{Binding ScreenEngine}">
+                                            <TextBlock Text="Roblox · RobloxShadeHost" FontSize="13.5" FontWeight="SemiBold" Foreground="White" />
+                                            <TextBlock Text="{Binding RobloxShadeHostStatus}" TextWrapping="Wrap" Foreground="#CBD5E1" FontSize="12" />
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <Button Content="Start RobloxShadeHost" Click="OnRobloxShadeHostStartClicked" IsVisible="{Binding !IsRobloxShadeHostRunning}"
+                                                        IsEnabled="{Binding CanStartRobloxShadeHost}" />
+                                                <Button Content="Stop" Click="OnRobloxShadeHostStopClicked" IsVisible="{Binding IsRobloxShadeHostRunning}" />
+                                            </StackPanel>
+                                            <TextBlock Text="Watches the Roblox window through Windows Graphics Capture and runs ReShade beside it. Nothing is installed into Roblox's folder. It stops the Screen Engine while it runs."
+                                                       TextWrapping="Wrap" Foreground="#A3AEC0" FontSize="11" />
+                                        </StackPanel>
+                                        <Border Height="1" Background="#24FFFFFF" Margin="0,3" />
                                         <TextBlock Text="Lossless Scaling · automated two-display setup" FontSize="13.5" FontWeight="SemiBold" Foreground="White" />
                                         <TextBlock Text="{Binding LosslessScalingStatus}" TextWrapping="Wrap" Foreground="#CBD5E1" FontSize="12" />
                                         <ProgressBar Minimum="0" Maximum="100" Value="{Binding LosslessScalingProgress}" Height="6"
